@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     VERSION: str = "0.1.0"
 
     DATABASE_URL: str
+    DB_POOL_SIZE: int = 10
+    DB_MAX_OVERFLOW: int = 10
     REDIS_URL: str
 
     JWT_SECRET: str

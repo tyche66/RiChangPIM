@@ -58,4 +58,5 @@ cleanup
 
 echo "[entrypoint] 启动服务 ..."
 # exec 使 uvicorn 接管 PID 1，正确接收并转发 SIGTERM/SIGINT 等信号。
-exec uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8000}"
+exec uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8000}" \
+  --workers "${UVICORN_WORKERS:-2}" --no-access-log

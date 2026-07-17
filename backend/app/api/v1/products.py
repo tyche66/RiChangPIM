@@ -6,7 +6,7 @@ import pandas as pd
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import joinedload, selectinload
 
 from app.core.database import get_db
 from app.core.permission import PermissionChecker
@@ -46,9 +46,9 @@ async def list_products(
 ):
     query = select(Product).options(
         selectinload(Product.tags),
-        selectinload(Product.brand),
-        selectinload(Product.supplier),
-        selectinload(Product.category),
+        joinedload(Product.brand),
+        joinedload(Product.supplier),
+        joinedload(Product.category),
     ).where(Product.is_deleted.is_(False))
 
     if category_id:
@@ -93,7 +93,7 @@ async def list_products(
     query = query.offset((page - 1) * size).limit(size)
     result = await db.execute(query)
     products = result.scalars().all()
-    items = [_product_response(p) for p in products]
+    items = [_product_list_response(p) for p in products]
     role_code = getattr(request.state, "role_code", None) or "sales"
     items = filter_sensitive_fields(items, role_code)
     return {
@@ -176,9 +176,9 @@ async def get_product(
         select(Product)
         .options(
             selectinload(Product.tags),
-            selectinload(Product.brand),
-            selectinload(Product.supplier),
-            selectinload(Product.category),
+            joinedload(Product.brand),
+            joinedload(Product.supplier),
+            joinedload(Product.category),
         )
         .where(Product.id == product_id, Product.is_deleted.is_(False))
     )
@@ -198,6 +198,34 @@ def _product_response(product: Product) -> dict:
     body["tags"] = [tag.tag_name for tag in product.tags]
     body["tag_ids"] = [str(tag.id) for tag in product.tags]
     return body
+
+
+def _product_list_response(product: Product) -> dict:
+    return {
+        "id": str(product.id),
+        "product_no": product.product_no,
+        "product_name": product.product_name,
+        "brand_id": str(product.brand_id),
+        "supplier_id": str(product.supplier_id),
+        "category_id": str(product.category_id),
+        "face_price": product.face_price,
+        "cost_price": product.cost_price,
+        "material": product.material,
+        "stock_status": product.stock_status,
+        "status": product.status,
+        "description": product.description,
+        "specification": product.specification,
+        "colors": product.colors,
+        "data_source": product.data_source,
+        "completeness_status": product.completeness_status,
+        "create_time": product.create_time.isoformat(),
+        "update_time": product.update_time.isoformat(),
+        "brand_name": product.brand.brand_name if product.brand else None,
+        "supplier_name": product.supplier.supplier_name if product.supplier else None,
+        "category_name": product.category.category_name if product.category else None,
+        "tags": [tag.tag_name for tag in product.tags],
+        "tag_ids": [str(tag.id) for tag in product.tags],
+    }
 
 
 @router.post(
