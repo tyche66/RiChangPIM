@@ -7,68 +7,70 @@
         </div>
       </template>
 
-      <el-table
-        v-loading="loading"
-        :data="shares"
-        border
-        stripe
-      >
-        <el-table-column
-          prop="id"
-          label="分享ID"
-          width="240"
-        />
-        <el-table-column
-          prop="share_type"
-          label="分享类型"
-          width="120"
+      <div class="table-responsive">
+        <el-table
+          v-loading="loading"
+          :data="shares"
+          border
+          stripe
         >
-          <template #default="{ row }">
-            <el-tag>{{ row.share_type === 'proposal' ? '方案' : '报价单' }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column
-          prop="target_id"
-          label="目标ID"
-          width="240"
-        />
-        <el-table-column
-          prop="status"
-          label="状态"
-          width="100"
-        >
-          <template #default="{ row }">
-            <el-tag :type="row.status === 'active' ? 'success' : row.status === 'disabled' ? 'danger' : 'info'">
-              {{ row.status }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column
-          prop="create_time"
-          label="创建时间"
-          width="170"
-        >
-          <template #default="{ row }">
-            {{ formatDate(row.create_time) }}
-          </template>
-        </el-table-column>
-        <el-table-column
-          label="操作"
-          width="120"
-          fixed="right"
-        >
-          <template #default="{ row }">
-            <el-button
-              v-if="hasPerm('share:delete') && row.status === 'active'"
-              size="small"
-              type="danger"
-              @click="handleRevoke(row)"
-            >
-              撤销
-            </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+          <el-table-column
+            prop="id"
+            label="分享ID"
+            width="240"
+          />
+          <el-table-column
+            prop="share_type"
+            label="分享类型"
+            width="120"
+          >
+            <template #default="{ row }">
+              <el-tag>{{ row.share_type === 'proposal' ? '方案' : '报价单' }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column
+            prop="target_id"
+            label="目标ID"
+            width="240"
+          />
+          <el-table-column
+            prop="status"
+            label="状态"
+            width="100"
+          >
+            <template #default="{ row }">
+              <el-tag :type="row.status === 'active' ? 'success' : row.status === 'disabled' ? 'danger' : 'info'">
+                {{ row.status }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column
+            prop="create_time"
+            label="创建时间"
+            width="170"
+          >
+            <template #default="{ row }">
+              {{ formatDate(row.create_time) }}
+            </template>
+          </el-table-column>
+          <el-table-column
+            label="操作"
+            width="120"
+            fixed="right"
+          >
+            <template #default="{ row }">
+              <el-button
+                v-if="hasPerm('share:delete') && row.status === 'active'"
+                size="small"
+                type="danger"
+                @click="handleRevoke(row)"
+              >
+                撤销
+              </el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
     </el-card>
   </div>
 </template>
@@ -123,9 +125,60 @@ onMounted(fetchShares)
 </script>
 
 <style scoped>
+.share-management-page {
+  min-height: 100vh;
+  background: #f0f0f0;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+.share-management-page :deep(.el-card) {
+  background: rgba(255, 255, 255, 0.68);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 4px 32px rgba(30, 50, 90, 0.06);
+}
+
+.share-management-page :deep(.el-card__body) {
+  padding: 24px;
+}
+
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.card-header :deep(span) {
+  font-size: 20px;
+  font-weight: 600;
+  color: rgb(30, 50, 90);
+  letter-spacing: 0.3px;
+}
+
+.table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 12px;
+}
+
+.table-responsive :deep(.el-table) {
+  min-width: 700px;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+@media (max-width: 768px) {
+  .share-management-page {
+    padding: 12px;
+  }
+  .share-management-page :deep(.el-card__body) {
+    padding: 16px;
+  }
+  .card-header :deep(span) {
+    font-size: 18px;
+  }
 }
 </style>

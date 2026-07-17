@@ -217,22 +217,49 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.import-page {
+  min-height: 100vh;
+  background: #f0f0f0;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+.import-page :deep(.el-card) {
+  background: rgba(255, 255, 255, 0.68);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 4px 32px rgba(30, 50, 90, 0.06);
+}
+
+.import-page :deep(.el-card__body) {
+  padding: 24px;
+}
+
 .toolbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 16px;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 12px;
 }
 
 .toolbar h2 {
   margin: 0;
-  font-size: 18px;
+  font-size: 20px;
+  font-weight: 600;
+  color: rgb(30, 50, 90);
+  letter-spacing: 0.3px;
 }
 
 .import-form {
   margin-bottom: 16px;
+}
+
+.import-form :deep(.el-button) {
+  border-radius: 20px;
 }
 
 .upload-area {
@@ -246,11 +273,26 @@ onMounted(() => {
   max-width: 600px;
 }
 
+.upload-dropzone :deep(.el-upload-dragger) {
+  border-radius: 20px;
+  border: 2px dashed rgba(30, 50, 90, 0.2);
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.upload-dropzone :deep(.el-upload-dragger:hover) {
+  border-color: rgb(30, 50, 90);
+  background: rgba(30, 50, 90, 0.03);
+}
+
 .import-actions {
   display: flex;
   justify-content: center;
   gap: 12px;
   margin: 24px 0;
+}
+
+.import-actions :deep(.el-button) {
+  border-radius: 20px;
 }
 
 .import-result {
@@ -263,6 +305,19 @@ onMounted(() => {
 
 .failures-table h4 {
   margin: 0 0 12px 0;
-  color: #303133;
+  color: #5E6470;
+  font-weight: 600;
+}
+
+@media (max-width: 768px) {
+  .import-page {
+    padding: 12px;
+  }
+  .import-page :deep(.el-card__body) {
+    padding: 16px;
+  }
+  .toolbar h2 {
+    font-size: 18px;
+  }
 }
 </style>

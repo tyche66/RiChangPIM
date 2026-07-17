@@ -12,75 +12,77 @@
         </el-button>
       </div>
 
-      <el-table
-        v-loading="loading"
-        :data="suppliers"
-        border
-        stripe
-      >
-        <el-table-column
-          prop="supplierName"
-          label="供应商名称"
-          min-width="200"
-        />
-        <el-table-column
-          prop="contact"
-          label="联系人"
-          width="120"
-        />
-        <el-table-column
-          prop="phone"
-          label="联系电话"
-          width="140"
-        />
-        <el-table-column
-          prop="cooperationStatus"
-          label="合作状态"
-          width="100"
-          align="center"
+      <div class="table-responsive">
+        <el-table
+          v-loading="loading"
+          :data="suppliers"
+          border
+          stripe
         >
-          <template #default="{ row }">
-            <el-tag
-              :type="row.cooperationStatus === 'active' ? 'success' : row.cooperationStatus === 'suspended' ? 'warning' : 'danger'"
-              size="small"
-            >
-              {{ cooperationStatusMap[row.cooperationStatus] || row.cooperationStatus }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column
-          prop="createTime"
-          label="创建时间"
-          width="160"
-        >
-          <template #default="{ row }">
-            {{ formatDate(row.createTime) }}
-          </template>
-        </el-table-column>
-        <el-table-column
-          label="操作"
-          width="160"
-          align="center"
-        >
-          <template #default="{ row }">
-            <el-button
-              v-if="canEdit"
-              size="small"
-              @click="handleEdit(row)"
-            >
-              编辑
-            </el-button>
-            <el-button
-              v-if="canDelete"
-              size="small"
-              type="danger"
-              @click="handleDelete(row)"
-            >
-              删除
-            </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+          <el-table-column
+            prop="supplierName"
+            label="供应商名称"
+            min-width="200"
+          />
+          <el-table-column
+            prop="contact"
+            label="联系人"
+            width="120"
+          />
+          <el-table-column
+            prop="phone"
+            label="联系电话"
+            width="140"
+          />
+          <el-table-column
+            prop="cooperationStatus"
+            label="合作状态"
+            width="100"
+            align="center"
+          >
+            <template #default="{ row }">
+              <el-tag
+                :type="row.cooperationStatus === 'active' ? 'success' : row.cooperationStatus === 'suspended' ? 'warning' : 'danger'"
+                size="small"
+              >
+                {{ cooperationStatusMap[row.cooperationStatus] || row.cooperationStatus }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column
+            prop="createTime"
+            label="创建时间"
+            width="160"
+          >
+            <template #default="{ row }">
+              {{ formatDate(row.createTime) }}
+            </template>
+          </el-table-column>
+          <el-table-column
+            label="操作"
+            width="160"
+            align="center"
+          >
+            <template #default="{ row }">
+              <el-button
+                v-if="canEdit"
+                size="small"
+                @click="handleEdit(row)"
+              >
+                编辑
+              </el-button>
+              <el-button
+                v-if="canDelete"
+                size="small"
+                type="danger"
+                @click="handleDelete(row)"
+              >
+                删除
+              </el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
 
       <div
         v-if="!loading && suppliers.length === 0"
@@ -279,23 +281,87 @@ onMounted(fetchSuppliers)
 </script>
 
 <style scoped>
+.suppliers-page {
+  min-height: 100vh;
+  background: #f0f0f0;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+.suppliers-page :deep(.el-card) {
+  background: rgba(255, 255, 255, 0.68);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 4px 32px rgba(30, 50, 90, 0.06);
+}
+
+.suppliers-page :deep(.el-card__body) {
+  padding: 24px;
+}
+
 .toolbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 12px;
 }
 
 .toolbar h2 {
   margin: 0;
-  font-size: 18px;
+  font-size: 20px;
+  font-weight: 600;
+  color: rgb(30, 50, 90);
+  letter-spacing: 0.3px;
+}
+
+.toolbar :deep(.el-button) {
+  border-radius: 20px;
+}
+
+.table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 12px;
+}
+
+.table-responsive :deep(.el-table) {
+  min-width: 700px;
+  border-radius: 12px;
+  overflow: hidden;
 }
 
 .empty-state {
   display: flex;
   justify-content: center;
-  padding: 40px 0;
+  padding: 48px 0;
+}
+
+:global(.el-dialog) {
+  border-radius: 24px;
+  overflow: hidden;
+}
+
+@media (max-width: 768px) {
+  .suppliers-page {
+    padding: 12px;
+  }
+  .suppliers-page :deep(.el-card__body) {
+    padding: 16px;
+  }
+  .toolbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .toolbar h2 {
+    font-size: 18px;
+  }
+  :global(.el-dialog) {
+    width: 95vw !important;
+    max-width: 95vw !important;
+  }
 }
 </style>

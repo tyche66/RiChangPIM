@@ -3,11 +3,12 @@
     <el-card
       v-if="loading"
       v-loading="loading"
+      class="glass-card skeleton-card"
       style="min-height: 200px;"
     />
     <el-card
       v-else-if="!product"
-      class="not-found"
+      class="glass-card not-found"
     >
       <el-result
         icon="error"
@@ -17,6 +18,7 @@
         <template #extra>
           <el-button
             type="primary"
+            class="capsule-btn capsule-btn-primary"
             @click="$router.push('/products')"
           >
             返回产品列表
@@ -24,7 +26,10 @@
         </template>
       </el-result>
     </el-card>
-    <el-card v-else>
+    <el-card
+      v-else
+      class="glass-card"
+    >
       <template #header>
         <div class="detail-header">
           <div class="detail-title">
@@ -36,6 +41,7 @@
               v-if="product.status"
               :type="product.status === 'active' ? 'success' : product.status === 'draft' ? 'info' : 'danger'"
               size="large"
+              class="capsule-tag-lg"
             >
               {{ statusMap[product.status] || product.status }}
             </el-tag>
@@ -43,25 +49,28 @@
               v-if="product.stockStatus"
               :type="product.stockStatus === 'in_stock' ? 'success' : product.stockStatus === 'out_of_stock' ? 'danger' : product.stockStatus === 'unknown' ? 'info' : 'warning'"
               size="large"
-              style="margin-left: 8px"
+              class="capsule-tag-lg"
             >
               {{ stockStatusMap[product.stockStatus] || product.stockStatus }}
             </el-tag>
             <el-button
               v-if="canEdit"
               type="primary"
+              class="capsule-btn capsule-btn-primary"
               @click="editMode = !editMode"
             >
               {{ editMode ? '取消编辑' : '编辑' }}
             </el-button>
             <el-button
               v-if="canChangeStatus"
+              class="capsule-btn"
               @click="showStatusDialog = true"
             >
               改状态
             </el-button>
             <el-button
               v-if="canClone"
+              class="capsule-btn"
               @click="handleClone"
             >
               克隆
@@ -69,11 +78,15 @@
             <el-button
               v-if="canDelete"
               type="danger"
+              class="capsule-btn"
               @click="handleDelete"
             >
               删除
             </el-button>
-            <el-button @click="$router.push('/products')">
+            <el-button
+              class="capsule-btn"
+              @click="$router.push('/products')"
+            >
               返回
             </el-button>
           </div>
@@ -83,9 +96,10 @@
       <el-descriptions
         :column="2"
         border
+        class="glass-descriptions"
       >
         <el-descriptions-item label="产品编号">
-          {{ product.productNo }}
+          <span class="mono-text">{{ product.productNo }}</span>
         </el-descriptions-item>
         <el-descriptions-item label="产品名称">
           {{ product.productName }}
@@ -111,16 +125,23 @@
             v-if="product.facePrice === 99999 && product.completenessStatus === 'pending'"
             size="small"
             type="warning"
+            class="capsule-tag"
           >
             待核价
           </el-tag>
-          <span v-else>¥{{ product.facePrice.toFixed(2) }}</span>
+          <span
+            v-else
+            class="price-text"
+          >¥{{ product.facePrice.toFixed(2) }}</span>
         </el-descriptions-item>
         <el-descriptions-item
           v-if="canViewCost"
           label="成本价"
         >
-          <span v-if="product.costPrice != null">¥{{ product.costPrice.toFixed(2) }}</span>
+          <span
+            v-if="product.costPrice != null"
+            class="price-text"
+          >¥{{ product.costPrice.toFixed(2) }}</span>
           <span
             v-else
             class="text-muted"
@@ -145,7 +166,10 @@
           {{ product.colors || '待补充' }}
         </el-descriptions-item>
         <el-descriptions-item label="数据完整性">
-          <el-tag :type="product.completenessStatus === 'complete' ? 'success' : 'warning'">
+          <el-tag
+            :type="product.completenessStatus === 'complete' ? 'success' : 'warning'"
+            class="capsule-tag"
+          >
             {{ product.completenessStatus === 'complete' ? '完整' : '待补充' }}
           </el-tag>
         </el-descriptions-item>
@@ -160,49 +184,58 @@
         </el-descriptions-item>
       </el-descriptions>
 
-      <section class="manual-section">
-        <h4>说明书状态</h4>
-        <el-table
-          :data="manuals"
-          size="small"
-          empty-text="暂无说明书"
-        >
-          <el-table-column
-            prop="doc_type"
-            label="类型"
-          />
-          <el-table-column
-            prop="parse_status"
-            label="解析状态"
-          />
-          <el-table-column
-            prop="index_status"
-            label="索引状态"
-          />
-          <el-table-column
-            label="失败原因"
-            min-width="180"
+      <section class="manual-section glass-section">
+        <h4 class="section-title">
+          说明书状态
+        </h4>
+        <div class="table-wrapper">
+          <el-table
+            :data="manuals"
+            size="small"
+            empty-text="暂无说明书"
+            class="mini-table"
           >
-            <template #default="scope">
-              {{ scope.row.parse_error || scope.row.index_error || '-' }}
-            </template>
-          </el-table-column>
-        </el-table>
+            <el-table-column
+              prop="doc_type"
+              label="类型"
+            />
+            <el-table-column
+              prop="parse_status"
+              label="解析状态"
+            />
+            <el-table-column
+              prop="index_status"
+              label="索引状态"
+            />
+            <el-table-column
+              label="失败原因"
+              min-width="180"
+            >
+              <template #default="scope">
+                {{ scope.row.parse_error || scope.row.index_error || '-' }}
+              </template>
+            </el-table-column>
+          </el-table>
+        </div>
       </section>
 
       <div
         v-if="product.tags && product.tags.length"
-        class="tags-section"
+        class="tags-section glass-section"
       >
-        <h4>标签</h4>
-        <el-tag
-          v-for="tag in product.tags"
-          :key="tag"
-          type="info"
-          style="margin-right: 8px; margin-bottom: 8px;"
-        >
-          {{ tag }}
-        </el-tag>
+        <h4 class="section-title">
+          标签
+        </h4>
+        <div class="tags-wrap">
+          <el-tag
+            v-for="tag in product.tags"
+            :key="tag"
+            type="info"
+            class="capsule-tag"
+          >
+            {{ tag }}
+          </el-tag>
+        </div>
       </div>
 
       <!-- Edit Form -->
@@ -210,7 +243,7 @@
         v-if="editMode"
         v-model="editMode"
         title="编辑产品"
-        width="600px"
+        class="glass-dialog"
         :close-on-click-modal="false"
         destroy-on-close
       >
@@ -221,12 +254,15 @@
           label-width="90px"
         >
           <el-row :gutter="16">
-            <el-col :span="12">
+            <el-col :span="24">
               <el-form-item
                 label="产品名称"
                 prop="productName"
               >
-                <el-input v-model="editForm.productName" />
+                <el-input
+                  v-model="editForm.productName"
+                  class="capsule-input"
+                />
               </el-form-item>
             </el-col>
             <el-col :span="12">
@@ -238,7 +274,7 @@
                   v-model="editForm.facePrice"
                   :min="0"
                   :precision="2"
-                  style="width:100%"
+                  class="capsule-number full-width"
                 />
               </el-form-item>
             </el-col>
@@ -249,7 +285,7 @@
                 <el-select
                   v-model="editForm.brandId"
                   placeholder="请选择"
-                  style="width:100%"
+                  class="capsule-select full-width"
                 >
                   <el-option
                     v-for="b in brands"
@@ -265,7 +301,7 @@
                 <el-select
                   v-model="editForm.supplierId"
                   placeholder="请选择"
-                  style="width:100%"
+                  class="capsule-select full-width"
                 >
                   <el-option
                     v-for="s in suppliers"
@@ -284,7 +320,7 @@
                   v-model="editForm.categoryId"
                   :options="categoryOptions"
                   :props="{ checkStrictly: true, value: 'id', label: 'categoryName', children: 'children' }"
-                  style="width:100%"
+                  class="capsule-select full-width"
                   placeholder="请选择"
                 />
               </el-form-item>
@@ -293,7 +329,7 @@
               <el-form-item label="库存状态">
                 <el-select
                   v-model="editForm.stockStatus"
-                  style="width:100%"
+                  class="capsule-select full-width"
                 >
                   <el-option
                     label="有库存"
@@ -325,20 +361,23 @@
                   v-model="editForm.costPrice"
                   :min="0"
                   :precision="2"
-                  style="width:100%"
+                  class="capsule-number full-width"
                 />
               </el-form-item>
             </el-col>
             <el-col :span="12">
               <el-form-item label="材质">
-                <el-input v-model="editForm.material" />
+                <el-input
+                  v-model="editForm.material"
+                  class="capsule-input"
+                />
               </el-form-item>
             </el-col>
           </el-row>
           <el-form-item label="状态">
             <el-select
               v-model="editForm.status"
-              style="width:100%"
+              class="capsule-select full-width"
             >
               <el-option
                 label="上架"
@@ -359,7 +398,7 @@
               v-model="editForm.tagIds"
               multiple
               placeholder="请选择标签"
-              style="width:100%"
+              class="capsule-select full-width"
             >
               <el-option
                 v-for="t in tags"
@@ -371,12 +410,16 @@
           </el-form-item>
         </el-form>
         <template #footer>
-          <el-button @click="editMode = false">
+          <el-button
+            class="capsule-btn"
+            @click="editMode = false"
+          >
             取消
           </el-button>
           <el-button
             type="primary"
             :loading="saving"
+            class="capsule-btn capsule-btn-primary"
             @click="handleSaveEdit"
           >
             保存
@@ -388,14 +431,14 @@
       <el-dialog
         v-model="showStatusDialog"
         title="修改状态"
-        width="360px"
+        class="glass-dialog dialog-sm"
         :close-on-click-modal="false"
       >
         <el-form label-width="80px">
           <el-form-item label="状态">
             <el-select
               v-model="statusForm.status"
-              style="width:100%"
+              class="capsule-select full-width"
             >
               <el-option
                 label="上架"
@@ -413,12 +456,16 @@
           </el-form-item>
         </el-form>
         <template #footer>
-          <el-button @click="showStatusDialog = false">
+          <el-button
+            class="capsule-btn"
+            @click="showStatusDialog = false"
+          >
             取消
           </el-button>
           <el-button
             type="primary"
             :loading="statusSaving"
+            class="capsule-btn capsule-btn-primary"
             @click="confirmStatusChange"
           >
             确定
@@ -680,10 +727,57 @@ watch(editMode, (val) => {
 </script>
 
 <style scoped>
+/* ===== CSS Variables ===== */
+.product-detail-page {
+  --brand-deep: rgba(30, 50, 90, 0.92);
+  --brand-primary: rgba(30, 50, 90, 0.85);
+  --brand-light: rgba(30, 50, 90, 0.08);
+  --brand-lighter: rgba(30, 50, 90, 0.04);
+  --text-primary: #5E6470;
+  --text-secondary: rgba(30, 50, 90, 0.6);
+  --bg-mist: #f0f0f0;
+  --glass-bg: rgba(255, 255, 255, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.5);
+  --radius-lg: 28px;
+  --radius-md: 18px;
+  --radius-sm: 12px;
+  --shadow-soft: 0 4px 24px rgba(30, 50, 90, 0.06);
+  --transition-fast: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  padding: 16px;
+  min-height: 100vh;
+  background: var(--bg-mist);
+}
+
+/* ===== Glass Card ===== */
+.glass-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+  overflow: hidden;
+}
+
+.glass-card :deep(.el-card__header) {
+  background: transparent;
+  border-bottom: 1px solid rgba(30, 50, 90, 0.06);
+  padding: 20px 24px;
+}
+
+.glass-card :deep(.el-card__body) {
+  padding: 24px;
+}
+
+.skeleton-card {
+  min-height: 200px;
+}
+
+/* ===== Detail Header ===== */
 .detail-header {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
 }
 
 .detail-title {
@@ -695,14 +789,14 @@ watch(editMode, (val) => {
 
 .product-no {
   font-size: 14px;
-  color: #909399;
+  color: var(--text-secondary);
   font-family: monospace;
 }
 
 .product-name {
-  font-size: 20px;
-  font-weight: bold;
-  color: #303133;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--brand-deep);
 }
 
 .detail-actions {
@@ -712,15 +806,194 @@ watch(editMode, (val) => {
   align-items: center;
 }
 
-.tags-section {
+/* ===== Capsule Buttons ===== */
+.capsule-btn {
+  border-radius: 20px !important;
+  padding: 8px 20px;
+  font-weight: 500;
+  transition: var(--transition-fast);
+}
+
+.capsule-btn:hover {
+  transform: scale(1.03);
+}
+
+.capsule-btn:active {
+  transform: scale(0.97);
+}
+
+.capsule-btn-primary {
+  background: var(--brand-primary);
+  border-color: var(--brand-primary);
+}
+
+.capsule-btn-primary:hover {
+  background: var(--brand-deep);
+  border-color: var(--brand-deep);
+}
+
+/* ===== Capsule Tags ===== */
+.capsule-tag {
+  border-radius: 12px;
+  padding: 2px 10px;
+  font-weight: 500;
+}
+
+.capsule-tag-lg {
+  border-radius: 16px;
+  padding: 4px 14px;
+  font-weight: 500;
+  font-size: 13px;
+}
+
+/* ===== Descriptions ===== */
+.glass-descriptions {
+  margin-top: 20px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.glass-descriptions :deep(.el-descriptions__header) {
+  margin-bottom: 0;
+}
+
+.glass-descriptions :deep(.el-descriptions__body) {
+  background: transparent;
+}
+
+.glass-descriptions :deep(.el-descriptions__label) {
+  background: var(--brand-lighter);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.glass-descriptions :deep(.el-descriptions__content) {
+  color: var(--text-primary);
+}
+
+.mono-text {
+  font-family: monospace;
+  color: var(--text-secondary);
+}
+
+.price-text {
+  color: var(--brand-deep);
+  font-weight: 600;
+  font-family: monospace;
+}
+
+/* ===== Sections ===== */
+.glass-section {
   margin-top: 24px;
+  padding: 20px;
+  background: var(--brand-lighter);
+  border-radius: var(--radius-md);
 }
 
-.tags-section h4 {
-  margin: 0 0 12px 0;
-  color: #303133;
+.section-title {
+  margin: 0 0 16px 0;
+  color: var(--brand-deep);
+  font-size: 15px;
+  font-weight: 600;
 }
 
+/* ===== Table ===== */
+.table-wrapper {
+  overflow-x: auto;
+  border-radius: var(--radius-sm);
+}
+
+.mini-table {
+  width: 100%;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.mini-table :deep(.el-table__header-wrapper) {
+  background: var(--brand-light);
+}
+
+.mini-table :deep(.el-table__header th) {
+  background: var(--brand-light);
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.mini-table :deep(.el-table__row:hover td) {
+  background: var(--brand-lighter);
+}
+
+/* ===== Tags ===== */
+.tags-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* ===== Glass Dialog ===== */
+.glass-dialog :deep(.el-dialog) {
+  border-radius: var(--radius-lg) !important;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(30, 50, 90, 0.15);
+}
+
+.glass-dialog :deep(.el-dialog__header) {
+  background: linear-gradient(135deg, rgba(30, 50, 90, 0.06), rgba(30, 50, 90, 0.02));
+  padding: 20px 24px 16px;
+  margin-right: 0;
+  border-bottom: 1px solid rgba(30, 50, 90, 0.06);
+}
+
+.glass-dialog :deep(.el-dialog__title) {
+  color: var(--text-primary);
+  font-weight: 700;
+  font-size: 18px;
+}
+
+.glass-dialog :deep(.el-dialog__body) {
+  padding: 24px;
+}
+
+.glass-dialog :deep(.el-dialog__footer) {
+  padding: 16px 24px;
+}
+
+.dialog-sm :deep(.el-dialog) {
+  width: 400px !important;
+  max-width: 90vw;
+}
+
+.full-width {
+  width: 100%;
+}
+
+/* ===== Capsule Inputs ===== */
+.capsule-input :deep(.el-input__wrapper),
+.capsule-select :deep(.el-select__wrapper),
+.capsule-select :deep(.el-input__wrapper) {
+  border-radius: 20px;
+  box-shadow: 0 0 0 1px rgba(30, 50, 90, 0.1) inset;
+  padding: 4px 16px;
+  transition: var(--transition-fast);
+}
+
+.capsule-input :deep(.el-input__wrapper):hover,
+.capsule-select :deep(.el-select__wrapper):hover,
+.capsule-select :deep(.el-input__wrapper):hover {
+  box-shadow: 0 0 0 1px rgba(30, 50, 90, 0.25) inset;
+}
+
+.capsule-number :deep(.el-input__wrapper) {
+  border-radius: 20px;
+}
+
+.capsule-number :deep(.el-input-number__decrease),
+.capsule-number :deep(.el-input-number__increase) {
+  border-radius: 0;
+}
+
+/* ===== Not Found ===== */
 .not-found {
   display: flex;
   justify-content: center;
@@ -729,10 +1002,75 @@ watch(editMode, (val) => {
 }
 
 .text-muted {
-  color: #909399;
+  color: var(--text-secondary);
 }
 
-@media (min-width: 768px) {
+/* ===== Responsive ===== */
+@media (max-width: 768px) {
+  .product-detail-page {
+    padding: 8px;
+  }
+
+  .glass-card {
+    border-radius: var(--radius-md);
+  }
+
+  .glass-card :deep(.el-card__header),
+  .glass-card :deep(.el-card__body) {
+    padding: 16px;
+  }
+
+  .detail-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .detail-title {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .product-name {
+    font-size: 18px;
+  }
+
+  .detail-actions {
+    width: 100%;
+  }
+
+  .detail-actions .capsule-btn,
+  .detail-actions :deep(.el-button) {
+    flex: 1;
+    min-width: 0;
+    text-align: center;
+  }
+
+  .glass-section {
+    padding: 16px;
+  }
+
+  .glass-descriptions :deep(.el-descriptions__label),
+  .glass-descriptions :deep(.el-descriptions__content) {
+    font-size: 12px;
+  }
+
+  .glass-dialog :deep(.el-dialog) {
+    width: 95vw !important;
+    max-width: 95vw;
+    margin: 8px auto;
+  }
+
+  .glass-dialog :deep(.el-dialog__body) {
+    padding: 16px;
+  }
+
+  .dialog-sm :deep(.el-dialog) {
+    width: 90vw !important;
+  }
+}
+
+@media (min-width: 769px) {
   .detail-header {
     flex-direction: row;
     justify-content: space-between;

@@ -12,66 +12,68 @@
         </el-button>
       </div>
 
-      <el-table
-        v-loading="loading"
-        :data="brands"
-        border
-        stripe
-      >
-        <el-table-column
-          prop="brandName"
-          label="品牌名称"
-          min-width="180"
-        />
-        <el-table-column
-          prop="logoUrl"
-          label="Logo"
-          min-width="200"
-          show-overflow-tooltip
+      <div class="table-responsive">
+        <el-table
+          v-loading="loading"
+          :data="brands"
+          border
+          stripe
         >
-          <template #default="{ row }">
-            <a
-              v-if="row.logoUrl"
-              :href="row.logoUrl"
-              target="_blank"
-              class="link"
-            >{{ row.logoUrl }}</a>
-            <span
-              v-else
-              class="text-muted"
-            >-</span>
-          </template>
-        </el-table-column>
-        <el-table-column
-          prop="description"
-          label="描述"
-          min-width="200"
-          show-overflow-tooltip
-        />
-        <el-table-column
-          label="操作"
-          width="160"
-          align="center"
-        >
-          <template #default="{ row }">
-            <el-button
-              v-if="canEdit"
-              size="small"
-              @click="handleEdit(row)"
-            >
-              编辑
-            </el-button>
-            <el-button
-              v-if="canDelete"
-              size="small"
-              type="danger"
-              @click="handleDelete(row)"
-            >
-              删除
-            </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+          <el-table-column
+            prop="brandName"
+            label="品牌名称"
+            min-width="180"
+          />
+          <el-table-column
+            prop="logoUrl"
+            label="Logo"
+            min-width="200"
+            show-overflow-tooltip
+          >
+            <template #default="{ row }">
+              <a
+                v-if="row.logoUrl"
+                :href="row.logoUrl"
+                target="_blank"
+                class="link"
+              >{{ row.logoUrl }}</a>
+              <span
+                v-else
+                class="text-muted"
+              >-</span>
+            </template>
+          </el-table-column>
+          <el-table-column
+            prop="description"
+            label="描述"
+            min-width="200"
+            show-overflow-tooltip
+          />
+          <el-table-column
+            label="操作"
+            width="160"
+            align="center"
+          >
+            <template #default="{ row }">
+              <el-button
+                v-if="canEdit"
+                size="small"
+                @click="handleEdit(row)"
+              >
+                编辑
+              </el-button>
+              <el-button
+                v-if="canDelete"
+                size="small"
+                type="danger"
+                @click="handleDelete(row)"
+              >
+                删除
+              </el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
 
       <div
         v-if="!loading && brands.length === 0"
@@ -238,29 +240,72 @@ onMounted(fetchBrands)
 </script>
 
 <style scoped>
+.brands-page {
+  min-height: 100vh;
+  background: #f0f0f0;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+.brands-page :deep(.el-card) {
+  background: rgba(255, 255, 255, 0.68);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 4px 32px rgba(30, 50, 90, 0.06);
+}
+
+.brands-page :deep(.el-card__body) {
+  padding: 24px;
+}
+
 .toolbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 12px;
 }
 
 .toolbar h2 {
   margin: 0;
-  font-size: 18px;
+  font-size: 20px;
+  font-weight: 600;
+  color: rgb(30, 50, 90);
+  letter-spacing: 0.3px;
+}
+
+.toolbar :deep(.el-button) {
+  border-radius: 20px;
+}
+
+.table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 12px;
+}
+
+.table-responsive :deep(.el-table) {
+  min-width: 600px;
+}
+
+.table-responsive :deep(.el-table) {
+  border-radius: 12px;
+  overflow: hidden;
 }
 
 .empty-state {
   display: flex;
   justify-content: center;
-  padding: 40px 0;
+  padding: 48px 0;
 }
 
 .link {
-  color: #409eff;
+  color: rgb(30, 50, 90);
   text-decoration: none;
+  font-weight: 500;
 }
 
 .link:hover {
@@ -269,5 +314,30 @@ onMounted(fetchBrands)
 
 .text-muted {
   color: #909399;
+}
+
+:global(.el-dialog) {
+  border-radius: 24px;
+  overflow: hidden;
+}
+
+@media (max-width: 768px) {
+  .brands-page {
+    padding: 12px;
+  }
+  .brands-page :deep(.el-card__body) {
+    padding: 16px;
+  }
+  .toolbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .toolbar h2 {
+    font-size: 18px;
+  }
+  :global(.el-dialog) {
+    width: 95vw !important;
+    max-width: 95vw !important;
+  }
 }
 </style>

@@ -246,18 +246,45 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.categories-page {
+  min-height: 100vh;
+  background: #f0f0f0;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+.categories-page :deep(.el-card) {
+  background: rgba(255, 255, 255, 0.68);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 4px 32px rgba(30, 50, 90, 0.06);
+}
+
+.categories-page :deep(.el-card__body) {
+  padding: 24px;
+}
+
 .toolbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 12px;
 }
 
 .toolbar h2 {
   margin: 0;
-  font-size: 18px;
+  font-size: 20px;
+  font-weight: 600;
+  color: rgb(30, 50, 90);
+  letter-spacing: 0.3px;
+}
+
+.toolbar :deep(.el-button) {
+  border-radius: 20px;
 }
 
 .category-tree {
@@ -269,28 +296,64 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   width: 100%;
-  padding: 4px 0;
+  padding: 8px 12px;
+  border-radius: 12px;
+  transition: background-color 0.2s ease;
+}
+
+.tree-node:hover {
+  background: rgba(30, 50, 90, 0.05);
 }
 
 .tree-label {
   flex: 1;
   font-size: 14px;
+  color: #5E6470;
 }
 
 .tree-actions {
   display: flex;
-  gap: 4px;
+  gap: 6px;
   opacity: 0;
-  transition: opacity 0.2s;
+  transition: opacity 0.2s ease;
 }
 
 .tree-node:hover .tree-actions {
   opacity: 1;
 }
 
+.tree-actions :deep(.el-button) {
+  border-radius: 16px;
+}
+
 .empty-state {
   display: flex;
   justify-content: center;
-  padding: 40px 0;
+  padding: 48px 0;
+}
+
+:global(.el-dialog) {
+  border-radius: 24px;
+  overflow: hidden;
+}
+
+@media (max-width: 768px) {
+  .categories-page {
+    padding: 12px;
+  }
+  .categories-page :deep(.el-card__body) {
+    padding: 16px;
+  }
+  .toolbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .toolbar h2 {
+    font-size: 18px;
+  }
+  :global(.el-dialog) {
+    width: 95vw !important;
+    max-width: 95vw !important;
+  }
 }
 </style>

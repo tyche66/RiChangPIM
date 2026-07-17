@@ -12,69 +12,71 @@
         </el-button>
       </div>
 
-      <el-table
-        v-loading="loading"
-        :data="tags"
-        border
-        stripe
-      >
-        <el-table-column
-          prop="tagName"
-          label="标签名称"
-          min-width="180"
-        />
-        <el-table-column
-          prop="tagType"
-          label="标签类型"
-          width="140"
+      <div class="table-responsive">
+        <el-table
+          v-loading="loading"
+          :data="tags"
+          border
+          stripe
         >
-          <template #default="{ row }">
-            <el-tag
-              v-if="row.tagType"
-              type="info"
-              size="small"
-            >
-              {{ row.tagType }}
-            </el-tag>
-            <span
-              v-else
-              class="text-muted"
-            >-</span>
-          </template>
-        </el-table-column>
-        <el-table-column
-          prop="createTime"
-          label="创建时间"
-          width="160"
-        >
-          <template #default="{ row }">
-            {{ formatDate(row.createTime) }}
-          </template>
-        </el-table-column>
-        <el-table-column
-          label="操作"
-          width="160"
-          align="center"
-        >
-          <template #default="{ row }">
-            <el-button
-              v-if="canEdit"
-              size="small"
-              @click="handleEdit(row)"
-            >
-              编辑
-            </el-button>
-            <el-button
-              v-if="canDelete"
-              size="small"
-              type="danger"
-              @click="handleDelete(row)"
-            >
-              删除
-            </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+          <el-table-column
+            prop="tagName"
+            label="标签名称"
+            min-width="180"
+          />
+          <el-table-column
+            prop="tagType"
+            label="标签类型"
+            width="140"
+          >
+            <template #default="{ row }">
+              <el-tag
+                v-if="row.tagType"
+                type="info"
+                size="small"
+              >
+                {{ row.tagType }}
+              </el-tag>
+              <span
+                v-else
+                class="text-muted"
+              >-</span>
+            </template>
+          </el-table-column>
+          <el-table-column
+            prop="createTime"
+            label="创建时间"
+            width="160"
+          >
+            <template #default="{ row }">
+              {{ formatDate(row.createTime) }}
+            </template>
+          </el-table-column>
+          <el-table-column
+            label="操作"
+            width="160"
+            align="center"
+          >
+            <template #default="{ row }">
+              <el-button
+                v-if="canEdit"
+                size="small"
+                @click="handleEdit(row)"
+              >
+                编辑
+              </el-button>
+              <el-button
+                v-if="canDelete"
+                size="small"
+                type="danger"
+                @click="handleDelete(row)"
+              >
+                删除
+              </el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
 
       <div
         v-if="!loading && tags.length === 0"
@@ -234,27 +236,91 @@ onMounted(fetchTags)
 </script>
 
 <style scoped>
+.tags-page {
+  min-height: 100vh;
+  background: #f0f0f0;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+.tags-page :deep(.el-card) {
+  background: rgba(255, 255, 255, 0.68);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 4px 32px rgba(30, 50, 90, 0.06);
+}
+
+.tags-page :deep(.el-card__body) {
+  padding: 24px;
+}
+
 .toolbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 12px;
 }
 
 .toolbar h2 {
   margin: 0;
-  font-size: 18px;
+  font-size: 20px;
+  font-weight: 600;
+  color: rgb(30, 50, 90);
+  letter-spacing: 0.3px;
+}
+
+.toolbar :deep(.el-button) {
+  border-radius: 20px;
+}
+
+.table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 12px;
+}
+
+.table-responsive :deep(.el-table) {
+  min-width: 600px;
+  border-radius: 12px;
+  overflow: hidden;
 }
 
 .empty-state {
   display: flex;
   justify-content: center;
-  padding: 40px 0;
+  padding: 48px 0;
 }
 
 .text-muted {
   color: #909399;
+}
+
+:global(.el-dialog) {
+  border-radius: 24px;
+  overflow: hidden;
+}
+
+@media (max-width: 768px) {
+  .tags-page {
+    padding: 12px;
+  }
+  .tags-page :deep(.el-card__body) {
+    padding: 16px;
+  }
+  .toolbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .toolbar h2 {
+    font-size: 18px;
+  }
+  :global(.el-dialog) {
+    width: 95vw !important;
+    max-width: 95vw !important;
+  }
 }
 </style>

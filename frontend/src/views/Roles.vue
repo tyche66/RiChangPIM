@@ -13,65 +13,67 @@
         </div>
       </div>
 
-      <el-table
-        v-loading="loading"
-        :data="roles"
-        border
-        stripe
-      >
-        <el-table-column
-          prop="role_name"
-          label="角色名称"
-        />
-        <el-table-column
-          prop="role_code"
-          label="角色编码"
-        />
-        <el-table-column
-          prop="description"
-          label="描述"
-          show-overflow-tooltip
-        />
-        <el-table-column
-          prop="create_time"
-          label="创建时间"
-          width="170"
+      <div class="table-responsive">
+        <el-table
+          v-loading="loading"
+          :data="roles"
+          border
+          stripe
         >
-          <template #default="{ row }">
-            {{ formatTime(row.create_time) }}
-          </template>
-        </el-table-column>
-        <el-table-column
-          label="操作"
-          width="240"
-        >
-          <template #default="{ row }">
-            <el-button
-              v-if="hasPermission(authStore.permissions, 'role:edit')"
-              size="small"
-              @click="handleEdit(row)"
-            >
-              编辑
-            </el-button>
-            <el-button
-              v-if="hasPermission(authStore.permissions, 'role:assign')"
-              size="small"
-              type="warning"
-              @click="handleAssign(row)"
-            >
-              权限
-            </el-button>
-            <el-button
-              v-if="hasPermission(authStore.permissions, 'role:delete')"
-              size="small"
-              type="danger"
-              @click="handleDelete(row)"
-            >
-              删除
-            </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+          <el-table-column
+            prop="role_name"
+            label="角色名称"
+          />
+          <el-table-column
+            prop="role_code"
+            label="角色编码"
+          />
+          <el-table-column
+            prop="description"
+            label="描述"
+            show-overflow-tooltip
+          />
+          <el-table-column
+            prop="create_time"
+            label="创建时间"
+            width="170"
+          >
+            <template #default="{ row }">
+              {{ formatTime(row.create_time) }}
+            </template>
+          </el-table-column>
+          <el-table-column
+            label="操作"
+            width="240"
+          >
+            <template #default="{ row }">
+              <el-button
+                v-if="hasPermission(authStore.permissions, 'role:edit')"
+                size="small"
+                @click="handleEdit(row)"
+              >
+                编辑
+              </el-button>
+              <el-button
+                v-if="hasPermission(authStore.permissions, 'role:assign')"
+                size="small"
+                type="warning"
+                @click="handleAssign(row)"
+              >
+                权限
+              </el-button>
+              <el-button
+                v-if="hasPermission(authStore.permissions, 'role:delete')"
+                size="small"
+                type="danger"
+                @click="handleDelete(row)"
+              >
+                删除
+              </el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
     </el-card>
 
     <!-- Create / Edit Dialog (shared structure) -->
@@ -379,19 +381,58 @@ onMounted(fetchRoles)
 </script>
 
 <style scoped>
+.roles-page {
+  min-height: 100vh;
+  background: #f0f0f0;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+.roles-page :deep(.el-card) {
+  background: rgba(255, 255, 255, 0.68);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 4px 32px rgba(30, 50, 90, 0.06);
+}
+
+.roles-page :deep(.el-card__body) {
+  padding: 24px;
+}
+
 .toolbar {
   display: flex;
   justify-content: flex-end;
   margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.toolbar :deep(.el-button) {
+  border-radius: 20px;
+}
+
+.table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 12px;
+}
+
+.table-responsive :deep(.el-table) {
+  min-width: 700px;
+  border-radius: 12px;
+  overflow: hidden;
 }
 
 .perm-section {
   margin-top: 16px;
-  border: 1px solid #ebeef5;
-  border-radius: 4px;
-  padding: 16px;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 16px;
+  padding: 20px;
   max-height: 400px;
   overflow-y: auto;
+  border: 1px solid rgba(30, 50, 90, 0.06);
 }
 
 .perm-header {
@@ -399,13 +440,14 @@ onMounted(fetchRoles)
   justify-content: space-between;
   align-items: center;
   margin-bottom: 12px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid #f0f0f0;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(30, 50, 90, 0.08);
 }
 
 .perm-title {
-  font-weight: bold;
+  font-weight: 600;
   font-size: 14px;
+  color: rgb(30, 50, 90);
 }
 
 .perm-group {
@@ -416,6 +458,7 @@ onMounted(fetchRoles)
   font-weight: 600;
   margin-bottom: 6px;
   text-transform: capitalize;
+  color: #5E6470;
 }
 
 .perm-group-items {
@@ -425,8 +468,32 @@ onMounted(fetchRoles)
   padding-left: 24px;
 }
 
-.perm-group-items .el-checkbox {
+.perm-group-items :deep(.el-checkbox) {
   width: calc(33.333% - 10px);
   min-width: 140px;
+}
+
+:global(.el-dialog) {
+  border-radius: 24px;
+  overflow: hidden;
+}
+
+@media (max-width: 768px) {
+  .roles-page {
+    padding: 12px;
+  }
+  .roles-page :deep(.el-card__body) {
+    padding: 16px;
+  }
+  .toolbar {
+    justify-content: flex-start;
+  }
+  :global(.el-dialog) {
+    width: 95vw !important;
+    max-width: 95vw !important;
+  }
+  .perm-group-items :deep(.el-checkbox) {
+    width: calc(50% - 10px);
+  }
 }
 </style>

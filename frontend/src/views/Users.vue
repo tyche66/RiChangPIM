@@ -5,6 +5,7 @@
         <el-form
           :inline="true"
           :model="queryParams"
+          class="filter-form"
         >
           <el-form-item label="角色">
             <el-select
@@ -60,80 +61,82 @@
         </div>
       </div>
 
-      <el-table
-        v-loading="loading"
-        :data="users"
-        border
-        stripe
-      >
-        <el-table-column
-          prop="username"
-          label="用户名"
-        />
-        <el-table-column
-          prop="email"
-          label="邮箱"
-        />
-        <el-table-column
-          prop="phone"
-          label="手机"
-        />
-        <el-table-column label="角色">
-          <template #default="{ row }">
-            {{ getRoleName(row.role_id) }}
-          </template>
-        </el-table-column>
-        <el-table-column
-          prop="status"
-          label="状态"
+      <div class="table-responsive">
+        <el-table
+          v-loading="loading"
+          :data="users"
+          border
+          stripe
         >
-          <template #default="{ row }">
-            <el-tag :type="row.status === 'active' ? 'success' : 'danger'">
-              {{ row.status === 'active' ? '启用' : '禁用' }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column
-          prop="last_login_time"
-          label="最后登录"
-          width="170"
-        >
-          <template #default="{ row }">
-            {{ row.last_login_time ? formatTime(row.last_login_time) : '从未' }}
-          </template>
-        </el-table-column>
-        <el-table-column
-          prop="create_time"
-          label="创建时间"
-          width="170"
-        >
-          <template #default="{ row }">
-            {{ formatTime(row.create_time) }}
-          </template>
-        </el-table-column>
-        <el-table-column
-          label="操作"
-          width="200"
-        >
-          <template #default="{ row }">
-            <el-button
-              v-if="hasPermission(authStore.permissions, 'user:edit')"
-              size="small"
-              @click="handleEdit(row)"
-            >
-              编辑
-            </el-button>
-            <el-button
-              v-if="hasPermission(authStore.permissions, 'user:delete')"
-              size="small"
-              type="danger"
-              @click="handleDelete(row)"
-            >
-              删除
-            </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+          <el-table-column
+            prop="username"
+            label="用户名"
+          />
+          <el-table-column
+            prop="email"
+            label="邮箱"
+          />
+          <el-table-column
+            prop="phone"
+            label="手机"
+          />
+          <el-table-column label="角色">
+            <template #default="{ row }">
+              {{ getRoleName(row.role_id) }}
+            </template>
+          </el-table-column>
+          <el-table-column
+            prop="status"
+            label="状态"
+          >
+            <template #default="{ row }">
+              <el-tag :type="row.status === 'active' ? 'success' : 'danger'">
+                {{ row.status === 'active' ? '启用' : '禁用' }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column
+            prop="last_login_time"
+            label="最后登录"
+            width="170"
+          >
+            <template #default="{ row }">
+              {{ row.last_login_time ? formatTime(row.last_login_time) : '从未' }}
+            </template>
+          </el-table-column>
+          <el-table-column
+            prop="create_time"
+            label="创建时间"
+            width="170"
+          >
+            <template #default="{ row }">
+              {{ formatTime(row.create_time) }}
+            </template>
+          </el-table-column>
+          <el-table-column
+            label="操作"
+            width="200"
+          >
+            <template #default="{ row }">
+              <el-button
+                v-if="hasPermission(authStore.permissions, 'user:edit')"
+                size="small"
+                @click="handleEdit(row)"
+              >
+                编辑
+              </el-button>
+              <el-button
+                v-if="hasPermission(authStore.permissions, 'user:delete')"
+                size="small"
+                type="danger"
+                @click="handleDelete(row)"
+              >
+                删除
+              </el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
 
       <el-pagination
         v-model:current-page="queryParams.page"
@@ -141,7 +144,7 @@
         :total="total"
         :page-sizes="[10, 20, 50, 100]"
         layout="total, sizes, prev, pager, next, jumper"
-        style="margin-top: 20px; justify-content: flex-end;"
+        class="pagination"
         @current-change="fetchUsers"
         @size-change="fetchUsers"
       />
@@ -523,10 +526,99 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.users-page {
+  min-height: 100vh;
+  background: #f0f0f0;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+.users-page :deep(.el-card) {
+  background: rgba(255, 255, 255, 0.68);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 4px 32px rgba(30, 50, 90, 0.06);
+}
+
+.users-page :deep(.el-card__body) {
+  padding: 24px;
+}
+
 .toolbar {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.filter-form {
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.filter-form :deep(.el-form-item) {
+  margin-bottom: 8px;
+}
+
+.toolbar :deep(.el-button) {
+  border-radius: 20px;
+}
+
+.table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 12px;
+}
+
+.table-responsive :deep(.el-table) {
+  min-width: 800px;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.pagination {
+  margin-top: 20px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.pagination :deep(.el-pagination) {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+:global(.el-dialog) {
+  border-radius: 24px;
+  overflow: hidden;
+}
+
+@media (max-width: 768px) {
+  .users-page {
+    padding: 12px;
+  }
+  .users-page :deep(.el-card__body) {
+    padding: 16px;
+  }
+  .toolbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .filter-form {
+    width: 100%;
+  }
+  .filter-form :deep(.el-form-item) {
+    margin-right: 8px !important;
+  }
+  .pagination {
+    justify-content: center;
+  }
+  :global(.el-dialog) {
+    width: 95vw !important;
+    max-width: 95vw !important;
+  }
 }
 </style>

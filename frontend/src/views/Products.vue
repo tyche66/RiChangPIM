@@ -1,6 +1,6 @@
 <template>
   <div class="products-page">
-    <el-card>
+    <el-card class="glass-card">
       <div class="toolbar">
         <el-form
           :inline="true"
@@ -12,7 +12,7 @@
               v-model="queryParams.keyword"
               placeholder="产品名称/编号"
               clearable
-              class="filter-input"
+              class="filter-input capsule-input"
             />
           </el-form-item>
           <el-form-item label="分类">
@@ -22,7 +22,7 @@
               :props="{ checkStrictly: true, value: 'id', label: 'categoryName', children: 'children' }"
               placeholder="全部"
               clearable
-              class="filter-input"
+              class="filter-input capsule-select"
             />
           </el-form-item>
           <el-form-item label="品牌">
@@ -30,7 +30,7 @@
               v-model="queryParams.brandId"
               placeholder="全部"
               clearable
-              class="filter-input"
+              class="filter-input capsule-select"
             >
               <el-option
                 v-for="b in brands"
@@ -45,7 +45,7 @@
               v-model="queryParams.supplierId"
               placeholder="全部"
               clearable
-              class="filter-input"
+              class="filter-input capsule-select"
             >
               <el-option
                 v-for="s in suppliers"
@@ -61,7 +61,7 @@
               placeholder="全部"
               clearable
               filterable
-              class="filter-input"
+              class="filter-input capsule-select"
             >
               <el-option
                 v-for="tag in seriesTags"
@@ -76,7 +76,7 @@
               v-model="queryParams.status"
               placeholder="全部"
               clearable
-              class="filter-input"
+              class="filter-input capsule-select"
             >
               <el-option
                 label="上架"
@@ -97,7 +97,7 @@
               v-model="queryParams.stockStatus"
               placeholder="全部"
               clearable
-              class="filter-input"
+              class="filter-input capsule-select"
             >
               <el-option
                 label="有库存"
@@ -125,7 +125,7 @@
                 :precision="2"
                 placeholder="最低"
                 controls-position="right"
-                style="width: 90px"
+                class="capsule-number"
               />
               <span class="price-sep">-</span>
               <el-input-number
@@ -134,18 +134,22 @@
                 :precision="2"
                 placeholder="最高"
                 controls-position="right"
-                style="width: 90px"
+                class="capsule-number"
               />
             </div>
           </el-form-item>
           <el-form-item>
             <el-button
               type="primary"
+              class="capsule-btn"
               @click="handleSearch"
             >
               查询
             </el-button>
-            <el-button @click="handleReset">
+            <el-button
+              class="capsule-btn"
+              @click="handleReset"
+            >
               重置
             </el-button>
           </el-form-item>
@@ -154,6 +158,7 @@
           <el-button
             v-if="canExport"
             type="success"
+            class="capsule-btn"
             @click="handleExport"
           >
             导出
@@ -161,6 +166,7 @@
           <el-button
             v-if="canCreate"
             type="primary"
+            class="capsule-btn capsule-btn-primary"
             @click="showCreateDialog = true"
           >
             新增产品
@@ -168,142 +174,158 @@
         </div>
       </div>
 
-      <el-table
-        v-loading="loading"
-        :data="products"
-        border
-        stripe
-        class="product-table"
-        :fit="false"
-      >
-        <el-table-column
-          prop="productNo"
-          label="产品编号"
-          min-width="120"
-        />
-        <el-table-column
-          prop="productName"
-          label="产品名称"
-          min-width="180"
-          show-overflow-tooltip
-        />
-        <el-table-column
-          prop="brandName"
-          label="品牌"
-          width="100"
-        />
-        <el-table-column
-          prop="categoryName"
-          label="分类"
-          width="100"
-        />
-        <el-table-column
-          prop="facePrice"
-          label="面价"
-          width="90"
-          align="right"
+      <div class="table-wrapper">
+        <el-table
+          v-loading="loading"
+          :data="products"
+          border
+          stripe
+          class="product-table"
+          :fit="false"
         >
-          <template #default="{ row }">
-            <el-tag
-              v-if="row.facePrice === 99999 && row.completenessStatus === 'pending'"
-              size="small"
-              type="warning"
-            >
-              待核价
-            </el-tag>
-            <span v-else>¥{{ row.facePrice.toFixed(2) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column
-          v-if="canViewCost"
-          prop="costPrice"
-          label="成本价"
-          width="90"
-          align="right"
-        >
-          <template #default="{ row }">
-            <span v-if="row.costPrice != null">¥{{ row.costPrice.toFixed(2) }}</span>
-            <span
-              v-else
-              class="text-muted"
-            >-</span>
-          </template>
-        </el-table-column>
-        <el-table-column
-          prop="stockStatus"
-          label="库存"
-          width="80"
-          align="center"
-        >
-          <template #default="{ row }">
-            <el-tag
-              :type="row.stockStatus === 'in_stock' ? 'success' : row.stockStatus === 'out_of_stock' ? 'danger' : row.stockStatus === 'unknown' ? 'info' : 'warning'"
-              size="small"
-            >
-              {{ stockStatusMap[row.stockStatus] || row.stockStatus }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column
-          prop="status"
-          label="状态"
-          width="80"
-          align="center"
-        >
-          <template #default="{ row }">
-            <el-tag
-              :type="row.status === 'active' ? 'success' : row.status === 'draft' ? 'info' : 'danger'"
-              size="small"
-            >
-              {{ statusMap[row.status] || row.status }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column
-          label="操作"
-          width="280"
-          fixed="right"
-          align="center"
-        >
-          <template #default="{ row }">
-            <el-button
-              size="small"
-              @click="handleView(row)"
-            >
-              查看
-            </el-button>
-            <el-button
-              v-if="canEdit"
-              size="small"
-              @click="handleEdit(row)"
-            >
-              编辑
-            </el-button>
-            <el-button
-              v-if="canChangeStatus"
-              size="small"
-              @click="showStatusDialog(row)"
-            >
-              状态
-            </el-button>
-            <el-button
-              v-if="canClone"
-              size="small"
-              @click="handleClone(row)"
-            >
-              克隆
-            </el-button>
-            <el-button
-              v-if="canDelete"
-              size="small"
-              type="danger"
-              @click="handleDelete(row)"
-            >
-              删除
-            </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+          <el-table-column
+            prop="productNo"
+            label="产品编号"
+            min-width="120"
+          />
+          <el-table-column
+            prop="productName"
+            label="产品名称"
+            min-width="180"
+            show-overflow-tooltip
+          />
+          <el-table-column
+            prop="brandName"
+            label="品牌"
+            width="100"
+          />
+          <el-table-column
+            prop="categoryName"
+            label="分类"
+            width="100"
+          />
+          <el-table-column
+            prop="facePrice"
+            label="面价"
+            width="90"
+            align="right"
+          >
+            <template #default="{ row }">
+              <el-tag
+                v-if="row.facePrice === 99999 && row.completenessStatus === 'pending'"
+                size="small"
+                type="warning"
+                class="capsule-tag"
+              >
+                待核价
+              </el-tag>
+              <span
+                v-else
+                class="price-text"
+              >¥{{ row.facePrice.toFixed(2) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column
+            v-if="canViewCost"
+            prop="costPrice"
+            label="成本价"
+            width="90"
+            align="right"
+          >
+            <template #default="{ row }">
+              <span
+                v-if="row.costPrice != null"
+                class="price-text"
+              >¥{{ row.costPrice.toFixed(2) }}</span>
+              <span
+                v-else
+                class="text-muted"
+              >-</span>
+            </template>
+          </el-table-column>
+          <el-table-column
+            prop="stockStatus"
+            label="库存"
+            width="80"
+            align="center"
+          >
+            <template #default="{ row }">
+              <el-tag
+                :type="row.stockStatus === 'in_stock' ? 'success' : row.stockStatus === 'out_of_stock' ? 'danger' : row.stockStatus === 'unknown' ? 'info' : 'warning'"
+                size="small"
+                class="capsule-tag"
+              >
+                {{ stockStatusMap[row.stockStatus] || row.stockStatus }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column
+            prop="status"
+            label="状态"
+            width="80"
+            align="center"
+          >
+            <template #default="{ row }">
+              <el-tag
+                :type="row.status === 'active' ? 'success' : row.status === 'draft' ? 'info' : 'danger'"
+                size="small"
+                class="capsule-tag"
+              >
+                {{ statusMap[row.status] || row.status }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column
+            label="操作"
+            width="280"
+            fixed="right"
+            align="center"
+          >
+            <template #default="{ row }">
+              <el-button
+                size="small"
+                class="capsule-btn btn-sm"
+                @click="handleView(row)"
+              >
+                查看
+              </el-button>
+              <el-button
+                v-if="canEdit"
+                size="small"
+                class="capsule-btn btn-sm"
+                @click="handleEdit(row)"
+              >
+                编辑
+              </el-button>
+              <el-button
+                v-if="canChangeStatus"
+                size="small"
+                class="capsule-btn btn-sm"
+                @click="showStatusDialog(row)"
+              >
+                状态
+              </el-button>
+              <el-button
+                v-if="canClone"
+                size="small"
+                class="capsule-btn btn-sm"
+                @click="handleClone(row)"
+              >
+                克隆
+              </el-button>
+              <el-button
+                v-if="canDelete"
+                size="small"
+                type="danger"
+                class="capsule-btn btn-sm"
+                @click="handleDelete(row)"
+              >
+                删除
+              </el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
 
       <el-pagination
         v-model:current-page="queryParams.page"
@@ -311,7 +333,7 @@
         :total="total"
         :page-sizes="[10, 20, 50, 100]"
         layout="total, sizes, prev, pager, next, jumper"
-        style="margin-top: 20px; justify-content: flex-end;"
+        class="pagination-wrap"
         @current-change="fetchProducts"
         @size-change="fetchProducts"
       />
@@ -321,7 +343,7 @@
     <el-dialog
       v-model="showCreateDialog"
       :title="editingProduct ? '编辑产品' : '新增产品'"
-      width="600px"
+      class="glass-dialog"
       :close-on-click-modal="false"
       destroy-on-close
     >
@@ -332,7 +354,7 @@
         label-width="90px"
       >
         <el-row :gutter="16">
-          <el-col :span="12">
+          <el-col :span="24">
             <el-form-item
               label="产品编号"
               prop="productNo"
@@ -340,15 +362,19 @@
               <el-input
                 v-model="productForm.productNo"
                 :disabled="!!editingProduct"
+                class="capsule-input"
               />
             </el-form-item>
           </el-col>
-          <el-col :span="12">
+          <el-col :span="24">
             <el-form-item
               label="产品名称"
               prop="productName"
             >
-              <el-input v-model="productForm.productName" />
+              <el-input
+                v-model="productForm.productName"
+                class="capsule-input"
+              />
             </el-form-item>
           </el-col>
         </el-row>
@@ -361,7 +387,7 @@
               <el-select
                 v-model="productForm.brandId"
                 placeholder="请选择"
-                style="width:100%"
+                class="capsule-select full-width"
               >
                 <el-option
                   v-for="b in brands"
@@ -380,7 +406,7 @@
               <el-select
                 v-model="productForm.supplierId"
                 placeholder="请选择"
-                style="width:100%"
+                class="capsule-select full-width"
               >
                 <el-option
                   v-for="s in suppliers"
@@ -402,7 +428,7 @@
                 v-model="productForm.categoryId"
                 :options="categoryOptions"
                 :props="{ checkStrictly: true, value: 'id', label: 'categoryName', children: 'children' }"
-                style="width:100%"
+                class="capsule-select full-width"
                 placeholder="请选择"
               />
             </el-form-item>
@@ -416,7 +442,7 @@
                 v-model="productForm.facePrice"
                 :min="0"
                 :precision="2"
-                style="width:100%"
+                class="capsule-number full-width"
               />
             </el-form-item>
           </el-col>
@@ -431,14 +457,17 @@
                 v-model="productForm.costPrice"
                 :min="0"
                 :precision="2"
-                style="width:100%"
+                class="capsule-number full-width"
                 :placeholder="canViewCost ? '可选' : '无权限'"
               />
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="材质">
-              <el-input v-model="productForm.material" />
+              <el-input
+                v-model="productForm.material"
+                class="capsule-input"
+              />
             </el-form-item>
           </el-col>
         </el-row>
@@ -447,7 +476,7 @@
             <el-form-item label="库存状态">
               <el-select
                 v-model="productForm.stockStatus"
-                style="width:100%"
+                class="capsule-select full-width"
               >
                 <el-option
                   label="有库存"
@@ -472,7 +501,7 @@
             <el-form-item label="状态">
               <el-select
                 v-model="productForm.status"
-                style="width:100%"
+                class="capsule-select full-width"
               >
                 <el-option
                   label="上架"
@@ -495,7 +524,7 @@
             v-model="productForm.tagIds"
             multiple
             placeholder="请选择标签"
-            style="width:100%"
+            class="capsule-select full-width"
           >
             <el-option
               v-for="t in tags"
@@ -507,12 +536,16 @@
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="showCreateDialog = false">
+        <el-button
+          class="capsule-btn"
+          @click="showCreateDialog = false"
+        >
           取消
         </el-button>
         <el-button
           type="primary"
           :loading="submitting"
+          class="capsule-btn capsule-btn-primary"
           @click="handleSubmit"
         >
           确定
@@ -524,14 +557,14 @@
     <el-dialog
       v-model="statusDialogVisible"
       title="修改状态"
-      width="360px"
+      class="glass-dialog dialog-sm"
       :close-on-click-modal="false"
     >
       <el-form label-width="80px">
         <el-form-item label="状态">
           <el-select
             v-model="statusForm.status"
-            style="width:100%"
+            class="capsule-select full-width"
           >
             <el-option
               label="上架"
@@ -549,12 +582,16 @@
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="statusDialogVisible = false">
+        <el-button
+          class="capsule-btn"
+          @click="statusDialogVisible = false"
+        >
           取消
         </el-button>
         <el-button
           type="primary"
           :loading="statusSubmitting"
+          class="capsule-btn capsule-btn-primary"
           @click="confirmStatusChange"
         >
           确定
@@ -909,17 +946,55 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* ===== CSS Variables ===== */
+.products-page {
+  --brand-deep: rgba(30, 50, 90, 0.92);
+  --brand-primary: rgba(30, 50, 90, 0.85);
+  --brand-light: rgba(30, 50, 90, 0.08);
+  --brand-lighter: rgba(30, 50, 90, 0.04);
+  --text-primary: #5E6470;
+  --text-secondary: rgba(30, 50, 90, 0.6);
+  --bg-mist: #f0f0f0;
+  --glass-bg: rgba(255, 255, 255, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.5);
+  --radius-lg: 28px;
+  --radius-md: 18px;
+  --radius-sm: 12px;
+  --shadow-soft: 0 4px 24px rgba(30, 50, 90, 0.06);
+  --shadow-hover: 0 8px 32px rgba(30, 50, 90, 0.1);
+  --transition-fast: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  padding: 16px;
+  min-height: 100vh;
+  background: var(--bg-mist);
+}
+
+/* ===== Glass Card ===== */
+.glass-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+  overflow: hidden;
+}
+
+.glass-card :deep(.el-card__header) {
+  background: transparent;
+  border-bottom: 1px solid rgba(30, 50, 90, 0.06);
+  padding: 20px 24px;
+}
+
+.glass-card :deep(.el-card__body) {
+  padding: 20px 24px;
+}
+
+/* ===== Toolbar ===== */
 .toolbar {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
   margin-bottom: 16px;
-}
-
-.toolbar-actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
 }
 
 .filter-form {
@@ -930,34 +1005,314 @@ onMounted(() => {
   margin-bottom: 12px;
 }
 
+.filter-form :deep(.el-form-item__label) {
+  color: var(--text-primary);
+  font-weight: 500;
+  font-size: 13px;
+}
+
+.toolbar-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* ===== Capsule Inputs & Selects ===== */
+.capsule-input :deep(.el-input__wrapper),
+.capsule-select :deep(.el-select__wrapper),
+.capsule-select :deep(.el-input__wrapper) {
+  border-radius: 20px;
+  box-shadow: 0 0 0 1px rgba(30, 50, 90, 0.1) inset;
+  padding: 4px 16px;
+  transition: var(--transition-fast);
+}
+
+.capsule-input :deep(.el-input__wrapper):hover,
+.capsule-select :deep(.el-select__wrapper):hover,
+.capsule-select :deep(.el-input__wrapper):hover {
+  box-shadow: 0 0 0 1px rgba(30, 50, 90, 0.25) inset;
+}
+
+.capsule-input :deep(.el-input__wrapper.is-focus),
+.capsule-select :deep(.el-select__wrapper.is-focus),
+.capsule-select :deep(.el-input__wrapper.is-focus) {
+  box-shadow: 0 0 0 2px rgba(30, 50, 90, 0.3) inset;
+}
+
 .filter-input {
   width: 160px;
 }
 
+.capsule-number {
+  width: 110px;
+}
+
+.capsule-number :deep(.el-input-number__decrease),
+.capsule-number :deep(.el-input-number__increase) {
+  border-radius: 0;
+}
+
+.capsule-number :deep(.el-input__wrapper) {
+  border-radius: 20px;
+}
+
+/* ===== Capsule Buttons ===== */
+.capsule-btn {
+  border-radius: 20px !important;
+  padding: 8px 20px;
+  font-weight: 500;
+  transition: var(--transition-fast);
+}
+
+.capsule-btn:hover {
+  transform: scale(1.03);
+}
+
+.capsule-btn:active {
+  transform: scale(0.97);
+}
+
+.capsule-btn-primary {
+  background: var(--brand-primary);
+  border-color: var(--brand-primary);
+}
+
+.capsule-btn-primary:hover {
+  background: var(--brand-deep);
+  border-color: var(--brand-deep);
+}
+
+.btn-sm {
+  padding: 5px 14px;
+  font-size: 12px;
+  border-radius: 16px !important;
+}
+
+/* ===== Price Range ===== */
 .price-range {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
 }
 
 .price-sep {
-  color: #909399;
+  color: var(--text-secondary);
   font-size: 14px;
+}
+
+/* ===== Table ===== */
+.table-wrapper {
+  overflow-x: auto;
+  border-radius: var(--radius-md);
 }
 
 .product-table {
   width: 100%;
+  border-radius: var(--radius-md);
+  overflow: hidden;
 }
 
+.product-table :deep(.el-table__header-wrapper) {
+  background: var(--brand-lighter);
+}
+
+.product-table :deep(.el-table__header th) {
+  background: var(--brand-lighter);
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 13px;
+  padding: 14px 0;
+}
+
+.product-table :deep(.el-table__row td) {
+  padding: 12px 0;
+}
+
+.product-table :deep(.el-table__row:hover td) {
+  background: var(--brand-lighter);
+}
+
+.product-table :deep(.el-table--border)::after,
+.product-table :deep(.el-table--border)::before {
+  background: rgba(30, 50, 90, 0.06);
+}
+
+.price-text {
+  color: var(--brand-deep);
+  font-weight: 600;
+  font-family: monospace;
+}
+
+.capsule-tag {
+  border-radius: 12px;
+  padding: 2px 10px;
+  font-weight: 500;
+}
+
+/* ===== Pagination ===== */
+.pagination-wrap {
+  margin-top: 20px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.pagination-wrap :deep(.el-pagination) {
+  padding: 8px 0;
+}
+
+.pagination-wrap :deep(.el-pager li),
+.pagination-wrap :deep(.el-pagination .btn-prev),
+.pagination-wrap :deep(.el-pagination .btn-next) {
+  border-radius: 50%;
+  min-width: 32px;
+  height: 32px;
+  line-height: 32px;
+  transition: var(--transition-fast);
+}
+
+.pagination-wrap :deep(.el-pager li.active),
+.pagination-wrap :deep(.el-pager li.active:hover) {
+  background: var(--brand-primary);
+  color: #fff;
+}
+
+.pagination-wrap :deep(.el-pager li:hover:not(.active)),
+.pagination-wrap :deep(.el-pagination .btn-prev:hover),
+.pagination-wrap :deep(.el-pagination .btn-next:hover) {
+  background: var(--brand-light);
+}
+
+/* ===== Glass Dialog ===== */
+.glass-dialog :deep(.el-dialog) {
+  border-radius: var(--radius-lg) !important;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(30, 50, 90, 0.15);
+}
+
+.glass-dialog :deep(.el-dialog__header) {
+  background: linear-gradient(135deg, rgba(30, 50, 90, 0.06), rgba(30, 50, 90, 0.02));
+  padding: 20px 24px 16px;
+  margin-right: 0;
+  border-bottom: 1px solid rgba(30, 50, 90, 0.06);
+}
+
+.glass-dialog :deep(.el-dialog__title) {
+  color: var(--text-primary);
+  font-weight: 700;
+  font-size: 18px;
+}
+
+.glass-dialog :deep(.el-dialog__body) {
+  padding: 24px;
+}
+
+.glass-dialog :deep(.el-dialog__footer) {
+  padding: 16px 24px;
+}
+
+.dialog-sm :deep(.el-dialog) {
+  width: 380px !important;
+  max-width: 90vw;
+}
+
+.full-width {
+  width: 100%;
+}
+
+/* ===== Text ===== */
 .text-muted {
-  color: #909399;
+  color: var(--text-secondary);
 }
 
-@media (min-width: 768px) {
+/* ===== Responsive ===== */
+@media (max-width: 768px) {
+  .products-page {
+    padding: 8px;
+  }
+
+  .glass-card {
+    border-radius: var(--radius-md);
+  }
+
+  .glass-card :deep(.el-card__header),
+  .glass-card :deep(.el-card__body) {
+    padding: 16px;
+  }
+
+  .toolbar {
+    gap: 12px;
+  }
+
+  .filter-input {
+    width: 100%;
+  }
+
+  .filter-form :deep(.el-form-item) {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    width: 100%;
+  }
+
+  .filter-form :deep(.el-form-item__content) {
+    width: 100% !important;
+    margin-left: 0 !important;
+  }
+
+  .toolbar-actions {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .toolbar-actions .capsule-btn {
+    width: 100%;
+  }
+
+  .capsule-number {
+    width: 100%;
+  }
+
+  .price-range {
+    width: 100%;
+  }
+
+  .price-range :deep(.el-input-number) {
+    flex: 1;
+  }
+
+  .glass-dialog :deep(.el-dialog) {
+    width: 95vw !important;
+    max-width: 95vw;
+    margin: 8px auto;
+  }
+
+  .glass-dialog :deep(.el-dialog__body) {
+    padding: 16px;
+  }
+
+  .dialog-sm :deep(.el-dialog) {
+    width: 90vw !important;
+  }
+
+  .product-table :deep(.el-table__header-wrapper),
+  .product-table :deep(.el-table__row td) {
+    font-size: 12px;
+  }
+
+  .pagination-wrap {
+    justify-content: center;
+  }
+}
+
+@media (min-width: 769px) {
   .toolbar {
     flex-direction: row;
     justify-content: space-between;
     align-items: flex-start;
+  }
+
+  .toolbar-actions {
+    flex-shrink: 0;
   }
 }
 </style>
