@@ -14,6 +14,11 @@ from app.models.user import Role, User
 
 
 async def init_admin():
+    admin_username = os.environ.get("ADMIN_USERNAME", "admin")
+    admin_password = os.environ.get("ADMIN_PASSWORD")
+    if not admin_password:
+        raise RuntimeError("ADMIN_PASSWORD is required")
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
@@ -31,25 +36,25 @@ async def init_admin():
             db.add(admin_role)
             await db.flush()
 
-        result = await db.execute(select(User).where(User.username == "admin"))
+        result = await db.execute(select(User).where(User.username == admin_username))
         admin_user = result.scalar_one_or_none()
 
         if not admin_user:
             admin_user = User(
                 id=uuid4(),
-                username="admin",
-                password_hash=get_password_hash("admin123"),
+                username=admin_username,
+                password_hash=get_password_hash(admin_password),
                 role_id=admin_role.id,
                 status="active",
             )
             db.add(admin_user)
-            await db.commit()
-            print("初始管理员创建成功!")
-            print("  用户名: admin")
-            print("  密码: admin123")
-            print("  角色: 系统管理员")
+            print(f"初始管理员已创建: {admin_username}")
         else:
-            print("管理员已存在，跳过创建。")
+            admin_user.password_hash = get_password_hash(admin_password)
+            admin_user.role_id = admin_role.id
+            admin_user.status = "active"
+            print(f"管理员凭据已从受控环境变量同步: {admin_username}")
+        await db.commit()
 
 
 if __name__ == "__main__":

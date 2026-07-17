@@ -16,7 +16,7 @@ pip install -r requirements.txt
 基于仓库根 `.env.example` 准备 `.env`（或导出环境变量），至少包含：
 
 - `DATABASE_URL`（如 `postgresql://pim:pim_password@localhost:5432/ai_pim`）
-- `JWT_SECRET`、`MINIO_*`、`REDIS_URL` 等（详见 `.env.example`）
+- `JWT_SECRET`、`ADMIN_PASSWORD`、`MINIO_*`、`REDIS_URL` 等（详见 `.env.example`）
 
 ## 3. 数据库迁移（必须）
 
@@ -37,7 +37,7 @@ alembic upgrade head
 python -m app.scripts.init_admin
 ```
 
-默认创建：用户名 `admin` / 密码 `admin123` / 角色 `系统管理员`。已存在则跳过。
+用户名默认 `admin`，密码必须通过 `ADMIN_PASSWORD` 注入。启动时会将管理员凭据同步为受控环境值，日志不输出密码。
 
 ## 5. RBAC 种子数据
 

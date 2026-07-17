@@ -41,7 +41,7 @@
             </el-tag>
             <el-tag
               v-if="product.stockStatus"
-              :type="product.stockStatus === 'in_stock' ? 'success' : product.stockStatus === 'out_of_stock' ? 'danger' : 'warning'"
+              :type="product.stockStatus === 'in_stock' ? 'success' : product.stockStatus === 'out_of_stock' ? 'danger' : product.stockStatus === 'unknown' ? 'info' : 'warning'"
               size="large"
               style="margin-left: 8px"
             >
@@ -107,7 +107,14 @@
           >无权限查看</span>
         </el-descriptions-item>
         <el-descriptions-item label="面价">
-          ¥{{ (product.facePrice || 0).toFixed(2) }}
+          <el-tag
+            v-if="product.facePrice === 99999 && product.completenessStatus === 'pending'"
+            size="small"
+            type="warning"
+          >
+            待核价
+          </el-tag>
+          <span v-else>¥{{ product.facePrice.toFixed(2) }}</span>
         </el-descriptions-item>
         <el-descriptions-item
           v-if="canViewCost"
@@ -131,7 +138,57 @@
         <el-descriptions-item label="更新时间">
           {{ formatDate(product.updateTime) }}
         </el-descriptions-item>
+        <el-descriptions-item label="规格">
+          {{ product.specification || '待补充' }}
+        </el-descriptions-item>
+        <el-descriptions-item label="颜色">
+          {{ product.colors || '待补充' }}
+        </el-descriptions-item>
+        <el-descriptions-item label="数据完整性">
+          <el-tag :type="product.completenessStatus === 'complete' ? 'success' : 'warning'">
+            {{ product.completenessStatus === 'complete' ? '完整' : '待补充' }}
+          </el-tag>
+        </el-descriptions-item>
+        <el-descriptions-item label="来源">
+          {{ product.dataSource || '-' }}
+        </el-descriptions-item>
+        <el-descriptions-item
+          label="产品描述"
+          :span="2"
+        >
+          {{ product.description || '待补充' }}
+        </el-descriptions-item>
       </el-descriptions>
+
+      <section class="manual-section">
+        <h4>说明书状态</h4>
+        <el-table
+          :data="manuals"
+          size="small"
+          empty-text="暂无说明书"
+        >
+          <el-table-column
+            prop="doc_type"
+            label="类型"
+          />
+          <el-table-column
+            prop="parse_status"
+            label="解析状态"
+          />
+          <el-table-column
+            prop="index_status"
+            label="索引状态"
+          />
+          <el-table-column
+            label="失败原因"
+            min-width="180"
+          >
+            <template #default="scope">
+              {{ scope.row.parse_error || scope.row.index_error || '-' }}
+            </template>
+          </el-table-column>
+        </el-table>
+      </section>
 
       <div
         v-if="product.tags && product.tags.length"
@@ -249,6 +306,10 @@
                   <el-option
                     label="预售"
                     value="preorder"
+                  />
+                  <el-option
+                    label="未知"
+                    value="unknown"
                   />
                 </el-select>
               </el-form-item>
@@ -369,11 +430,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
-import { productApi, categoryApi, brandApi, supplierApi, tagApi } from '@/api'
+import { productApi, categoryApi, brandApi, supplierApi, tagApi, manualApi } from '@/api'
+import type { ProductManual } from '@/types/manuals'
 import { useAuthStore } from '@/stores/auth'
 import { hasPermission } from '@/types/permissions'
 
@@ -393,10 +455,11 @@ const canClone = computed(() => hasPermission(userPermissions.value, 'product:cl
 const canChangeStatus = computed(() => hasPermission(userPermissions.value, 'product:status'))
 
 const statusMap: Record<string, string> = { active: '上架', inactive: '下架', draft: '草稿' }
-const stockStatusMap: Record<string, string> = { in_stock: '有货', out_of_stock: '缺货', preorder: '预售' }
+const stockStatusMap: Record<string, string> = { in_stock: '有货', out_of_stock: '缺货', preorder: '预售', unknown: '未知' }
 
 const loading = ref(false)
 const product = ref<any>(null)
+const manuals = ref<ProductManual[]>([])
 const editMode = ref(false)
 const saving = ref(false)
 const productFormRef = ref<FormInstance>()
@@ -410,7 +473,7 @@ const editForm = reactive({
   brandId: '' as string | undefined,
   supplierId: '' as string | undefined,
   categoryId: '' as string | string[] | undefined,
-  facePrice: 0,
+  facePrice: 99999,
   costPrice: undefined as number | undefined,
   material: '',
   stockStatus: 'in_stock',
@@ -434,7 +497,7 @@ const fetchProduct = async () => {
   loading.value = true
   try {
     const res = await productApi.get(route.params.id as string)
-    product.value = res.data || res
+    product.value = normalizeProduct(res.data || res)
   } catch {
     product.value = null
   } finally {
@@ -442,18 +505,67 @@ const fetchProduct = async () => {
   }
 }
 
+const normalizeProduct = (item: any) => ({
+  ...item,
+  productNo: item.product_no,
+  productName: item.product_name,
+  brandId: item.brand_id,
+  brandName: item.brand_name,
+  supplierId: item.supplier_id,
+  supplierName: item.supplier_name,
+  categoryId: item.category_id,
+  categoryName: item.category_name,
+  facePrice: item.face_price,
+  costPrice: item.cost_price,
+  stockStatus: item.stock_status,
+  completenessStatus: item.completeness_status,
+  dataSource: item.data_source,
+  tagIds: item.tag_ids || [],
+  createTime: item.create_time,
+  updateTime: item.update_time,
+})
+
+const normalizeCategory = (item: any): any => ({
+  ...item,
+  categoryName: item.category_name,
+  children: (item.children || []).map(normalizeCategory),
+})
+
+const fetchManuals = async () => {
+  try {
+    const res = await manualApi.list({ product_id: route.params.id, page: 1, size: 50 }) as any
+    manuals.value = res.data?.list || []
+  } catch {
+    manuals.value = []
+  }
+}
+
 const fetchMasterData = async () => {
   try {
-    const [catRes, brandRes, supplierRes, tagRes] = await Promise.all([
+    const [catResult, brandResult, supplierResult, tagResult] = await Promise.allSettled([
       categoryApi.list(),
       brandApi.list(),
       supplierApi.list(),
       tagApi.list(),
     ])
-    categoryOptions.value = catRes.data || []
-    brands.value = brandRes.data?.list || []
-    suppliers.value = supplierRes.data?.list || []
-    tags.value = tagRes.data?.list || []
+    const catRes = catResult.status === 'fulfilled' ? catResult.value : { data: [] }
+    const brandRes = brandResult.status === 'fulfilled' ? brandResult.value : { data: { list: [] } }
+    const supplierRes = supplierResult.status === 'fulfilled' ? supplierResult.value : { data: { list: [] } }
+    const tagRes = tagResult.status === 'fulfilled' ? tagResult.value : { data: { list: [] } }
+    categoryOptions.value = (catRes.data || []).map(normalizeCategory)
+    brands.value = (brandRes.data?.list || []).map((item: any) => ({
+      ...item,
+      brandName: item.brand_name,
+    }))
+    suppliers.value = (supplierRes.data?.list || []).map((item: any) => ({
+      ...item,
+      supplierName: item.supplier_name,
+    }))
+    tags.value = (tagRes.data?.list || []).map((item: any) => ({
+      ...item,
+      tagName: item.tag_name,
+      tagType: item.tag_type,
+    }))
   } catch {
     // silently fail
   }
@@ -470,7 +582,11 @@ const populateEditForm = () => {
   editForm.material = product.value.material || ''
   editForm.stockStatus = product.value.stockStatus
   editForm.status = product.value.status
-  editForm.tagIds = (product.value.tags || []).filter(Boolean)
+  editForm.tagIds = product.value.tagIds?.length
+    ? [...product.value.tagIds]
+    : (product.value.tags || [])
+      .map((name: string) => tags.value.find((tag) => tag.tagName === name || tag.tag_name === name)?.id)
+      .filter(Boolean)
 }
 
 const handleSaveEdit = async () => {
@@ -551,11 +667,10 @@ const formatDate = (d: string | null | undefined) => {
 
 onMounted(() => {
   fetchProduct()
+  fetchManuals()
   fetchMasterData()
 })
 
-// Watch editMode to populate form when entering edit mode
-import { watch } from 'vue'
 watch(editMode, (val) => {
   if (val) populateEditForm()
   else {

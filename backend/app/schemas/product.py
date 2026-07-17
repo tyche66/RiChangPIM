@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class ProductBase(BaseModel):
@@ -15,7 +15,18 @@ class ProductBase(BaseModel):
     material: str | None = None
     stock_status: str = "in_stock"
     status: str = "draft"
+    description: str | None = None
+    specification: str | None = None
+    colors: str | None = None
+    data_source: str | None = None
+    completeness_status: str = "complete"
     tag_ids: list[UUID] = []
+
+    @model_validator(mode="after")
+    def validate_placeholder_price(self):
+        if self.face_price == 99999 and self.completeness_status != "pending":
+            raise ValueError("占位面价 99999 仅允许用于待补充产品")
+        return self
 
 
 class ProductCreate(ProductBase):
@@ -32,7 +43,19 @@ class ProductUpdate(BaseModel):
     material: str | None = None
     stock_status: str | None = None
     status: str | None = None
+    description: str | None = None
+    specification: str | None = None
+    colors: str | None = None
+    data_source: str | None = None
+    completeness_status: str | None = None
     tag_ids: list[UUID] | None = None
+
+    @field_validator("face_price")
+    @classmethod
+    def face_price_cannot_be_null(cls, value):
+        if value is None:
+            raise ValueError("面价不可为空，待核价时请使用 99999")
+        return value
 
 
 class ProductResponse(ProductBase):
@@ -41,7 +64,18 @@ class ProductResponse(ProductBase):
     update_time: datetime
     brand_name: str | None = None
     category_name: str | None = None
+    supplier_name: str | None = None
     tags: list[str] = []
+
+    @field_validator("tags", mode="before")
+    @classmethod
+    def serialize_tag_names(cls, value):
+        if not value:
+            return []
+        return [
+            item if isinstance(item, str) else getattr(item, "tag_name", str(item))
+            for item in value
+        ]
 
     model_config = ConfigDict(from_attributes=True)
 

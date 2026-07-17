@@ -151,6 +151,16 @@
             >
               <template #default="scope">
                 <el-button
+                  v-if="canEditProduct && scope.row.parse_status === 'ocr_required'"
+                  size="small"
+                  type="warning"
+                  :loading="busyId === scope.row.id"
+                  @click="ocrManual(scope.row.id)"
+                >
+                  OCR
+                </el-button>
+                <el-button
+                  v-if="canEditProduct"
                   size="small"
                   :loading="busyId === scope.row.id"
                   @click="parseManual(scope.row.id)"
@@ -158,6 +168,7 @@
                   解析
                 </el-button>
                 <el-button
+                  v-if="canIndex"
                   size="small"
                   type="primary"
                   :loading="busyId === scope.row.id"
@@ -251,10 +262,18 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { fileApi, manualApi } from '@/api'
 import type { ManualListResponse, ProductManual, RagAnswerResponse, RagSource } from '@/types/manuals'
+import { useAuthStore } from '@/stores/auth'
+import { hasPermission } from '@/types/permissions'
+
+const authStore = useAuthStore()
+const canEditProduct = computed(() => hasPermission(authStore.userPermissions, 'product:edit'))
+const canIndex = computed(() =>
+  authStore.userRoleCode === 'admin' && hasPermission(authStore.userPermissions, 'ai:use')
+)
 
 const manuals = ref<ProductManual[]>([])
 const selectedFile = ref<File | null>(null)
@@ -340,6 +359,20 @@ async function indexManual(id: string) {
     await loadManuals()
   } catch {
     ElMessage.error('索引失败，请查看失败原因')
+    await loadManuals()
+  } finally {
+    busyId.value = ''
+  }
+}
+
+async function ocrManual(id: string) {
+  busyId.value = id
+  try {
+    await manualApi.ocr(id)
+    ElMessage.success('OCR 识别完成')
+    await loadManuals()
+  } catch {
+    ElMessage.error('OCR 识别失败，请查看失败原因')
     await loadManuals()
   } finally {
     busyId.value = ''

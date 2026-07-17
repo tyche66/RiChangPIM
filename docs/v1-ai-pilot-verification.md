@@ -12,7 +12,7 @@
 
 - PostgreSQL：16.x，镜像 `pgvector/pgvector:pg16`
 - PostgreSQL 固定卷：`richangpim_go_postgres_pg16_data_20260716`
-- Alembic head：`0007_add_manual_parse_metadata`
+- 本文记录验收时 head 为 `0007_add_manual_parse_metadata`；当前 V1.1 head 已推进到 `0009_sunon_pilot_product_fields`
 - 圣奥导入：1 个供应商、11 个一级分类、53 个二级分类、173 个系列标签
 - 运行服务：PostgreSQL、Redis、MinIO、Gotenberg、backend、nginx 均正常
 - 最终 AI 配置：`AI_ADAPTER=none`，`AI_API_KEY` 为空

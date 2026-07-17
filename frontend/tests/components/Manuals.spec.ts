@@ -4,6 +4,7 @@ import { ElButton, ElInput, ElSelect, ElTag, ElMessage } from 'element-plus'
 import ElementPlus from 'element-plus'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { setActivePinia, createPinia } from 'pinia'
+import { useAuthStore } from '@/stores/auth'
 
 vi.mock('@/api', () => ({
   fileApi: {
@@ -18,6 +19,7 @@ vi.mock('@/api', () => ({
     get: vi.fn(),
     delete: vi.fn(),
     parse: vi.fn(),
+    ocr: vi.fn(),
     index: vi.fn(),
     answer: vi.fn(),
   },
@@ -99,9 +101,15 @@ const factory = async () => {
   router.push('/')
   await router.isReady()
 
+  const pinia = createPinia()
+  setActivePinia(pinia)
+  const authStore = useAuthStore(pinia)
+  authStore.permissions = ['product:edit', 'ai:use']
+  authStore.roleCode = 'admin'
+
   const wrapper = mount(Manuals, {
     global: {
-      plugins: [createPinia(), router, ElementPlus],
+      plugins: [pinia, router, ElementPlus],
     },
   })
   await flushPromises()

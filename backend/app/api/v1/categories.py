@@ -24,7 +24,7 @@ def _category_response(category: Category, children: list[CategoryResponse] | No
     )
 
 
-@router.get("", response_model=list, dependencies=[Depends(PermissionChecker("category:view"))])
+@router.get("", response_model=dict, dependencies=[Depends(PermissionChecker("category:view"))])
 async def list_categories(db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(Category)

@@ -3,8 +3,10 @@ services:
     image: nginx:alpine
     ports:
       - "80:80"
+      - "443:443"
     volumes:
       - ./docker/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./docker/nginx/certs:/etc/nginx/certs:ro
       - ./frontend/dist:/usr/share/nginx/html
     depends_on:
       backend:
@@ -21,6 +23,8 @@ services:
       - MINIO_ACCESS_KEY=${MINIO_ROOT_USER:?MINIO_ROOT_USER is required}
       - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
       - JWT_ALGORITHM=HS256
       - ACCESS_TOKEN_EXPIRE_MINUTES=120
       - AI_ADAPTER=${AI_ADAPTER:-none}
@@ -32,12 +36,17 @@ services:
       - AI_TIMEOUT=${AI_TIMEOUT:-30}
       - AI_RATE_LIMIT=${AI_RATE_LIMIT:-10}
       - AI_RATE_LIMIT_WINDOW=${AI_RATE_LIMIT_WINDOW:-60}
+      - OCR_ADAPTER=${OCR_ADAPTER:-none}
+      - OCR_API_URL=${OCR_API_URL:-http://ocr:8080}
+      - OCR_TIMEOUT=${OCR_TIMEOUT:-300}
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
       minio:
+        condition: service_healthy
+      ocr:
         condition: service_healthy
     restart: always
     healthcheck:
@@ -97,6 +106,16 @@ services:
     image: gotenberg/gotenberg:8
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: always
+
+  ocr:
+    build: ./docker/ocr
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8080/health')\""]
       interval: 15s
       timeout: 5s
       retries: 5

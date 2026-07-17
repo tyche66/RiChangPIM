@@ -146,7 +146,8 @@ export const productApi = {
   updateStatus: (id: string, status: string) =>
     api.patch(`/products/${id}/status`, { status }),
   clone: (id: string) => api.post(`/products/${id}/clone`),
-  export: () => api.get('/products/export'),
+  export: (params?: Record<string, unknown>) =>
+    api.get('/products/export', { params, responseType: 'blob' }),
   import: (data: unknown, params?: Record<string, unknown>) =>
     api.post('/products/import', data, { params }),
 }
@@ -233,6 +234,7 @@ export const manualApi = {
   get: (id: string) => api.get(`/manuals/${id}`),
   delete: (id: string) => api.delete(`/manuals/${id}`),
   parse: (id: string) => api.post(`/manuals/${id}/parse`),
+  ocr: (id: string) => api.post(`/manuals/${id}/ocr`),
   index: (id: string) => api.post(`/manuals/${id}/index`),
   answer: (data: unknown) => api.post('/manuals/answer', data),
 }

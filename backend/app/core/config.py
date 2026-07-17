@@ -36,6 +36,10 @@ class Settings(BaseSettings):
 
     GOTENBERG_URL: str = "http://gotenberg:3000"
 
+    OCR_ADAPTER: str = "none"
+    OCR_API_URL: str = "http://ocr:8080"
+    OCR_TIMEOUT: float = 300.0
+
     AI_ADAPTER: str | None = None
     AI_API_URL: str | None = None
     AI_API_KEY: str | None = None

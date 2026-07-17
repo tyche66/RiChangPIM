@@ -79,6 +79,10 @@ class Product(CommonBase):
     stock_status = Column(String(20), default="in_stock")
     status = Column(String(20), default="draft")
     description = Column(Text)
+    specification = Column(String(255))
+    colors = Column(Text)
+    data_source = Column(String(512))
+    completeness_status = Column(String(20), nullable=False, default="complete")
     vector = Column(Vector(1536), nullable=True)
 
     __table_args__ = (
@@ -86,8 +90,16 @@ class Product(CommonBase):
             "status IN ('active', 'inactive', 'draft')", name="check_product_status"
         ),
         CheckConstraint(
-            "stock_status IN ('in_stock', 'out_of_stock', 'preorder')",
+            "stock_status IN ('in_stock', 'out_of_stock', 'preorder', 'unknown')",
             name="check_product_stock_status",
+        ),
+        CheckConstraint(
+            "completeness_status IN ('complete', 'pending', 'unknown')",
+            name="check_product_completeness_status",
+        ),
+        CheckConstraint(
+            "face_price <> 99999 OR completeness_status = 'pending'",
+            name="check_product_placeholder_price",
         ),
         # 软删除语义：仅对未删除行保证 product_no 唯一，删除后编号可被复用。
         Index(

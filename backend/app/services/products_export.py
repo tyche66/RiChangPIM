@@ -12,8 +12,9 @@ from uuid import UUID
 import pandas as pd
 from sqlalchemy import func, select
 
+import app.models.doc_chunk  # noqa: F401 - register Product relationship target
 from app.core.database import AsyncSessionLocal
-from app.models.product import Brand, Category, Product, Supplier, Tag
+from app.models.product import Brand, Category, Product, ProductTag, Supplier, Tag
 
 FIELD_MAP = {
     "product_id": "id",
@@ -28,6 +29,10 @@ FIELD_MAP = {
     "stock_status": "stock_status",
     "status": "status",
     "description": "description",
+    "specification": "specification",
+    "colors": "colors",
+    "data_source": "data_source",
+    "completeness_status": "completeness_status",
     "create_time": "create_time",
     "update_time": "update_time",
 }
@@ -64,15 +69,15 @@ def _build_query(
             | (Product.product_no.ilike(f"%{keyword}%"))
         )
     if min_price is not None:
-        query = query.where(Product.face_price >= min_price)
+        query = query.where(Product.face_price != 99999, Product.face_price >= min_price)
     if max_price is not None:
-        query = query.where(Product.face_price <= max_price)
+        query = query.where(Product.face_price != 99999, Product.face_price <= max_price)
 
     if tag_ids:
         tag_id_list = [UUID(t.strip()) for t in tag_ids.split(",") if t.strip()]
         if tag_id_list:
-            subq = select(Product.id).where(
-                Product.id.in_(select(Tag.id).where(Tag.id.in_(tag_id_list)))
+            subq = select(ProductTag.product_id).where(
+                ProductTag.tag_id.in_(tag_id_list), ProductTag.is_deleted.is_(False)
             )
             query = query.where(Product.id.in_(subq))
 
@@ -133,12 +138,14 @@ async def fetch_products_for_export(
             )
             category_map = {c.id: c.category_name for c in category_result.scalars().all()}
 
-            from app.models.product import ProductTag
-
             tag_result = await session.execute(
                 select(ProductTag, Tag)
                 .join(Tag, ProductTag.tag_id == Tag.id)
-                .where(ProductTag.product_id.in_(product_ids))
+                .where(
+                    ProductTag.product_id.in_(product_ids),
+                    ProductTag.is_deleted.is_(False),
+                    Tag.is_deleted.is_(False),
+                )
             )
             for pt, tag in tag_result.all():
                 tag_map.setdefault(pt.product_id, []).append(tag.tag_name)
@@ -152,12 +159,16 @@ async def fetch_products_for_export(
             "brand_name": brand_map.get(p.brand_id),
             "supplier_name": supplier_map.get(p.supplier_id),
             "category_name": category_map.get(p.category_id),
-            "face_price": p.face_price,
+            "face_price": "待核价" if p.face_price == 99999 else p.face_price,
             "cost_price": p.cost_price,
             "material": p.material,
             "stock_status": p.stock_status,
             "status": p.status,
             "description": p.description,
+            "specification": p.specification,
+            "colors": p.colors,
+            "data_source": p.data_source,
+            "completeness_status": p.completeness_status,
             "create_time": p.create_time.isoformat() if p.create_time else "",
             "update_time": p.update_time.isoformat() if p.update_time else "",
             "tags": ", ".join(tag_map.get(p.id, [])),
@@ -172,12 +183,13 @@ def build_excel_bytes(rows: list[dict], role_code: str = "admin") -> bytes:
 
     role_code != 'sales' 时保留 cost_price；sales 角色该列置零。
     """
-    df = pd.DataFrame(rows)
+    df = pd.DataFrame(rows, columns=list(FIELD_MAP.keys()) + ["tags"])
 
-    if role_code == "sales":
-        df["cost_price"] = 0.0
+    fields = list(FIELD_MAP.keys())
+    if role_code in {"sales", "viewer"}:
+        fields = [field for field in fields if field not in {"cost_price", "supplier_name"}]
 
-    df = df[list(FIELD_MAP.keys()) + ["tags"]]
+    df = df[fields + ["tags"]]
 
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:

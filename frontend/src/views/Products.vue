@@ -55,6 +55,22 @@
               />
             </el-select>
           </el-form-item>
+          <el-form-item label="系列">
+            <el-select
+              v-model="queryParams.seriesTagId"
+              placeholder="全部"
+              clearable
+              filterable
+              class="filter-input"
+            >
+              <el-option
+                v-for="tag in seriesTags"
+                :key="tag.id"
+                :label="tag.tagName"
+                :value="tag.id"
+              />
+            </el-select>
+          </el-form-item>
           <el-form-item label="状态">
             <el-select
               v-model="queryParams.status"
@@ -94,6 +110,10 @@
               <el-option
                 label="预售"
                 value="preorder"
+              />
+              <el-option
+                label="未知"
+                value="unknown"
               />
             </el-select>
           </el-form-item>
@@ -184,7 +204,14 @@
           align="right"
         >
           <template #default="{ row }">
-            ¥{{ (row.facePrice || 0).toFixed(2) }}
+            <el-tag
+              v-if="row.facePrice === 99999 && row.completenessStatus === 'pending'"
+              size="small"
+              type="warning"
+            >
+              待核价
+            </el-tag>
+            <span v-else>¥{{ row.facePrice.toFixed(2) }}</span>
           </template>
         </el-table-column>
         <el-table-column
@@ -210,7 +237,7 @@
         >
           <template #default="{ row }">
             <el-tag
-              :type="row.stockStatus === 'in_stock' ? 'success' : row.stockStatus === 'out_of_stock' ? 'danger' : 'warning'"
+              :type="row.stockStatus === 'in_stock' ? 'success' : row.stockStatus === 'out_of_stock' ? 'danger' : row.stockStatus === 'unknown' ? 'info' : 'warning'"
               size="small"
             >
               {{ stockStatusMap[row.stockStatus] || row.stockStatus }}
@@ -434,6 +461,10 @@
                   label="预售"
                   value="preorder"
                 />
+                <el-option
+                  label="未知"
+                  value="unknown"
+                />
               </el-select>
             </el-form-item>
           </el-col>
@@ -557,7 +588,7 @@ const canClone = computed(() => hasPermission(userPermissions.value, 'product:cl
 const canChangeStatus = computed(() => hasPermission(userPermissions.value, 'product:status'))
 
 const statusMap: Record<string, string> = { active: '上架', inactive: '下架', draft: '草稿' }
-const stockStatusMap: Record<string, string> = { in_stock: '有货', out_of_stock: '缺货', preorder: '预售' }
+const stockStatusMap: Record<string, string> = { in_stock: '有货', out_of_stock: '缺货', preorder: '预售', unknown: '未知' }
 
 const loading = ref(false)
 const products = ref<any[]>([])
@@ -570,6 +601,7 @@ const productFormRef = ref<FormInstance>()
 const brands = ref<any[]>([])
 const suppliers = ref<any[]>([])
 const tags = ref<any[]>([])
+const seriesTags = computed(() => tags.value.filter((tag) => tag.tagType === 'series'))
 const categoryOptions = ref<any[]>([])
 
 const queryParams = reactive({
@@ -578,6 +610,7 @@ const queryParams = reactive({
   stockStatus: '',
   brandId: '' as string | undefined,
   supplierId: '' as string | undefined,
+  seriesTagId: '' as string | undefined,
   categoryId: '' as string | string[] | undefined,
   minPrice: undefined as number | undefined,
   maxPrice: undefined as number | undefined,
@@ -591,7 +624,7 @@ const productForm = reactive({
   brandId: '' as string | undefined,
   supplierId: '' as string | undefined,
   categoryId: '' as string | string[] | undefined,
-  facePrice: 0,
+  facePrice: 99999,
   costPrice: undefined as number | undefined,
   material: '',
   stockStatus: 'in_stock',
@@ -625,6 +658,7 @@ const fetchProducts = async () => {
     if (queryParams.stockStatus) params.stock_status = queryParams.stockStatus
     if (queryParams.brandId) params.brand_id = queryParams.brandId
     if (queryParams.supplierId) params.supplier_id = queryParams.supplierId
+    if (queryParams.seriesTagId) params.tag_ids = queryParams.seriesTagId
     if (queryParams.categoryId) {
       const catId = Array.isArray(queryParams.categoryId) ? queryParams.categoryId[queryParams.categoryId.length - 1] : queryParams.categoryId
       params.category_id = catId
@@ -633,7 +667,7 @@ const fetchProducts = async () => {
     if (queryParams.maxPrice !== undefined && queryParams.maxPrice !== null) params.max_price = queryParams.maxPrice
 
     const res = await productApi.list(params)
-    products.value = res.data.list
+    products.value = (res.data.list || []).map(normalizeProduct)
     total.value = res.data.total
   } catch {
     ElMessage.error('加载产品列表失败')
@@ -642,18 +676,58 @@ const fetchProducts = async () => {
   }
 }
 
+const normalizeProduct = (item: any) => ({
+  ...item,
+  productNo: item.product_no,
+  productName: item.product_name,
+  brandId: item.brand_id,
+  brandName: item.brand_name,
+  supplierId: item.supplier_id,
+  supplierName: item.supplier_name,
+  categoryId: item.category_id,
+  categoryName: item.category_name,
+  facePrice: item.face_price,
+  costPrice: item.cost_price,
+  stockStatus: item.stock_status,
+  completenessStatus: item.completeness_status,
+  dataSource: item.data_source,
+  tagIds: item.tag_ids || [],
+  createTime: item.create_time,
+  updateTime: item.update_time,
+})
+
+const normalizeCategory = (item: any): any => ({
+  ...item,
+  categoryName: item.category_name,
+  children: (item.children || []).map(normalizeCategory),
+})
+
 const fetchMasterData = async () => {
   try {
-    const [catRes, brandRes, supplierRes, tagRes] = await Promise.all([
+    const [catResult, brandResult, supplierResult, tagResult] = await Promise.allSettled([
       categoryApi.list(),
       brandApi.list(),
       supplierApi.list(),
       tagApi.list(),
     ])
-    categoryOptions.value = catRes.data || []
-    brands.value = brandRes.data?.list || []
-    suppliers.value = supplierRes.data?.list || []
-    tags.value = tagRes.data?.list || []
+    const catRes = catResult.status === 'fulfilled' ? catResult.value : { data: [] }
+    const brandRes = brandResult.status === 'fulfilled' ? brandResult.value : { data: { list: [] } }
+    const supplierRes = supplierResult.status === 'fulfilled' ? supplierResult.value : { data: { list: [] } }
+    const tagRes = tagResult.status === 'fulfilled' ? tagResult.value : { data: { list: [] } }
+    categoryOptions.value = (catRes.data || []).map(normalizeCategory)
+    brands.value = (brandRes.data?.list || []).map((item: any) => ({
+      ...item,
+      brandName: item.brand_name,
+    }))
+    suppliers.value = (supplierRes.data?.list || []).map((item: any) => ({
+      ...item,
+      supplierName: item.supplier_name,
+    }))
+    tags.value = (tagRes.data?.list || []).map((item: any) => ({
+      ...item,
+      tagName: item.tag_name,
+      tagType: item.tag_type,
+    }))
   } catch {
     // silently fail - master data is optional for product list
   }
@@ -670,6 +744,7 @@ const handleReset = () => {
   queryParams.stockStatus = ''
   queryParams.brandId = ''
   queryParams.supplierId = ''
+  queryParams.seriesTagId = ''
   queryParams.categoryId = ''
   queryParams.minPrice = undefined
   queryParams.maxPrice = undefined
@@ -683,7 +758,7 @@ const resetProductForm = () => {
   productForm.brandId = ''
   productForm.supplierId = ''
   productForm.categoryId = ''
-  productForm.facePrice = 0
+  productForm.facePrice = 99999
   productForm.costPrice = undefined
   productForm.material = ''
   productForm.stockStatus = 'in_stock'
@@ -745,7 +820,11 @@ const handleEdit = (row: any) => {
   productForm.material = row.material || ''
   productForm.stockStatus = row.stockStatus
   productForm.status = row.status
-  productForm.tagIds = (row.tags || []).map((t: any) => typeof t === 'string' ? t : t.id).filter(Boolean)
+  productForm.tagIds = row.tagIds?.length
+    ? [...row.tagIds]
+    : (row.tags || [])
+      .map((name: string) => tags.value.find((tag) => tag.tagName === name || tag.tag_name === name)?.id)
+      .filter(Boolean)
   showCreateDialog.value = true
 }
 
@@ -795,13 +874,14 @@ const handleClone = async (row: any) => {
   }
 }
 
-const handleExport = () => {
+const handleExport = async () => {
   const params: Record<string, string> = {}
   if (queryParams.keyword) params.keyword = queryParams.keyword
   if (queryParams.status) params.status = queryParams.status
   if (queryParams.stockStatus) params.stock_status = queryParams.stockStatus
   if (queryParams.brandId) params.brand_id = queryParams.brandId
   if (queryParams.supplierId) params.supplier_id = queryParams.supplierId
+  if (queryParams.seriesTagId) params.tag_ids = queryParams.seriesTagId
   if (queryParams.categoryId) {
     const catId = Array.isArray(queryParams.categoryId) ? queryParams.categoryId[queryParams.categoryId.length - 1] : queryParams.categoryId
     params.category_id = catId
@@ -809,12 +889,17 @@ const handleExport = () => {
   if (queryParams.minPrice !== undefined && queryParams.minPrice !== null) params.min_price = String(queryParams.minPrice)
   if (queryParams.maxPrice !== undefined && queryParams.maxPrice !== null) params.max_price = String(queryParams.maxPrice)
 
-  const qs = Object.entries(params).map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join('&')
-  const url = `/api/v1/products/export${qs ? '?' + qs : ''}`
-  const a = document.createElement('a')
-  a.href = url
-  a.download = 'products_export.xlsx'
-  a.click()
+  try {
+    const blob = await productApi.export(params) as unknown as Blob
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'products_export.xlsx'
+    a.click()
+    URL.revokeObjectURL(url)
+  } catch {
+    // error handled by api interceptor
+  }
 }
 
 onMounted(() => {

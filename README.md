@@ -30,11 +30,15 @@ npm run dev
 # 1. 配置环境变量
 cp .env.example .env
 # 编辑 .env 修改密码与密钥
+# 必须设置强随机 ADMIN_PASSWORD；缺失时后端 fail-closed，不启动服务
 
 # 2. 构建前端
 cd frontend && npm install && npm run build && cd ..
 
-# 3. 启动全部服务（backend 容器会自动完成 迁移 -> 初始管理员 -> 种子数据 -> 启动）
+# 3. 配置 TLS 证书。仅本地验收可生成自签名证书；生产环境必须放置受信任证书
+./scripts/generate_dev_tls.sh
+
+# 4. 启动全部服务（backend 容器会自动完成 迁移 -> 初始管理员 -> 种子数据 -> 启动）
 docker compose up -d
 ```
 
@@ -42,7 +46,16 @@ docker compose up -d
 > **自动执行**，无需手动 `alembic upgrade head` / `init_admin`。任意步骤真实失败时容器以非零状态退出，
 > 不会对外提供服务。手动 migrate/seed 仅用于故障恢复与维护（详见 `backend/README.md`）。
 
-访问地址: http://localhost
+访问地址: https://localhost（开发自签名证书需要浏览器手动信任）
+
+### V1.1 运维
+
+- OCR 默认关闭：`OCR_ADAPTER=none`。仅在受控环境改为 `tesseract`，扫描 PDF 才会调用内部 OCR 服务。
+- AI 默认关闭：`AI_ADAPTER=none`。外部 AI Key 只能通过未提交的 `.env` 或秘密管理系统注入。
+- PostgreSQL 备份/恢复：`scripts/db_backup.sh`、`scripts/db_restore.sh`。
+- MinIO 备份/恢复：`scripts/minio_backup.sh`、`scripts/minio_restore.sh`。
+- 本地 TLS：`scripts/generate_dev_tls.sh`；生产必须使用受信任证书或外部 TLS 终止。
+- 当前 migration head：`0009_sunon_pilot_product_fields`。
 
 ## 技术栈
 

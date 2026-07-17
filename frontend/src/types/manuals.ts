@@ -4,7 +4,7 @@ export interface ProductManual {
   attachment_id: string
   doc_type: string
   parsed_content?: string | null
-  parse_status: 'pending' | 'processing' | 'parsed' | 'failed'
+  parse_status: 'pending' | 'processing' | 'parsed' | 'failed' | 'ocr_required'
   parse_error?: string | null
   parser_name?: string | null
   parser_version?: string | null

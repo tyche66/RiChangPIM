@@ -188,8 +188,9 @@
 - 成功响应：`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`
   流（`products_export.xlsx`），响应头 `X-Total-Count`。字段含 product_id/product_no/
   product_name/brand_name/supplier_name/category_name/face_price/cost_price/material/
-  stock_status/status/description/create_time/update_time/tags。`role_code="sales"` 时
-  `cost_price` 置 0。
+  specification/colors/data_source/completeness_status/stock_status/status/description/
+  create_time/update_time/tags。待核价占位值导出为“待核价”；sales/viewer 导出不包含
+  `cost_price` 和 `supplier_name` 列。
 - 主要错误码：40101/40102/40301。
 
 ---

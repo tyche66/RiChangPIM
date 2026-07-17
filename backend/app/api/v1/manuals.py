@@ -23,6 +23,7 @@ from app.schemas.manuals import (
     ProductManualResponse,
     RagAnswerRequest,
 )
+from app.services.ocr import OcrError, ocr_pdf
 from app.services.parsers import ParserError, get_parser
 from app.services.rag_index import RagIndexer, RagSearcher
 
@@ -244,6 +245,65 @@ async def parse_manual(
         raise HTTPException(
             status_code=status_code,
             detail={"code": 42204, "msg": exc.message, "reason": exc.code},
+        ) from exc
+
+
+@router.post(
+    "/{manual_id}/ocr",
+    response_model=dict,
+    dependencies=[
+        Depends(PermissionChecker("product:edit")),
+        Depends(_check_admin_rate_limit),
+    ],
+)
+@audit_action("manual_ocr", module="manuals", target_id_kwarg="manual_id")
+async def ocr_manual(
+    request: Request,
+    manual_id: UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    manual = await _fetch_manual(db, manual_id)
+    attachment = await _fetch_attachment(db, manual.attachment_id)
+    if attachment.file_type != "pdf":
+        raise HTTPException(status_code=422, detail={"code": 42202, "msg": "OCR 仅支持 PDF"})
+    manual.parse_status = "processing"
+    manual.parse_error = None
+    await db.commit()
+    try:
+        file_bytes = await _download_attachment_bytes(attachment)
+        result = await ocr_pdf(file_bytes, attachment.file_name)
+        manual = await _fetch_manual(db, manual_id)
+        manual.parsed_content = result.text
+        manual.content_hash = result.content_hash
+        manual.page_count = result.page_count
+        manual.parser_name = result.engine
+        manual.parser_version = result.version
+        manual.parse_status = "parsed"
+        manual.parse_error = None
+        manual.index_status = "pending"
+        manual.index_error = None
+        await db.commit()
+        await db.refresh(manual)
+        return _envelope(ProductManualResponse.model_validate(manual).model_dump(mode="json"))
+    except (OcrError, ParserError) as exc:
+        manual = await _fetch_manual(db, manual_id)
+        manual.parse_status = "failed"
+        manual.parse_error = str(exc)
+        manual.index_status = "failed"
+        manual.index_error = str(exc)
+        await db.commit()
+        raise HTTPException(
+            status_code=503, detail={"code": 50303, "msg": str(exc)}
+        ) from exc
+    except Exception as exc:  # noqa: BLE001 - persist a diagnosable terminal state
+        manual = await _fetch_manual(db, manual_id)
+        manual.parse_status = "failed"
+        manual.parse_error = "OCR 处理异常"
+        manual.index_status = "failed"
+        manual.index_error = "OCR 处理异常"
+        await db.commit()
+        raise HTTPException(
+            status_code=503, detail={"code": 50303, "msg": "OCR 处理异常"}
         ) from exc
 
 

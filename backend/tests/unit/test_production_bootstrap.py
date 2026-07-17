@@ -32,6 +32,12 @@ def test_backend_and_postgres_receive_same_required_password():
     assert expected in backend_env["DATABASE_URL"]
 
 
+def test_production_requires_admin_password():
+    compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
+    backend_env = _service_environment(compose, "backend")
+    assert backend_env["ADMIN_PASSWORD"] == "${ADMIN_PASSWORD:-}"
+
+
 def test_pgvector_uses_sqlalchemy_type_without_conflicting_asyncpg_codec():
     from app.core import database
 

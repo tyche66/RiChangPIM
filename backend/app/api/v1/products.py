@@ -44,7 +44,12 @@ async def list_products(
     size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
 ):
-    query = select(Product).options(selectinload(Product.tags)).where(Product.is_deleted.is_(False))
+    query = select(Product).options(
+        selectinload(Product.tags),
+        selectinload(Product.brand),
+        selectinload(Product.supplier),
+        selectinload(Product.category),
+    ).where(Product.is_deleted.is_(False))
 
     if category_id:
         query = query.where(Product.category_id == category_id)
@@ -52,6 +57,22 @@ async def list_products(
         query = query.where(Product.brand_id == brand_id)
     if supplier_id:
         query = query.where(Product.supplier_id == supplier_id)
+    if tag_ids:
+        try:
+            parsed_tag_ids = [UUID(value.strip()) for value in tag_ids.split(",") if value.strip()]
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=422, detail={"code": 42201, "msg": "tag_ids 格式无效"}
+            ) from exc
+        if parsed_tag_ids:
+            query = (
+                query.join(ProductTag)
+                .where(
+                    ProductTag.tag_id.in_(parsed_tag_ids),
+                    ProductTag.is_deleted.is_(False),
+                )
+                .distinct()
+            )
     if status:
         query = query.where(Product.status == status)
     if stock_status:
@@ -62,9 +83,9 @@ async def list_products(
             | (Product.product_no.ilike(f"%{keyword}%"))
         )
     if min_price is not None:
-        query = query.where(Product.face_price >= min_price)
+        query = query.where(Product.face_price != 99999, Product.face_price >= min_price)
     if max_price is not None:
-        query = query.where(Product.face_price <= max_price)
+        query = query.where(Product.face_price != 99999, Product.face_price <= max_price)
 
     total_result = await db.execute(select(func.count()).select_from(query.subquery()))
     total = total_result.scalar()
@@ -72,7 +93,7 @@ async def list_products(
     query = query.offset((page - 1) * size).limit(size)
     result = await db.execute(query)
     products = result.scalars().all()
-    items = [ProductResponse.model_validate(p).model_dump(mode="json") for p in products]
+    items = [_product_response(p) for p in products]
     role_code = getattr(request.state, "role_code", None) or "sales"
     items = filter_sensitive_fields(items, role_code)
     return {
@@ -153,15 +174,30 @@ async def get_product(
 ):
     result = await db.execute(
         select(Product)
-        .options(selectinload(Product.tags))
+        .options(
+            selectinload(Product.tags),
+            selectinload(Product.brand),
+            selectinload(Product.supplier),
+            selectinload(Product.category),
+        )
         .where(Product.id == product_id, Product.is_deleted.is_(False))
     )
     product = result.scalar_one_or_none()
     if not product:
         raise HTTPException(status_code=404, detail={"code": 40401, "msg": "产品不存在"})
-    body = ProductResponse.model_validate(product).model_dump(mode="json")
+    body = _product_response(product)
     role_code = getattr(request.state, "role_code", None)
     return filter_sensitive_fields(body, role_code or "sales")
+
+
+def _product_response(product: Product) -> dict:
+    body = ProductResponse.model_validate(product).model_dump(mode="json")
+    body["brand_name"] = product.brand.brand_name if product.brand else None
+    body["supplier_name"] = product.supplier.supplier_name if product.supplier else None
+    body["category_name"] = product.category.category_name if product.category else None
+    body["tags"] = [tag.tag_name for tag in product.tags]
+    body["tag_ids"] = [str(tag.id) for tag in product.tags]
+    return body
 
 
 @router.post(
@@ -191,9 +227,17 @@ async def create_product(
             db.add(ProductTag(product_id=product.id, tag_id=tag_id))
 
     await db.commit()
-    await db.refresh(product)
-    await db.refresh(product, ["tags"])
-    return product
+    product = await db.scalar(
+        select(Product)
+        .options(
+            selectinload(Product.tags),
+            selectinload(Product.brand),
+            selectinload(Product.supplier),
+            selectinload(Product.category),
+        )
+        .where(Product.id == product.id)
+    )
+    return _product_response(product)
 
 
 @router.put(
@@ -213,13 +257,37 @@ async def update_product(
     if not product:
         raise HTTPException(status_code=404, detail={"code": 40401, "msg": "产品不存在"})
 
-    for field, value in product_data.model_dump(exclude_unset=True).items():
-        if value is not None:
-            setattr(product, field, value)
+    values = product_data.model_dump(exclude_unset=True)
+    tag_ids = values.pop("tag_ids", None)
+    next_face_price = values.get("face_price", product.face_price)
+    next_completeness = values.get("completeness_status", product.completeness_status)
+    if next_face_price == 99999 and next_completeness != "pending":
+        raise HTTPException(
+            status_code=422,
+            detail={"code": 42205, "msg": "占位面价 99999 仅允许用于待补充产品"},
+        )
+    for field, value in values.items():
+        setattr(product, field, value)
+
+    if tag_ids is not None:
+        await db.execute(
+            ProductTag.__table__.delete().where(ProductTag.product_id == product.id)
+        )
+        for tag_id in tag_ids:
+            db.add(ProductTag(product_id=product.id, tag_id=tag_id))
 
     await db.commit()
-    await db.refresh(product)
-    return product
+    product = await db.scalar(
+        select(Product)
+        .options(
+            selectinload(Product.tags),
+            selectinload(Product.brand),
+            selectinload(Product.supplier),
+            selectinload(Product.category),
+        )
+        .where(Product.id == product.id)
+    )
+    return _product_response(product)
 
 
 @router.delete("/{product_id}", dependencies=[Depends(PermissionChecker("product:delete"))])
@@ -291,6 +359,12 @@ async def clone_product(
         face_price=product.face_price,
         cost_price=product.cost_price,
         material=product.material,
+        specification=product.specification,
+        colors=product.colors,
+        description=product.description,
+        data_source=product.data_source,
+        completeness_status=product.completeness_status,
+        stock_status=product.stock_status,
         status="draft",
     )
     db.add(cloned)

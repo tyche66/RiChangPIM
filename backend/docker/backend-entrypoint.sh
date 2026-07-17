@@ -9,8 +9,9 @@ DB_USER="${POSTGRES_USER:-pim}"
 DB_PASS="${POSTGRES_PASSWORD:-pim_password}"
 DB_NAME="${POSTGRES_DB:-ai_pim}"
 
-# 容器内连接串：覆盖 alembic.ini 里写死的 localhost。
-DB_URL="postgresql://${DB_USER}:${DB_PASS}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
+# DATABASE_URL 是应用与 Alembic 的权威目标；分项变量仅作为本地 Compose 回退。
+DB_URL="${DATABASE_URL:-postgresql://${DB_USER}:${DB_PASS}@${DB_HOST}:${DB_PORT}/${DB_NAME}}"
+DB_URL="${DB_URL/postgresql+asyncpg:/postgresql:}"
 
 # 临时 alembic 配置：成功/失败都必须清理。
 TMP_INI="$(mktemp)"
@@ -20,7 +21,7 @@ trap cleanup EXIT
 # 写覆盖后的 alembic 配置。
 sed "s#^sqlalchemy.url = .*#sqlalchemy.url = ${DB_URL}#" alembic.ini > "$TMP_INI"
 
-echo "[entrypoint] 等待数据库 ${DB_HOST}:${DB_PORT} 就绪..."
+echo "[entrypoint] 等待配置的数据库就绪..."
 
 # 注意：后端镜像基于 python:3.11-slim + libpq-dev，不含 pg_isready 二进制。
 # 这里用镜像内已安装的 psycopg2 做连接探测，避免依赖未安装的系统客户端。

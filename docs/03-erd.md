@@ -1,12 +1,12 @@
 # docs/03 — 数据模型 / ERD（实体关系图）
 
 > 本文档为 **AI-PIM MVP（阶段①~③）已交付** 的权威数据模型说明，依据实际 ORM
-> （`backend/app/models/*`）与 Alembic migration（`0001_initial` → `0008_v11_audit_workflow_ocr`）
+> （`backend/app/models/*`）与 Alembic migration（`0001_initial` → `0009_sunon_pilot_product_fields`）
 > 逐表核对生成，**仅描述已实现行为，不虚构表/字段**。
 >
 > 源依据：
 > - ORM：`app/models/base.py`、`product.py`、`sales.py`、`audit.py`、`user.py`、`doc_chunk.py`
-> - Migration：`alembic/versions/0001_initial.py` → `0008_v11_audit_workflow_ocr.py`
+> - Migration：`alembic/versions/0001_initial.py` → `0009_sunon_pilot_product_fields.py`
 > - 通用基类 `CommonBase` 为所有业务表提供：`id`（PK, UUID）、`create_time`、
 >   `update_time`（`BEFORE UPDATE` 触发器维护）、`deleted_at`（软删除时间）、
 >   `is_deleted`（布尔软删除标记，默认 `false`）。
@@ -227,12 +227,16 @@ SoftDel=软删除（`is_deleted`/`deleted_at`）；`↻`=由 DB 触发器维护 
 | brand_id | UUID | N | — | FK→brand.id | 品牌 |
 | supplier_id | UUID | N | — | FK→supplier.id | 供应商 |
 | category_id | UUID | N | — | FK→category.id | 品类 |
-| face_price | Float | N | — | | 面价 |
+| face_price | Float | N | — | CHK 占位值 99999 仅允许 completeness_status=pending | 面价；待核价使用内部占位值 99999，UI/导出显示“待核价” |
 | cost_price | Float | Y | — | | 成本价（敏感字段，sales/viewer 不可见） |
 | material | String(128) | Y | — | | 材质 |
-| stock_status | String(20) | N | 'in_stock' | CHK `IN ('in_stock','out_of_stock','preorder')` | 库存状态 |
+| stock_status | String(20) | N | 'in_stock' | CHK `IN ('in_stock','out_of_stock','preorder','unknown')` | 库存状态 |
 | status | String(20) | N | 'draft' | CHK `IN ('active','inactive','draft')` | 上下架状态 |
 | description | Text | Y | — | | 描述 |
+| specification | String(255) | Y | — | | 规格（0009） |
+| colors | Text | Y | — | | 颜色（0009） |
+| data_source | String(512) | Y | — | | 数据来源（0009） |
+| completeness_status | String(20) | N | 'complete' | CHK complete/pending/unknown | 字段完整性（0009） |
 | vector | Vector(1536) | Y | — | HNSW 索引 | 产品向量（pgvector；未装则字段退化） |
 | create_time / update_time | DateTime(tz) | N | now | `↻` | |
 | deleted_at / is_deleted | — | — | — | SoftDel | |

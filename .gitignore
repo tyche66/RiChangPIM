@@ -21,6 +21,7 @@ htmlcov/
 .env.local
 backend/.env
 docker/volumes/
+docker/nginx/certs/
 logs/
 backups/
 node_modules/

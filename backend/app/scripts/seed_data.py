@@ -151,7 +151,6 @@ ROLE_PERMISSIONS = {
 }
 
 ADMIN_USERNAME = "admin"
-ADMIN_PASSWORD = "admin123"
 
 
 def _expand(perm_codes):
@@ -250,6 +249,9 @@ async def _ensure_role_permissions(db, check_only):
 
 
 async def _ensure_admin_user(db, check_only):
+    admin_password = os.environ.get("ADMIN_PASSWORD")
+    if not check_only and not admin_password:
+        raise RuntimeError("ADMIN_PASSWORD is required when creating the admin user")
     role = (
         await db.execute(select(Role).where(Role.role_code == "admin", Role.is_deleted.is_(False)))
     ).scalar_one_or_none()
@@ -271,12 +273,12 @@ async def _ensure_admin_user(db, check_only):
         User(
             id=uuid4(),
             username=ADMIN_USERNAME,
-            password_hash=get_password_hash(ADMIN_PASSWORD),
+            password_hash=get_password_hash(admin_password),
             role_id=role.id,
             status="active",
         )
     )
-    print(f"  创建 admin 用户: {ADMIN_USERNAME} / 密码: {ADMIN_PASSWORD}")
+    print(f"  创建 admin 用户: {ADMIN_USERNAME}")
     return 1
 
 
