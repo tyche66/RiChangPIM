@@ -1,0 +1,45 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: pim
+      POSTGRES_PASSWORD: pim_password
+      POSTGRES_DB: ai_pim
+    volumes:
+      - ${PG_DATA:-./docker/volumes/postgres_dev}:/var/lib/postgresql/data
+      # 首次初始化（数据目录为空）时自动建集成测试库 ai_pim_test（幂等）。
+      - ./docker/postgres/initdb:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pim"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  minio:
+    image: minio/minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: pim_minio
+      MINIO_ROOT_PASSWORD: pim_minio_secret
+    command: server /data --console-address ":9001"
+    volumes:
+      - ${MINIO_DATA:-./docker/volumes/minio_dev}:/data
+
+  gotenberg:
+    image: gotenberg/gotenberg:8
+    ports:
+      - "8002:3000"
+
+# 本地默认走 ./docker/volumes/* 绑定挂载（数据留在项目目录内）；
+# 命名卷仅在被服务引用时才生效，此处无需预声明。

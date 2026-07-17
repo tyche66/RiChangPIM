@@ -1,0 +1,96 @@
+# AI-PIM RiChangPIM
+
+AI 驱动的企业级产品信息管理平台（AI-PIM）- 日常构建版本
+
+## 快速开始
+
+### 开发环境
+
+```bash
+# 1. 启动依赖中间件
+docker compose -f docker-compose.dev.yml up -d
+
+# 2. 后端
+cd backend
+python -m venv venv
+source venv/bin/activate  # Linux/Mac
+# venv\Scripts\activate  # Windows
+pip install -r requirements.txt
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+# 3. 前端（新终端）
+cd frontend
+npm install
+npm run dev
+```
+
+### 生产环境
+
+```bash
+# 1. 配置环境变量
+cp .env.example .env
+# 编辑 .env 修改密码与密钥
+
+# 2. 构建前端
+cd frontend && npm install && npm run build && cd ..
+
+# 3. 启动全部服务（backend 容器会自动完成 迁移 -> 初始管理员 -> 种子数据 -> 启动）
+docker compose up -d
+```
+
+> 数据库迁移、初始管理员、RBAC 种子数据由 `backend/docker/backend-entrypoint.sh` 在容器启动后
+> **自动执行**，无需手动 `alembic upgrade head` / `init_admin`。任意步骤真实失败时容器以非零状态退出，
+> 不会对外提供服务。手动 migrate/seed 仅用于故障恢复与维护（详见 `backend/README.md`）。
+
+访问地址: http://localhost
+
+## 技术栈
+
+| 层次 | 技术 |
+| --- | --- |
+| 表现层 | Vue3 + Vite + Element Plus + Pinia |
+| 业务层 | FastAPI (Python) |
+| 基础设施 | PostgreSQL + pgvector + Redis + MinIO |
+
+## 项目结构
+
+```
+RiChangPIM/
+├── backend/                    # FastAPI 后端
+│   ├── app/
+│   │   ├── api/v1/            # API 路由
+│   │   ├── core/              # 核心配置
+│   │   ├── models/            # ORM 模型
+│   │   ├── schemas/           # Pydantic 模型
+│   │   ├── services/          # 业务逻辑
+│   │   ├── adapters/          # AI Service Adapter
+│   │   └── main.py            # 应用入口
+│   ├── alembic/               # 数据库迁移
+│   └── Dockerfile
+├── frontend/                   # Vue3 前端
+│   ├── src/
+│   │   ├── api/               # API 请求封装
+│   │   ├── views/             # 页面视图
+│   │   ├── layouts/           # 布局组件
+│   │   └── router.ts          # 路由配置
+│   └── package.json
+├── docker/                     # Docker 配置
+├── docker-compose.yml          # 生产环境
+├── docker-compose.dev.yml      # 开发环境
+└── .env.example               # 环境变量示例
+```
+
+## API 文档
+
+启动后访问: http://localhost/docs
+
+## MVP 功能范围
+
+- 用户管理、RBAC 基础权限
+- 产品 CRUD、分类管理、标签管理
+- 方案生成与基础明细
+- H5 分享 + 二维码 + 基础访问控制
+
+## 许可证
+
+Proprietary

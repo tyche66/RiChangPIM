@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        working-directory: RiChangPIM/backend
+        run: |
+          pip install ruff
+          ruff check app/
+      - name: Syntax check
+        working-directory: RiChangPIM/backend
+        run: python3 -c "import ast, sys; [ast.parse(open(f).read()) for f in __import__('pathlib').Path('app').glob('**/*.py')]"
+
+  frontend-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install and build
+        working-directory: RiChangPIM/frontend
+        run: |
+          npm ci
+          npm run build
+
+  compose-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Docker Compose
+        run: |
+          docker compose version
+      - name: Validate docker-compose.yml
+        run: docker compose -f docker-compose.yml config --quiet
+      - name: Validate docker-compose.dev.yml
+        run: docker compose -f docker-compose.dev.yml config --quiet
