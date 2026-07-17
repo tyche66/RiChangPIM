@@ -16,12 +16,12 @@ jobs:
         with:
           python-version: '3.11'
       - name: Install dependencies
-        working-directory: RiChangPIM/backend
+        working-directory: backend
         run: |
           pip install ruff
           ruff check app/
       - name: Syntax check
-        working-directory: RiChangPIM/backend
+        working-directory: backend
         run: python3 -c "import ast, sys; [ast.parse(open(f).read()) for f in __import__('pathlib').Path('app').glob('**/*.py')]"
 
   frontend-build:
@@ -32,14 +32,21 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
       - name: Install and build
-        working-directory: RiChangPIM/frontend
+        working-directory: frontend
         run: |
           npm ci
           npm run build
 
   compose-validation:
     runs-on: ubuntu-latest
+    env:
+      POSTGRES_PASSWORD: ci-placeholder
+      MINIO_ROOT_USER: ci-placeholder
+      MINIO_ROOT_PASSWORD: ci-placeholder
+      JWT_SECRET: ci-placeholder
     steps:
       - uses: actions/checkout@v4
       - name: Set up Docker Compose
