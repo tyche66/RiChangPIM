@@ -51,3 +51,16 @@
 - 本地 Git 仓库已初始化。
 - 远程 GitHub 尚未配置，等待用户提供仓库地址和认证方式。
 - 尚未创建首次 commit。
+
+## 凭据事件
+
+| 日期 | 事件 | 处理状态 |
+| --- | --- | --- |
+| 2026-07-17 | GitHub PAT 曾在交互会话中明文暴露；文档不记录其值 | 该凭据禁止继续使用，等待在 GitHub 撤销并通过 `gh auth login` 重新登录 |
+
+安全处理要求：
+
+- 在 GitHub `Settings -> Developer settings -> Personal access tokens` 中立即撤销已暴露 Token。
+- 执行 `gh auth logout --hostname github.com` 清除本机旧登录。
+- 推荐重新执行 `gh auth login --hostname github.com --web --git-protocol https`，通过浏览器设备授权登录，避免在聊天或命令参数中传递新 Token。
+- 新凭据不得写入本项目文件、Git 提交、测试报告或操作记录。
