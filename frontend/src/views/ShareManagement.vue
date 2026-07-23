@@ -54,14 +54,24 @@
           </el-table-column>
           <el-table-column
             label="操作"
-            width="120"
-            fixed="right"
+            width="180"
+            align="center"
           >
             <template #default="{ row }">
               <el-button
+                v-if="row.share_type === 'proposal'"
+                size="small"
+                text
+                class="action-link"
+                @click="handleView(row)"
+              >
+                查看
+              </el-button>
+              <el-button
                 v-if="hasPerm('share:delete') && row.status === 'active'"
                 size="small"
-                type="danger"
+                text
+                class="action-link danger"
                 @click="handleRevoke(row)"
               >
                 撤销
@@ -76,12 +86,14 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { shareApi } from '@/api'
 import { useAuthStore } from '@/stores/auth'
 import { hasPermission } from '@/types/permissions'
 
 const authStore = useAuthStore()
+const router = useRouter()
 
 function hasPerm(perm: string): boolean {
   return hasPermission(authStore.permissions, perm)
@@ -128,6 +140,12 @@ const handleRevoke = async (row: ShareRecord) => {
     if (e !== 'cancel') {
       // error handled by interceptor
     }
+  }
+}
+
+const handleView = (row: ShareRecord) => {
+  if (row.share_type === 'proposal') {
+    router.push(`/proposals/${row.target_id}`)
   }
 }
 
@@ -178,6 +196,27 @@ onMounted(fetchShares)
   min-width: 700px;
   border-radius: 12px;
   overflow: hidden;
+}
+
+.action-link {
+  padding: 0;
+  min-height: 0;
+  border: 0;
+  background: transparent;
+  color: rgb(30, 50, 90);
+}
+
+.action-link:hover {
+  background: transparent;
+  color: rgb(30, 50, 90);
+}
+
+.action-link.danger {
+  color: #f56c6c;
+}
+
+.action-link.danger:hover {
+  color: #f56c6c;
 }
 
 @media (max-width: 768px) {

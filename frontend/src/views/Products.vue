@@ -155,6 +155,18 @@
           </el-form-item>
         </el-form>
         <div class="toolbar-actions">
+          <el-radio-group
+            v-model="viewMode"
+            size="small"
+            class="view-mode-toggle"
+          >
+            <el-radio-button value="table">
+              <el-icon><List /></el-icon>
+            </el-radio-button>
+            <el-radio-button value="grid">
+              <el-icon><Grid /></el-icon>
+            </el-radio-button>
+          </el-radio-group>
           <el-button
             class="capsule-btn"
             @click="toggleAutoFit"
@@ -239,7 +251,10 @@
         </button>
       </div>
 
-      <div class="table-wrapper">
+      <div
+        v-if="viewMode === 'table'"
+        class="table-wrapper"
+      >
         <el-table
           ref="productTableRef"
           v-loading="loading"
@@ -390,7 +405,7 @@
           <el-table-column
             prop="status"
             label="状态"
-            width="80"
+            width="88"
             align="center"
           >
             <template #default="{ row }">
@@ -406,14 +421,15 @@
           <el-table-column
             label="操作"
             class="op-col"
-            :width="autoFit ? colWidths['operation'] : 280"
-            fixed="right"
+            min-width="240"
+            :width="autoFit ? colWidths['operation'] : 240"
             align="center"
           >
             <template #default="{ row }">
               <el-button
                 size="small"
-                class="capsule-btn btn-sm"
+                text
+                class="action-link"
                 @click="handleView(row)"
               >
                 查看
@@ -421,39 +437,107 @@
               <el-button
                 v-if="canEdit"
                 size="small"
-                class="capsule-btn btn-sm"
+                text
+                class="action-link"
                 @click="handleEdit(row)"
               >
                 编辑
               </el-button>
-              <el-button
-                v-if="canChangeStatus"
-                size="small"
-                class="capsule-btn btn-sm"
-                @click="showStatusDialog(row)"
-              >
-                状态
-              </el-button>
-              <el-button
-                v-if="canClone"
-                size="small"
-                class="capsule-btn btn-sm"
-                @click="handleClone(row)"
-              >
-                克隆
-              </el-button>
-              <el-button
-                v-if="canDelete"
-                size="small"
-                type="danger"
-                class="capsule-btn btn-sm"
-                @click="handleDelete(row)"
-              >
-                删除
-              </el-button>
+              <el-dropdown trigger="click">
+                <button
+                  type="button"
+                  class="more-trigger"
+                  aria-label="更多操作"
+                >
+                  <el-icon><ArrowDown /></el-icon>
+                </button>
+                <template #dropdown>
+                  <el-dropdown-menu class="flat-action-menu">
+                    <el-dropdown-item
+                      v-if="canChangeStatus"
+                      @click="showStatusDialog(row)"
+                    >
+                      状态
+                    </el-dropdown-item>
+                    <el-dropdown-item
+                      v-if="canClone"
+                      @click="handleClone(row)"
+                    >
+                      克隆
+                    </el-dropdown-item>
+                    <el-dropdown-item
+                      v-if="canDelete"
+                      class="dropdown-item-danger"
+                      @click="handleDelete(row)"
+                    >
+                      删除
+                    </el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
             </template>
           </el-table-column>
         </el-table>
+      </div>
+
+      <div
+        v-else
+        class="product-grid-wrap"
+      >
+        <div class="product-grid">
+          <article
+            v-for="row in products"
+            :key="row.id"
+            class="product-tile"
+            :class="{ 'is-selected': proposalMode && selectedIds.has(row.id) }"
+            @click="handleGridTileClick(row)"
+          >
+            <div class="product-tile-image">
+              <el-image
+                v-if="row.primaryImage?.thumbnailUrl || row.primaryImage?.url"
+                :src="row.primaryImage.thumbnailUrl || row.primaryImage.url"
+                fit="cover"
+                class="tile-img"
+              >
+                <template #error>
+                  <div class="tile-placeholder">
+                    {{ getPlaceholderText(row.productName) }}
+                  </div>
+                </template>
+              </el-image>
+              <div
+                v-else
+                class="tile-placeholder"
+              >
+                {{ getPlaceholderText(row.productName) }}
+              </div>
+            </div>
+            <div class="product-tile-body">
+              <div class="product-tile-meta">
+                <span class="product-tile-no">{{ row.productNo }}</span>
+                <el-tag
+                  size="small"
+                  :type="row.status === 'active' ? 'success' : row.status === 'draft' ? 'info' : 'danger'"
+                  class="capsule-tag tile-status"
+                >
+                  {{ statusMap[row.status] || row.status }}
+                </el-tag>
+              </div>
+              <h3 class="product-tile-name">
+                {{ row.productName }}
+              </h3>
+              <p class="product-tile-brand">
+                {{ row.brandName || '未设置品牌' }}
+              </p>
+              <div class="product-tile-footer">
+                <span class="product-tile-price">¥{{ row.facePrice.toFixed(2) }}</span>
+                <span class="product-tile-category">
+                  {{ row.categoryName || '-' }}
+                </span>
+              </div>
+            </div>
+          </article>
+        </div>
       </div>
 
       <el-pagination
@@ -744,7 +828,7 @@
 import { ref, reactive, computed, onMounted, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
-import { View, Hide, Operation, Grid } from '@element-plus/icons-vue'
+import { View, Hide, Operation, Grid, List, ArrowDown } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 import { productApi, categoryApi, brandApi, supplierApi, tagApi } from '@/api'
 import { useAuthStore } from '@/stores/auth'
@@ -780,6 +864,7 @@ const submitting = ref(false)
 const productFormRef = ref<FormInstance>()
 
 const autoFit = ref(true)
+const viewMode = ref<'table' | 'grid'>('table')
 const costVisible = ref(false)
 const colWidths = ref<Record<string, number>>({})
 const productTableRef = ref()
@@ -808,6 +893,14 @@ function previewProductImage(row: any) {
   if (row.primaryImage?.url) {
     previewUrl.value = row.primaryImage.url
   }
+}
+
+const handleGridTileClick = (row: any) => {
+  if (proposalMode.value) {
+    toggleMobileSelection(row)
+    return
+  }
+  handleView(row)
 }
 
 const brands = ref<any[]>([])
@@ -1357,6 +1450,34 @@ onMounted(() => {
   flex-wrap: wrap;
 }
 
+.view-mode-toggle {
+  align-self: center;
+}
+
+.view-mode-toggle :deep(.el-radio-button__inner) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 0;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: 0 0 0 1px rgba(30, 50, 90, 0.08) inset;
+}
+
+.view-mode-toggle :deep(.el-radio-button__inner .el-icon) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.view-mode-toggle :deep(.el-radio-button__orig-radio:checked + .el-radio-button__inner) {
+  background: rgba(30, 50, 90, 0.92);
+  color: #fff;
+  box-shadow: none;
+}
+
 /* ===== Capsule Inputs & Selects ===== */
 .capsule-input :deep(.el-input__wrapper),
 .capsule-select :deep(.el-select__wrapper),
@@ -1428,6 +1549,66 @@ onMounted(() => {
   border-radius: 16px !important;
 }
 
+.action-link {
+  padding: 0;
+  min-height: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.action-link:hover {
+  background: transparent;
+  color: var(--brand-deep);
+}
+
+.more-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin-left: 6px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.more-trigger:hover {
+  color: var(--brand-deep);
+  background: rgba(30, 50, 90, 0.06);
+}
+
+.flat-action-menu {
+  padding: 6px;
+}
+
+.flat-action-menu :deep(.el-dropdown-menu__item) {
+  border-radius: 10px;
+  line-height: 1.1;
+  padding: 9px 14px;
+  color: var(--text-primary);
+}
+
+.flat-action-menu :deep(.el-dropdown-menu__item:hover) {
+  background: rgba(30, 50, 90, 0.06);
+  color: var(--brand-deep);
+}
+
+.dropdown-item-danger {
+  color: #f56c6c;
+}
+
+.dropdown-item-danger:hover {
+  background: #fef0f0;
+  color: #f56c6c;
+}
+
 /* ===== Price Range ===== */
 .price-range {
   display: flex;
@@ -1474,7 +1655,7 @@ onMounted(() => {
   flex-wrap: nowrap;
   justify-content: center;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   white-space: nowrap;
 }
 
@@ -1507,6 +1688,130 @@ onMounted(() => {
   color: var(--brand-deep);
   font-weight: 600;
   font-family: monospace;
+}
+
+.product-grid-wrap {
+  margin-top: 4px;
+}
+
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.product-tile {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 16px;
+  background: #fff;
+  border: 1px solid rgba(30, 50, 90, 0.06);
+  box-shadow: 0 4px 16px rgba(30, 50, 90, 0.05);
+  cursor: pointer;
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
+
+.product-tile:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 28px rgba(30, 50, 90, 0.08);
+}
+
+.product-tile.is-selected {
+  border-color: rgba(30, 50, 90, 0.28);
+  box-shadow: 0 0 0 2px rgba(30, 50, 90, 0.08), 0 10px 28px rgba(30, 50, 90, 0.08);
+}
+
+.product-tile-image {
+  aspect-ratio: 1 / 1;
+  background: linear-gradient(180deg, rgba(30, 50, 90, 0.03), rgba(30, 50, 90, 0.01));
+  overflow: hidden;
+}
+
+.tile-img {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.tile-img :deep(img) {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.tile-placeholder {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  color: rgba(30, 50, 90, 0.42);
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  background: linear-gradient(135deg, rgba(30, 50, 90, 0.04), rgba(30, 50, 90, 0.02));
+}
+
+.product-tile-body {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+}
+
+.product-tile-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.product-tile-no {
+  color: var(--text-secondary);
+  font-family: monospace;
+  font-size: 12px;
+}
+
+.tile-status {
+  flex: 0 0 auto;
+}
+
+.product-tile-name {
+  margin: 0;
+  color: var(--brand-deep);
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: -0.02em;
+  min-height: 2.7em;
+}
+
+.product-tile-brand {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.product-tile-footer {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.product-tile-price {
+  color: var(--brand-deep);
+  font-size: 18px;
+  font-weight: 700;
+  font-family: monospace;
+}
+
+.product-tile-category {
+  color: var(--text-secondary);
+  font-size: 12px;
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ===== Product Thumb ===== */
@@ -1750,6 +2055,18 @@ onMounted(() => {
     width: 100%;
   }
 
+  .view-mode-toggle {
+    width: 100%;
+  }
+
+  .view-mode-toggle :deep(.el-radio-button) {
+    flex: 1;
+  }
+
+  .view-mode-toggle :deep(.el-radio-button__inner) {
+    width: 100%;
+  }
+
   .toolbar-actions .capsule-btn {
     width: 100%;
   }
@@ -1783,6 +2100,24 @@ onMounted(() => {
   .product-table :deep(.el-table__header-wrapper),
   .product-table :deep(.el-table__row td) {
     font-size: 12px;
+  }
+
+  .product-grid {
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 10px;
+  }
+
+  .product-tile-body {
+    padding: 12px;
+  }
+
+  .product-tile-name {
+    font-size: 15px;
+    min-height: 2.4em;
+  }
+
+  .product-tile-price {
+    font-size: 16px;
   }
 
   .pagination-wrap {

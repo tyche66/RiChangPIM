@@ -2,87 +2,89 @@
   <div class="tags-page">
     <el-card>
       <div class="toolbar">
-        <h2>标签管理</h2>
-        <el-button
-          v-if="canCreate"
-          type="primary"
-          @click="showCreateDialog = true"
-        >
-          新增标签
-        </el-button>
-      </div>
-
-      <div class="table-responsive">
-        <el-table
-          v-loading="loading"
-          :data="tags"
-          border
-          stripe
-        >
-          <el-table-column
-            prop="tagName"
-            label="标签名称"
-            min-width="180"
+        <div class="toolbar-title">
+          <h2>标签管理</h2>
+          <p>按类型聚合展示，减少纵向无限排列</p>
+        </div>
+        <div class="toolbar-actions">
+          <el-input
+            v-model="filterText"
+            clearable
+            placeholder="搜索标签名称/类型"
+            class="capsule-input tag-search"
           />
-          <el-table-column
-            prop="tagType"
-            label="标签类型"
-            width="140"
+          <el-button
+            v-if="canCreate"
+            type="primary"
+            class="capsule-btn capsule-btn-primary"
+            @click="showCreateDialog = true"
           >
-            <template #default="{ row }">
-              <el-tag
-                v-if="row.tagType"
-                type="info"
-                size="small"
-              >
-                {{ row.tagType }}
-              </el-tag>
-              <span
-                v-else
-                class="text-muted"
-              >-</span>
-            </template>
-          </el-table-column>
-          <el-table-column
-            prop="createTime"
-            label="创建时间"
-            width="160"
-          >
-            <template #default="{ row }">
-              {{ formatDate(row.createTime) }}
-            </template>
-          </el-table-column>
-          <el-table-column
-            label="操作"
-            width="160"
-            align="center"
-          >
-            <template #default="{ row }">
-              <el-button
-                v-if="canEdit"
-                size="small"
-                @click="handleEdit(row)"
-              >
-                编辑
-              </el-button>
-              <el-button
-                v-if="canDelete"
-                size="small"
-                type="danger"
-                @click="handleDelete(row)"
-              >
-                删除
-              </el-button>
-            </template>
-          </el-table-column>
-        </el-table>
+            新增标签
+          </el-button>
+        </div>
       </div>
 
       <div
-        v-if="!loading && tags.length === 0"
-        class="empty-state"
+        v-loading="loading"
+        class="tag-board"
       >
-        <el-empty description="暂无标签" />
+        <div
+          v-for="group in groupedTags"
+          :key="group.key"
+          class="tag-group"
+        >
+          <div class="tag-group-header">
+            <div>
+              <h3 class="tag-group-title">
+                {{ group.title }}
+              </h3>
+              <p class="tag-group-meta">
+                {{ group.items.length }} 个标签
+              </p>
+            </div>
+          </div>
+
+          <div class="tag-cloud">
+            <div
+              v-for="row in group.items"
+              :key="row.id"
+              class="tag-chip"
+            >
+              <div class="tag-chip-main">
+                <span class="tag-chip-name">{{ row.tagName }}</span>
+                <span
+                  v-if="row.tagType"
+                  class="tag-chip-type"
+                >{{ row.tagType }}</span>
+              </div>
+              <div class="tag-chip-actions">
+                <el-button
+                  v-if="canEdit"
+                  text
+                  class="action-link"
+                  @click="handleEdit(row)"
+                >
+                  编辑
+                </el-button>
+                <el-button
+                  v-if="canDelete"
+                  text
+                  class="action-link danger"
+                  @click="handleDelete(row)"
+                >
+                  删除
+                </el-button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div
+          v-if="!loading && groupedTags.length === 0"
+          class="empty-state"
+        >
+          <el-empty description="暂无标签" />
+        </div>
       </div>
     </el-card>
 
@@ -150,6 +152,7 @@ const canDelete = computed(() => hasPermission(userPermissions.value, 'tag:delet
 
 const loading = ref(false)
 const tags = ref<any[]>([])
+const filterText = ref('')
 const showCreateDialog = ref(false)
 const editingItem = ref<any>(null)
 const submitting = ref(false)
@@ -169,6 +172,28 @@ const normalizeTag = (item: any) => ({
   tagName: item.tag_name,
   tagType: item.tag_type,
   createTime: item.create_time,
+})
+
+const groupedTags = computed(() => {
+  const keyword = filterText.value.trim().toLowerCase()
+  const source = keyword
+    ? tags.value.filter((tag) => {
+        const name = tag.tagName?.toLowerCase() || ''
+        const type = tag.tagType?.toLowerCase() || ''
+        return name.includes(keyword) || type.includes(keyword)
+      })
+    : tags.value
+
+  const groups = new Map<string, { key: string; title: string; items: any[] }>()
+  for (const tag of source) {
+    const key = tag.tagType || '未分类'
+    if (!groups.has(key)) {
+      groups.set(key, { key, title: key, items: [] })
+    }
+    groups.get(key)!.items.push(tag)
+  }
+
+  return [...groups.values()].sort((a, b) => a.title.localeCompare(b.title, 'zh-Hans-CN'))
 })
 
 const fetchTags = async () => {
@@ -236,11 +261,6 @@ const handleDelete = async (row: any) => {
   }
 }
 
-const formatDate = (d: string | null | undefined) => {
-  if (!d) return '-'
-  return new Date(d).toLocaleString('zh-CN')
-}
-
 onMounted(fetchTags)
 </script>
 
@@ -268,13 +288,18 @@ onMounted(fetchTags)
 .toolbar {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   margin-bottom: 20px;
   flex-wrap: wrap;
   gap: 12px;
 }
 
-.toolbar h2 {
+.toolbar-title {
+  display: grid;
+  gap: 6px;
+}
+
+.toolbar-title h2 {
   margin: 0;
   font-size: 20px;
   font-weight: 600;
@@ -282,20 +307,119 @@ onMounted(fetchTags)
   letter-spacing: 0.3px;
 }
 
-.toolbar :deep(.el-button) {
-  border-radius: 20px;
+.toolbar-title p {
+  margin: 0;
+  color: rgba(30, 50, 90, 0.52);
+  font-size: 13px;
 }
 
-.table-responsive {
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  border-radius: 12px;
+.toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
-.table-responsive :deep(.el-table) {
-  min-width: 600px;
-  border-radius: 12px;
-  overflow: hidden;
+.tag-search {
+  width: 260px;
+}
+
+.tag-board {
+  display: grid;
+  gap: 16px;
+  min-height: 200px;
+}
+
+.tag-group {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(30, 50, 90, 0.06);
+  box-shadow: 0 4px 24px rgba(30, 50, 90, 0.05);
+}
+
+.tag-group-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+
+.tag-group-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: rgba(30, 50, 90, 0.92);
+}
+
+.tag-group-meta {
+  margin: 6px 0 0;
+  color: rgba(30, 50, 90, 0.52);
+  font-size: 13px;
+}
+
+.tag-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.tag-chip {
+  min-width: 180px;
+  flex: 1 1 220px;
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(30, 50, 90, 0.03);
+  border: 1px solid rgba(30, 50, 90, 0.05);
+}
+
+.tag-chip-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.tag-chip-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: rgba(30, 50, 90, 0.92);
+}
+
+.tag-chip-type {
+  color: rgba(30, 50, 90, 0.56);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.tag-chip-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.action-link {
+  padding: 0;
+  min-height: 0;
+  border: 0;
+  background: transparent;
+  color: rgba(30, 50, 90, 0.78);
+  font-weight: 500;
+}
+
+.action-link:hover {
+  color: rgba(30, 50, 90, 0.98);
+  background: transparent;
+}
+
+.action-link.danger {
+  color: #f56c6c;
+}
+
+.action-link.danger:hover {
+  color: #d94b4b;
 }
 
 .empty-state {
@@ -324,9 +448,27 @@ onMounted(fetchTags)
     flex-direction: column;
     align-items: flex-start;
   }
-  .toolbar h2 {
-    font-size: 18px;
+
+  .toolbar-actions {
+    width: 100%;
   }
+
+  .tag-search {
+    width: 100%;
+  }
+
+  .tag-group {
+    padding: 16px;
+  }
+
+  .tag-group-title {
+    font-size: 16px;
+  }
+
+  .tag-chip {
+    min-width: 100%;
+  }
+
   :global(.el-dialog) {
     width: 95vw !important;
     max-width: 95vw !important;

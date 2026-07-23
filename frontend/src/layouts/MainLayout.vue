@@ -272,10 +272,16 @@ const handleLogout = async () => {
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.sidebar :deep(.el-menu::-webkit-scrollbar) {
+  display: none;
 }
 
 .logo-img {
-  height: 32px;
+  height: 38px;
   width: auto;
   display: block;
 }
@@ -284,6 +290,7 @@ const handleLogout = async () => {
   height: 86px;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 12px;
   padding: 0 20px;
   color: #fff;

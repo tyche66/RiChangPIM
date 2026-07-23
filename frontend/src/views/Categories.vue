@@ -2,62 +2,132 @@
   <div class="categories-page">
     <el-card>
       <div class="toolbar">
-        <h2>分类管理</h2>
-        <el-button
-          v-if="canCreate"
-          type="primary"
-          @click="showCreateDialog = true"
-        >
-          新增分类
-        </el-button>
+        <div class="toolbar-title">
+          <h2>分类管理</h2>
+          <p>层级卡片化展示，提升浏览和定位效率</p>
+        </div>
+        <div class="toolbar-actions">
+          <el-input
+            v-model="filterText"
+            clearable
+            placeholder="搜索分类名称"
+            class="capsule-input category-search"
+          />
+          <el-button
+            v-if="canCreate"
+            type="primary"
+            class="capsule-btn capsule-btn-primary"
+            @click="showCreateDialog = true"
+          >
+            新增分类
+          </el-button>
+        </div>
       </div>
 
-      <el-tree
-        v-loading="loading"
-        :data="categories"
-        :props="{ label: 'categoryName', children: 'children' }"
-        node-key="id"
-        default-expand-all
-        :expand-on-click-node="false"
-        class="category-tree"
-      >
-        <template #default="{ node, data }">
-          <div class="tree-node">
-            <span class="tree-label">
-              {{ node.label }}
-              <el-tag
-                v-if="data.sort"
-                size="small"
-                type="info"
-                style="margin-left: 8px"
-              >排序:{{ data.sort }}</el-tag>
-              <el-tag
-                size="small"
-                style="margin-left: 4px"
-              >L{{ data.level }}</el-tag>
-            </span>
-            <span class="tree-actions">
-              <el-button
-                v-if="canEdit"
-                size="small"
-                @click="handleEdit(data)"
-              >编辑</el-button>
-              <el-button
-                v-if="canDelete"
-                size="small"
-                type="danger"
-                @click="handleDelete(data)"
-              >删除</el-button>
-            </span>
-          </div>
-        </template>
-      </el-tree>
+      <div class="category-board">
+        <div
+          v-loading="loading"
+          class="category-board-inner"
+        >
+          <div
+            v-for="root in filteredCategories"
+            :key="root.id"
+            class="category-card"
+          >
+            <div class="category-card-header">
+              <div>
+                <div class="category-name-row">
+                  <span class="category-name">{{ root.categoryName }}</span>
+                  <el-tag size="small" type="info">L{{ root.level }}</el-tag>
+                </div>
+                <p class="category-meta">
+                  排序 {{ root.sort || 0 }} · {{ root.children?.length || 0 }} 个子分类
+                </p>
+              </div>
+              <div class="tree-actions visible">
+                <el-button
+                  v-if="canEdit"
+                  text
+                  class="action-link"
+                  @click="handleEdit(root)"
+                >
+                  编辑
+                </el-button>
+                <el-button
+                  v-if="canDelete"
+                  text
+                  class="action-link danger"
+                  @click="handleDelete(root)"
+                >
+                  删除
+                </el-button>
+              </div>
+            </div>
 
-      <div
-        v-if="!loading && categories.length === 0"
-        class="empty-state"
-      >
-        <el-empty description="暂无分类" />
+            <div
+              v-if="root.children && root.children.length"
+              class="category-children"
+            >
+              <div
+                v-for="child in root.children"
+                :key="child.id"
+                class="category-child"
+              >
+                <div class="child-main">
+                  <div>
+                    <div class="child-title-row">
+                      <span class="child-name">{{ child.categoryName }}</span>
+                      <el-tag size="small" type="info">L{{ child.level }}</el-tag>
+                    </div>
+                    <p class="child-meta">
+                      排序 {{ child.sort || 0 }}
+                      <span v-if="child.children?.length">· {{ child.children.length }} 个子分类</span>
+                    </p>
+                  </div>
+                  <div class="tree-actions visible">
+                    <el-button
+                      v-if="canEdit"
+                      text
+                      class="action-link"
+                      @click="handleEdit(child)"
+                    >
+                      编辑
+                    </el-button>
+                    <el-button
+                      v-if="canDelete"
+                      text
+                      class="action-link danger"
+                      @click="handleDelete(child)"
+                    >
+                      删除
+                    </el-button>
+                  </div>
+                </div>
+
+                <div
+                  v-if="child.children && child.children.length"
+                  class="category-grandchildren"
+                >
+                  <span
+                    v-for="grand in child.children"
+                    :key="grand.id"
+                    class="grand-chip"
+                  >
+                    <span class="grand-name">{{ grand.categoryName }}</span>
+                    <span class="grand-sort">{{ grand.sort || 0 }}</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div
+            v-if="!loading && filteredCategories.length === 0"
+            class="empty-state"
+          >
+            <el-empty description="暂无分类" />
+          </div>
+        </div>
       </div>
     </el-card>
 
@@ -142,6 +212,7 @@ const canDelete = computed(() => hasPermission(userPermissions.value, 'category:
 
 const loading = ref(false)
 const categories = ref<any[]>([])
+const filterText = ref('')
 const showCreateDialog = ref(false)
 const editingItem = ref<any>(null)
 const submitting = ref(false)
@@ -169,6 +240,26 @@ const categoryTreeForSelect = computed(() => {
     return result
   }
   return flatten(categories.value, editingItem.value?.id)
+})
+
+const filteredCategories = computed(() => {
+  const keyword = filterText.value.trim().toLowerCase()
+  if (!keyword) return categories.value
+
+  const matches = (node: any): boolean => {
+    if (node.categoryName?.toLowerCase().includes(keyword)) return true
+    return (node.children || []).some(matches)
+  }
+
+  const cloneWithMatches = (node: any): any | null => {
+    if (!matches(node)) return null
+    return {
+      ...node,
+      children: (node.children || []).map(cloneWithMatches).filter(Boolean),
+    }
+  }
+
+  return categories.value.map(cloneWithMatches).filter(Boolean)
 })
 
 const normalizeCategory = (item: any): any => ({
@@ -278,13 +369,18 @@ onMounted(() => {
 .toolbar {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   margin-bottom: 20px;
   flex-wrap: wrap;
   gap: 12px;
 }
 
-.toolbar h2 {
+.toolbar-title {
+  display: grid;
+  gap: 6px;
+}
+
+.toolbar-title h2 {
   margin: 0;
   font-size: 20px;
   font-weight: 600;
@@ -292,47 +388,161 @@ onMounted(() => {
   letter-spacing: 0.3px;
 }
 
-.toolbar :deep(.el-button) {
-  border-radius: 20px;
+.toolbar-title p {
+  margin: 0;
+  color: rgba(30, 50, 90, 0.52);
+  font-size: 13px;
 }
 
-.category-tree {
+.toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.category-search {
+  width: 240px;
+}
+
+.category-board {
+  display: grid;
+  gap: 16px;
   min-height: 200px;
 }
 
-.tree-node {
+.category-board-inner {
+  display: grid;
+  gap: 16px;
+}
+
+.category-card {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(30, 50, 90, 0.06);
+  box-shadow: 0 4px 24px rgba(30, 50, 90, 0.05);
+}
+
+.category-card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  width: 100%;
-  padding: 8px 12px;
-  border-radius: 12px;
-  transition: background-color 0.2s ease;
+  gap: 12px;
 }
 
-.tree-node:hover {
-  background: rgba(30, 50, 90, 0.05);
+.category-name-row,
+.child-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
-.tree-label {
-  flex: 1;
-  font-size: 14px;
-  color: #5E6470;
+.category-name,
+.child-name {
+  font-weight: 600;
+  color: rgba(30, 50, 90, 0.92);
+}
+
+.category-name {
+  font-size: 18px;
+}
+
+.child-name {
+  font-size: 15px;
 }
 
 .tree-actions {
   display: flex;
   gap: 6px;
-  opacity: 0;
-  transition: opacity 0.2s ease;
 }
 
-.tree-node:hover .tree-actions {
+.tree-actions.visible {
   opacity: 1;
 }
 
-.tree-actions :deep(.el-button) {
-  border-radius: 16px;
+.action-link {
+  padding: 0;
+  min-height: 0;
+  border: 0;
+  background: transparent;
+  color: rgba(30, 50, 90, 0.78);
+  font-weight: 500;
+}
+
+.action-link:hover {
+  color: rgba(30, 50, 90, 0.98);
+  background: transparent;
+}
+
+.action-link.danger {
+  color: #f56c6c;
+}
+
+.action-link.danger:hover {
+  color: #d94b4b;
+}
+
+.category-meta,
+.child-meta {
+  margin: 6px 0 0;
+  color: rgba(30, 50, 90, 0.52);
+  font-size: 13px;
+}
+
+.category-children {
+  display: grid;
+  gap: 12px;
+  padding-left: 4px;
+}
+
+.category-child {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(30, 50, 90, 0.03);
+  border: 1px solid rgba(30, 50, 90, 0.05);
+}
+
+.child-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.category-grandchildren {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.grand-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(30, 50, 90, 0.06);
+  color: rgba(30, 50, 90, 0.82);
+  font-size: 13px;
+}
+
+.grand-name {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.grand-sort {
+  color: rgba(30, 50, 90, 0.45);
+  font-family: monospace;
 }
 
 .empty-state {
@@ -357,9 +567,33 @@ onMounted(() => {
     flex-direction: column;
     align-items: flex-start;
   }
-  .toolbar h2 {
-    font-size: 18px;
+
+  .toolbar-actions {
+    width: 100%;
   }
+
+  .category-search {
+    width: 100%;
+  }
+
+  .category-card-header,
+  .child-main {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .category-card {
+    padding: 16px;
+  }
+
+  .category-name {
+    font-size: 16px;
+  }
+
+  .grand-name {
+    max-width: 120px;
+  }
+
   :global(.el-dialog) {
     width: 95vw !important;
     max-width: 95vw !important;

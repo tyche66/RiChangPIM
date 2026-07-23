@@ -113,63 +113,66 @@
           </el-table-column>
           <el-table-column
             label="操作"
-            width="320"
+            width="220"
             fixed="right"
             align="center"
           >
             <template #default="{ row }">
               <el-button
                 size="small"
-                class="capsule-btn btn-sm"
+                text
+                class="action-link"
                 @click="handleView(row)"
               >
                 查看
               </el-button>
               <el-button
-                v-if="hasPerm('quotation:create')"
-                size="small"
-                type="success"
-                class="capsule-btn btn-sm"
-                @click="handleCreateQuotation(row)"
-              >
-                生成报价
-              </el-button>
-              <el-button
                 v-if="hasPerm('share:create')"
                 size="small"
-                type="warning"
-                class="capsule-btn btn-sm"
+                text
+                class="action-link"
                 @click="handleShare(row)"
               >
                 分享
               </el-button>
-              <el-button
-                v-if="hasPerm('proposal:confirm') && row.status !== 'confirmed'"
-                size="small"
-                type="success"
-                class="capsule-btn btn-sm"
-                @click="handleConfirm(row)"
-              >
-                确认
-              </el-button>
-              <el-button
-                v-if="hasPerm('proposal:edit') && row.status === 'confirmed'"
-                size="small"
-                type="warning"
-                class="capsule-btn btn-sm"
-                @click="handleRevert(row)"
-              >
-                撤销确认
-              </el-button>
-              <el-button
-                v-if="hasPerm('proposal:delete')"
-                size="small"
-                type="danger"
-                class="capsule-btn btn-sm"
-                @click="handleDelete(row)"
-              >
-                删除
-              </el-button>
+              <el-dropdown trigger="click">
+                <button
+                  type="button"
+                  class="more-trigger"
+                  aria-label="更多操作"
+                >
+                  <el-icon><ArrowDown /></el-icon>
+                </button>
+                <template #dropdown>
+                  <el-dropdown-menu class="flat-action-menu">
+                    <el-dropdown-item
+                      v-if="hasPerm('quotation:create')"
+                      @click="handleCreateQuotation(row)"
+                    >
+                      生成报价
+                    </el-dropdown-item>
+                    <el-dropdown-item
+                      v-if="hasPerm('proposal:confirm') && row.status !== 'confirmed'"
+                      @click="handleConfirm(row)"
+                    >
+                      确认
+                    </el-dropdown-item>
+                    <el-dropdown-item
+                      v-if="hasPerm('proposal:edit') && row.status === 'confirmed'"
+                      @click="handleRevert(row)"
+                    >
+                      撤销确认
+                    </el-dropdown-item>
+                    <el-dropdown-item
+                      v-if="hasPerm('proposal:delete')"
+                      class="dropdown-item-danger"
+                      @click="handleDelete(row)"
+                    >
+                      删除
+                    </el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
             </template>
           </el-table-column>
         </el-table>
@@ -324,6 +327,7 @@ import { ref, reactive, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
+import { ArrowDown } from '@element-plus/icons-vue'
 import { proposalApi, shareApi } from '@/api'
 import { useAuthStore } from '@/stores/auth'
 import { hasPermission } from '@/types/permissions'
@@ -716,6 +720,66 @@ onMounted(fetchProposals)
   padding: 5px 14px;
   font-size: 12px;
   border-radius: 16px !important;
+}
+
+.action-link {
+  padding: 0;
+  min-height: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.action-link:hover {
+  background: transparent;
+  color: var(--brand-deep);
+}
+
+.more-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin-left: 6px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.more-trigger:hover {
+  color: var(--brand-deep);
+  background: rgba(30, 50, 90, 0.06);
+}
+
+.flat-action-menu {
+  padding: 6px;
+}
+
+.flat-action-menu :deep(.el-dropdown-menu__item) {
+  border-radius: 10px;
+  line-height: 1.1;
+  padding: 9px 14px;
+  color: var(--text-primary);
+}
+
+.flat-action-menu :deep(.el-dropdown-menu__item:hover) {
+  background: rgba(30, 50, 90, 0.06);
+  color: var(--brand-deep);
+}
+
+.dropdown-item-danger {
+  color: #f56c6c;
+}
+
+.dropdown-item-danger:hover {
+  background: #fef0f0;
+  color: #f56c6c;
 }
 
 .capsule-tag {

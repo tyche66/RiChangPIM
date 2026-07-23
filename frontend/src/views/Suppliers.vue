@@ -60,13 +60,15 @@
           </el-table-column>
           <el-table-column
             label="操作"
-            width="160"
+            width="220"
             align="center"
           >
             <template #default="{ row }">
               <el-button
                 v-if="canEdit"
                 size="small"
+                text
+                class="action-link"
                 @click="handleEdit(row)"
               >
                 编辑
@@ -74,7 +76,8 @@
               <el-button
                 v-if="canDelete"
                 size="small"
-                type="danger"
+                text
+                class="action-link danger"
                 @click="handleDelete(row)"
               >
                 删除
@@ -331,6 +334,36 @@ onMounted(fetchSuppliers)
 
 .toolbar :deep(.el-button) {
   border-radius: 20px;
+}
+
+.action-link {
+  padding: 0;
+  min-height: 0;
+  border: 0;
+  background: transparent;
+  color: rgba(30, 50, 90, 0.78);
+  font-weight: 500;
+}
+
+.action-link:hover {
+  color: rgba(30, 50, 90, 0.98);
+  background: transparent;
+}
+
+.action-link.danger {
+  color: #f56c6c;
+}
+
+.action-link.danger:hover {
+  color: #d94b4b;
+}
+
+.table-responsive :deep(.el-table__cell:last-child .cell) {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
 }
 
 .table-responsive {
