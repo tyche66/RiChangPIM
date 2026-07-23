@@ -88,6 +88,8 @@
       v-model="showCreateDialog"
       :title="editingItem ? '编辑品牌' : '新增品牌'"
       width="520px"
+      append-to-body
+      lock-scroll
       :close-on-click-modal="false"
       destroy-on-close
     >
@@ -168,11 +170,18 @@ const rules: FormRules = {
   brandName: [{ required: true, message: '请输入品牌名称', trigger: 'blur' }],
 }
 
+const normalizeBrand = (item: any) => ({
+  ...item,
+  brandName: item.brand_name,
+  logoUrl: item.logo_url,
+  description: item.description,
+})
+
 const fetchBrands = async () => {
   loading.value = true
   try {
     const res = await brandApi.list()
-    brands.value = res.data?.list || []
+    brands.value = (res.data?.list || []).map(normalizeBrand)
   } catch {
     ElMessage.error('加载品牌列表失败')
   } finally {

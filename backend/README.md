@@ -17,6 +17,12 @@ pip install -r requirements.txt
 
 - `DATABASE_URL`（如 `postgresql://pim:pim_password@localhost:5432/ai_pim`）
 - `JWT_SECRET`、`ADMIN_PASSWORD`、`MINIO_*`、`REDIS_URL` 等（详见 `.env.example`）
+- `APP_VERSION`、`BUILD_ID`、`GIT_COMMIT`、`BUILD_TIME`、`APP_ENV`（构建信息；本地可使用
+  `dev`/`dev-local`/`unknown`）
+
+生产和开发 Compose 均应从同一份受控 `.env` 读取 PostgreSQL 与 MinIO 凭据。重建数据库或
+对象存储容器时，必须同时确认后端容器使用相同值，避免出现数据库
+`InvalidPasswordError` 或 MinIO `InvalidAccessKeyId`。
 
 ## 3. 数据库迁移（必须）
 
@@ -30,6 +36,10 @@ alembic upgrade head
 - 回滚全部：`alembic downgrade base`（会清掉所有表，仅用于全新环境）
 
 `0004_seed_data` 为**数据迁移**，幂等：重复执行不会重复插入角色/权限/映射。
+
+当前 migration head 为 `0012_product_scene_image_partial_unique`。该 revision 会先将 Alembic
+版本列扩展为 `VARCHAR(64)`，以兼容长 revision ID；不要重命名已在运行数据库中记录的
+revision ID。
 
 ## 4. 初始管理员
 
@@ -70,6 +80,32 @@ python -m app.scripts.seed_data --no-admin
 # 默认即自动完成 migrate/seed，无需手动执行
 docker compose up -d
 ```
+
+### 登录接口返回 500
+
+先查看后端 traceback，不要把数据库连接失败当作管理员密码错误：
+
+```bash
+docker compose ps
+docker compose logs --tail=200 backend
+docker compose config --quiet
+```
+
+如果日志包含 `password authentication failed for user "pim"`，说明后端 `DATABASE_URL` 中的
+密码与 PostgreSQL 容器实际角色密码不一致。统一受控 `.env` 后重建相关服务，不要只重建
+PostgreSQL 或只重建后端。若日志包含 MinIO `InvalidAccessKeyId`，按相同原则检查
+`MINIO_ROOT_USER/MINIO_ROOT_PASSWORD` 与后端 `MINIO_ACCESS_KEY/MINIO_SECRET_KEY`。
+
+修复后应验证：
+
+```bash
+curl -k -X POST https://localhost/api/v1/auth/login \
+  -H 'Content-Type: application/json' \
+  --data '{"username":"admin","password":"<ADMIN_PASSWORD>"}'
+```
+
+预期 HTTP 200。禁止把真实密码写入命令历史、文档或日志；生产环境应通过秘密管理系统执行
+等价验证。
 
 ### 手动 migrate / seed（仅故障恢复与维护）
 

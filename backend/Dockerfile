@@ -1,10 +1,21 @@
 FROM python:3.11-slim
 
+ARG APP_VERSION=dev
+ARG BUILD_ID=dev-local
+ARG GIT_COMMIT=unknown
+ARG BUILD_TIME=unknown
+ARG APP_ENV=production
+
 WORKDIR /app
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1
+    PIP_NO_CACHE_DIR=1 \
+    APP_VERSION=${APP_VERSION} \
+    BUILD_ID=${BUILD_ID} \
+    GIT_COMMIT=${GIT_COMMIT} \
+    BUILD_TIME=${BUILD_TIME} \
+    APP_ENV=${APP_ENV}
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \

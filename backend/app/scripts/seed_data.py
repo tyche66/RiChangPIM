@@ -88,6 +88,10 @@ PERMISSIONS = [
     ("file:view", "文件查看", "file", "view", "read"),
     ("file:upload", "文件上传", "file", "upload", "write"),
     ("file:delete", "文件删除", "file", "delete", "write"),
+    ("media:view", "媒体库查看", "media", "view", "read"),
+    ("media:upload", "媒体库上传", "media", "upload", "write"),
+    ("media:delete", "媒体库删除", "media", "delete", "write"),
+    ("media:replace", "媒体库替换", "media", "replace", "write"),
     ("stats:view", "统计查看", "stats", "view", "read"),
     ("audit:view", "审计日志查看", "audit", "view", "read"),
     ("ai:use", "AI 能力使用", "ai", "use", "write"),
@@ -123,6 +127,10 @@ ROLE_PERMISSIONS = {
         "supplier:delete",
         "file:view",
         "file:upload",
+        "media:view",
+        "media:upload",
+        "media:delete",
+        "media:replace",
         "stats:view",
     ],
     "sales": [
@@ -143,10 +151,16 @@ ROLE_PERMISSIONS = {
         "file:upload",
         "stats:view",
         "ai:use",
+        "scene_image:view",
+        "scene_image:create",
+        "scene_image:edit",
+        "scene_image:delete",
     ],
     "viewer": [
         "product:view",
         "stats:view",
+        "media:view",
+        "scene_image:view",
     ],
 }
 

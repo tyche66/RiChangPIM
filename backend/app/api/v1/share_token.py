@@ -1,4 +1,5 @@
-from datetime import UTC, datetime
+import datetime
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -6,11 +7,13 @@ from sqlalchemy import or_, select
 from sqlalchemy import update as sa_update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.database import get_db
+from app.core.minio_client import ensure_bucket, get_minio_client
 from app.core.serializers import filter_sensitive_fields
 from app.middleware.audit import audit_action
 from app.models.audit import Share, ShareLog, ShareToken, Visitor
-from app.models.product import Product
+from app.models.product import Attachment, Product, ProductImage, SceneImage, product_scene_image
 from app.models.sales import Proposal, ProposalItem, Quotation, QuotationItem
 
 router = APIRouter()
@@ -84,7 +87,60 @@ async def _resolve_visitor(
     return visitor
 
 
-async def _build_content(db: AsyncSession, share_type: str, target_id: UUID) -> dict | None:
+def _calc_image_expire_seconds(st: ShareToken) -> int:
+    """计算图片预签名 URL 的有效期（秒）。
+
+    取分享链接剩余有效期与配置上限的最小值；若分享链接无过期时间，
+    则使用配置的上限值。
+    """
+    max_hours = int(settings.SHARE_IMAGE_URL_EXPIRE_HOURS)
+    max_seconds = max(max_hours * 3600, 3600)
+
+    exp = _normalize_expire(st.expire_time)
+    if exp is None:
+        return max_seconds
+
+    now = datetime.now(UTC)
+    if exp <= now:
+        return max_seconds
+
+    remaining = int((exp - now).total_seconds())
+    return min(remaining, max_seconds) if remaining > 0 else max_seconds
+
+
+async def _fetch_presigned_urls(
+    db: AsyncSession, attachment_ids: list[UUID], expire_seconds: int
+) -> dict[UUID, str]:
+    """异步批量生成附件的预签名 URL。"""
+    if not attachment_ids:
+        return {}
+
+    result = await db.execute(
+        select(Attachment.id, Attachment.oss_key)
+        .where(Attachment.id.in_(attachment_ids), Attachment.is_deleted.is_(False))
+    )
+    rows = result.fetchall()
+    if not rows:
+        return {}
+
+    client = get_minio_client()
+    bucket = ensure_bucket(client)
+    expires = timedelta(seconds=expire_seconds)
+
+    url_map: dict[UUID, str] = {}
+    for att_id, oss_key in rows:
+        try:
+            url_map[att_id] = client.presigned_get_object(
+                bucket, oss_key, expires=expires
+            )
+        except Exception:
+            url_map[att_id] = None
+    return url_map
+
+
+async def _build_content(db: AsyncSession, share_type: str, target_id: UUID, st: ShareToken) -> dict | None:
+    expire_seconds = _calc_image_expire_seconds(st)
+
     if share_type == "proposal":
         prop = (
             await db.execute(
@@ -98,24 +154,132 @@ async def _build_content(db: AsyncSession, share_type: str, target_id: UUID) -> 
             .scalars()
             .all()
         )
+        product_ids = [it.product_id for it in rows]
+        if not product_ids:
+            return {
+                "proposal_no": prop.proposal_no,
+                "proposal_name": prop.proposal_name,
+                "customer_name": prop.customer_name,
+                "status": prop.status,
+                "total_face_value": 0.0,
+                "items": [],
+            }
+
+        # 批量加载产品
+        prod_result = await db.execute(
+            select(Product).where(Product.id.in_(product_ids), Product.is_deleted.is_(False))
+        )
+        products_map = {p.id: p for p in prod_result.scalars().all()}
+
+        # 批量加载产品图片
+        img_result = await db.execute(
+            select(ProductImage)
+            .where(ProductImage.product_id.in_(product_ids), ProductImage.is_deleted.is_(False))
+        )
+        product_images: dict[UUID, list[ProductImage]] = {}
+        for pi in img_result.scalars().all():
+            product_images.setdefault(pi.product_id, []).append(pi)
+
+        # 批量加载场景图关联
+        scene_assoc = await db.execute(
+            select(product_scene_image.c.product_id, product_scene_image.c.scene_image_id, product_scene_image.c.sort)
+            .where(
+                product_scene_image.c.product_id.in_(product_ids),
+                product_scene_image.c.is_deleted.is_(False),
+            )
+            .order_by(product_scene_image.c.product_id, product_scene_image.c.sort)
+        )
+        scene_assoc_rows = scene_assoc.fetchall()
+        scene_image_ids = [row.scene_image_id for row in scene_assoc_rows]
+
+        # 批量加载场景图详情
+        scene_images_map: dict[UUID, list[SceneImage]] = {}
+        if scene_image_ids:
+            scene_result = await db.execute(
+                select(SceneImage)
+                .where(SceneImage.id.in_(scene_image_ids), SceneImage.is_deleted.is_(False))
+            )
+            for si in scene_result.scalars().all():
+                scene_images_map.setdefault(si.id, []).append(si)
+
+        # 构建场景图按 product_id 分组的字典（含 attachment_id）
+        product_scene_images: dict[UUID, list[dict]] = {}
+        for row in scene_assoc_rows:
+            pid = row.product_id
+            sid = row.scene_image_id
+            sort = row.sort or 0
+            scenes = scene_images_map.get(sid, [])
+            if scenes:
+                si = scenes[0]
+                product_scene_images.setdefault(pid, []).append(
+                    {
+                        "id": str(si.id),
+                        "name": si.name,
+                        "sort": sort,
+                        "attachment_id": si.attachment_id,
+                    }
+                )
+
+        # 收集所有需要预签名的 attachment_id
+        cover_att_ids: list[UUID] = []
+        scene_att_ids: list[UUID] = []
+        for pid in product_ids:
+            images = product_images.get(pid, [])
+            if images:
+                cover = next((img for img in images if img.is_cover), None) or images[0]
+                if cover and cover.attachment_id:
+                    cover_att_ids.append(cover.attachment_id)
+            for si_info in product_scene_images.get(pid, []):
+                if si_info["attachment_id"]:
+                    scene_att_ids.append(si_info["attachment_id"])
+
+        all_att_ids = list(dict.fromkeys(cover_att_ids + scene_att_ids))
+        url_map = await _fetch_presigned_urls(db, all_att_ids, expire_seconds)
+
         items = []
+        total_face_value = 0.0
         for it in rows:
-            prod = (
-                await db.execute(select(Product).where(Product.id == it.product_id))
-            ).scalar_one_or_none()
+            prod = products_map.get(it.product_id)
+            images = product_images.get(it.product_id, [])
+            cover = next((img for img in images if img.is_cover), None) or (images[0] if images else None)
+
+            cover_image_url = None
+            if cover and cover.attachment_id:
+                cover_image_url = url_map.get(cover.attachment_id)
+
+            scenes = []
+            for si_info in product_scene_images.get(it.product_id, [])[:30]:
+                img_url = url_map.get(si_info["attachment_id"])
+                scenes.append(
+                    {
+                        "id": si_info["id"],
+                        "name": si_info["name"],
+                        "image_url": img_url,
+                        "sort": si_info["sort"],
+                    }
+                )
+
+            line_total = round(prod.face_price * it.quantity, 2) if prod else 0.0
+            total_face_value += line_total
+
             items.append(
                 {
                     "product_id": str(it.product_id),
+                    "product_no": prod.product_no if prod else None,
                     "product_name": prod.product_name if prod else None,
                     "face_price": prod.face_price if prod else None,
-                    "cost_price": prod.cost_price if prod else None,
                     "quantity": it.quantity,
+                    "line_total": line_total,
+                    "cover_image_url": cover_image_url,
+                    "scene_images": scenes,
                 }
             )
         return {
+            "proposal_no": prop.proposal_no,
             "proposal_name": prop.proposal_name,
             "customer_name": prop.customer_name,
             "status": prop.status,
+            "total_face_value": round(total_face_value, 2),
             "items": items,
         }
 
@@ -132,25 +296,129 @@ async def _build_content(db: AsyncSession, share_type: str, target_id: UUID) -> 
             .scalars()
             .all()
         )
+        product_ids = [it.product_id for it in rows]
+        if not product_ids:
+            return {
+                "quotation_no": quo.quotation_no,
+                "status": quo.status,
+                "total_amount": quo.total_amount,
+                "subtotal": quo.subtotal,
+                "items": [],
+            }
+
+        # 批量加载产品
+        prod_result = await db.execute(
+            select(Product).where(Product.id.in_(product_ids), Product.is_deleted.is_(False))
+        )
+        products_map = {p.id: p for p in prod_result.scalars().all()}
+
+        # 批量加载产品图片
+        img_result = await db.execute(
+            select(ProductImage)
+            .where(ProductImage.product_id.in_(product_ids), ProductImage.is_deleted.is_(False))
+        )
+        product_images: dict[UUID, list[ProductImage]] = {}
+        for pi in img_result.scalars().all():
+            product_images.setdefault(pi.product_id, []).append(pi)
+
+        # 批量加载场景图关联
+        scene_assoc = await db.execute(
+            select(product_scene_image.c.product_id, product_scene_image.c.scene_image_id, product_scene_image.c.sort)
+            .where(
+                product_scene_image.c.product_id.in_(product_ids),
+                product_scene_image.c.is_deleted.is_(False),
+            )
+            .order_by(product_scene_image.c.product_id, product_scene_image.c.sort)
+        )
+        scene_assoc_rows = scene_assoc.fetchall()
+        scene_image_ids = [row.scene_image_id for row in scene_assoc_rows]
+
+        # 批量加载场景图详情
+        scene_images_map: dict[UUID, list[SceneImage]] = {}
+        if scene_image_ids:
+            scene_result = await db.execute(
+                select(SceneImage)
+                .where(SceneImage.id.in_(scene_image_ids), SceneImage.is_deleted.is_(False))
+            )
+            for si in scene_result.scalars().all():
+                scene_images_map.setdefault(si.id, []).append(si)
+
+        # 构建场景图按 product_id 分组的字典（含 attachment_id）
+        product_scene_images: dict[UUID, list[dict]] = {}
+        for row in scene_assoc_rows:
+            pid = row.product_id
+            sid = row.scene_image_id
+            sort = row.sort or 0
+            scenes = scene_images_map.get(sid, [])
+            if scenes:
+                si = scenes[0]
+                product_scene_images.setdefault(pid, []).append(
+                    {
+                        "id": str(si.id),
+                        "name": si.name,
+                        "sort": sort,
+                        "attachment_id": si.attachment_id,
+                    }
+                )
+
+        # 收集所有需要预签名的 attachment_id
+        cover_att_ids: list[UUID] = []
+        scene_att_ids: list[UUID] = []
+        for pid in product_ids:
+            images = product_images.get(pid, [])
+            if images:
+                cover = next((img for img in images if img.is_cover), None) or images[0]
+                if cover and cover.attachment_id:
+                    cover_att_ids.append(cover.attachment_id)
+            for si_info in product_scene_images.get(pid, []):
+                if si_info["attachment_id"]:
+                    scene_att_ids.append(si_info["attachment_id"])
+
+        all_att_ids = list(dict.fromkeys(cover_att_ids + scene_att_ids))
+        url_map = await _fetch_presigned_urls(db, all_att_ids, expire_seconds)
+
         items = []
         for it in rows:
-            prod = (
-                await db.execute(select(Product).where(Product.id == it.product_id))
-            ).scalar_one_or_none()
+            prod = products_map.get(it.product_id)
+            images = product_images.get(it.product_id, [])
+            cover = next((img for img in images if img.is_cover), None) or (images[0] if images else None)
+
+            cover_image_url = None
+            if cover and cover.attachment_id:
+                cover_image_url = url_map.get(cover.attachment_id)
+
+            scenes = []
+            for si_info in product_scene_images.get(it.product_id, [])[:30]:
+                img_url = url_map.get(si_info["attachment_id"])
+                scenes.append(
+                    {
+                        "id": si_info["id"],
+                        "name": si_info["name"],
+                        "image_url": img_url,
+                        "sort": si_info["sort"],
+                    }
+                )
+
+            subtotal = round(it.unit_price * it.quantity, 2)
             items.append(
                 {
                     "product_id": str(it.product_id),
+                    "product_no": prod.product_no if prod else None,
                     "product_name": prod.product_name if prod else None,
                     "face_price": prod.face_price if prod else None,
-                    "cost_price": prod.cost_price if prod else None,
-                    "unit_price": it.unit_price,
                     "quantity": it.quantity,
+                    "unit_price": it.unit_price,
+                    "tax_rate": it.tax_rate,
+                    "subtotal": subtotal,
+                    "cover_image_url": cover_image_url,
+                    "scene_images": scenes,
                 }
             )
         return {
             "quotation_no": quo.quotation_no,
             "status": quo.status,
             "total_amount": quo.total_amount,
+            "subtotal": quo.subtotal,
             "items": items,
         }
 
@@ -297,7 +565,7 @@ async def get_share_content(
 
     visitor = await _resolve_visitor(db, fingerprint=fingerprint, openid=openid)
 
-    raw_content = await _build_content(db, share.share_type, share.target_id)
+    raw_content = await _build_content(db, share.share_type, share.target_id, st)
     content = filter_sensitive_fields(raw_content, role_code="sales") if raw_content else None
 
     await _write_share_log(

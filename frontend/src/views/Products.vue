@@ -156,6 +156,16 @@
         </el-form>
         <div class="toolbar-actions">
           <el-button
+            class="capsule-btn"
+            @click="toggleAutoFit"
+          >
+            <el-icon>
+              <Operation v-if="autoFit" />
+              <Grid v-else />
+            </el-icon>
+            <span>{{ autoFit ? '紧凑' : '自适应' }}</span>
+          </el-button>
+          <el-button
             v-if="canExport"
             type="success"
             class="capsule-btn"
@@ -171,38 +181,139 @@
           >
             新增产品
           </el-button>
+          <el-button
+            v-if="canProposalCreate"
+            type="success"
+            class="capsule-btn"
+            @click="enterProposalMode"
+          >
+            制作方案
+          </el-button>
         </div>
+      </div>
+
+      <div
+        v-if="proposalMode"
+        class="selection-bar"
+      >
+        <span class="selection-count">已选 {{ selectedCount }} 项</span>
+        <div class="selection-actions">
+          <el-button
+            class="capsule-btn"
+            @click="exitProposalMode"
+          >
+            取消
+          </el-button>
+          <el-button
+            type="primary"
+            class="capsule-btn capsule-btn-primary"
+            :disabled="selectedCount === 0"
+            @click="finishProposal"
+          >
+            完成
+          </el-button>
+        </div>
+      </div>
+
+      <div
+        v-if="proposalMode"
+        class="proposal-mobile-list"
+      >
+        <button
+          v-for="row in products"
+          :key="row.id"
+          type="button"
+          class="proposal-mobile-item"
+          :class="{ selected: selectedIds.has(row.id) }"
+          :disabled="!isSelectable(row)"
+          @click="toggleMobileSelection(row)"
+        >
+          <span class="proposal-mobile-check">{{ selectedIds.has(row.id) ? '已选' : '选择' }}</span>
+          <span class="proposal-mobile-product">
+            <strong>{{ row.productName }}</strong>
+            <small>{{ row.productNo }} · ¥{{ row.facePrice.toFixed(2) }}</small>
+          </span>
+          <el-tag size="small" :type="row.status === 'active' ? 'success' : 'info'">
+            {{ statusMap[row.status] || row.status }}
+          </el-tag>
+        </button>
       </div>
 
       <div class="table-wrapper">
         <el-table
+          ref="productTableRef"
           v-loading="loading"
           :data="products"
           border
           stripe
           class="product-table"
           :fit="false"
+          :row-key="(row: any) => row.id"
+          :reserve-selection="true"
+          @header-dragend="onHeaderDragEnd"
+          @selection-change="onSelectionChange"
         >
+          <el-table-column
+            v-if="proposalMode"
+            type="selection"
+            width="50"
+            fixed="left"
+            :selectable="isSelectable"
+          />
+          <el-table-column
+            label="图片"
+            width="80"
+            align="center"
+          >
+            <template #default="{ row }">
+              <div
+                class="product-thumb"
+                @click="previewProductImage(row)"
+              >
+                <el-image
+                  v-if="row.primaryImage?.thumbnailUrl || row.primaryImage?.url"
+                  :src="row.primaryImage.thumbnailUrl || row.primaryImage.url"
+                  fit="cover"
+                  class="thumb-img"
+                >
+                  <template #error>
+                    <div class="thumb-placeholder">
+                      {{ getPlaceholderText(row.productName) }}
+                    </div>
+                  </template>
+                </el-image>
+                <div
+                  v-else
+                  class="thumb-placeholder"
+                >
+                  {{ getPlaceholderText(row.productName) }}
+                </div>
+              </div>
+            </template>
+          </el-table-column>
           <el-table-column
             prop="productNo"
             label="产品编号"
-            min-width="120"
+            :width="autoFit ? colWidths['productNo'] : 120"
+            :show-overflow-tooltip="{ teleported: true, placement: 'top' }"
           />
           <el-table-column
             prop="productName"
             label="产品名称"
-            min-width="180"
-            show-overflow-tooltip
+            :width="autoFit ? colWidths['productName'] : 180"
+            :show-overflow-tooltip="{ teleported: true, placement: 'top' }"
           />
           <el-table-column
             prop="brandName"
             label="品牌"
-            width="100"
+            :width="autoFit ? colWidths['brandName'] : 100"
+            :show-overflow-tooltip="{ teleported: true, placement: 'top' }"
           />
           <el-table-column
             prop="categoryName"
             label="分类"
-            width="100"
+            :width="autoFit ? colWidths['categoryName'] : 100"
+            :show-overflow-tooltip="{ teleported: true, placement: 'top' }"
           />
           <el-table-column
             prop="facePrice"
@@ -232,15 +343,32 @@
             width="90"
             align="right"
           >
+            <template #header>
+              <span class="cost-header">
+                成本价
+                <el-button
+                  link
+                  size="small"
+                  class="cost-eye"
+                  :title="costVisible ? '隐藏成本价' : '显示成本价'"
+                  @click.stop="costVisible = !costVisible"
+                >
+                  <el-icon>
+                    <View v-if="costVisible" />
+                    <Hide v-else />
+                  </el-icon>
+                </el-button>
+              </span>
+            </template>
             <template #default="{ row }">
               <span
-                v-if="row.costPrice != null"
+                v-if="costVisible && row.costPrice != null"
                 class="price-text"
               >¥{{ row.costPrice.toFixed(2) }}</span>
               <span
                 v-else
                 class="text-muted"
-              >-</span>
+              >—</span>
             </template>
           </el-table-column>
           <el-table-column
@@ -277,7 +405,8 @@
           </el-table-column>
           <el-table-column
             label="操作"
-            width="280"
+            class="op-col"
+            :width="autoFit ? colWidths['operation'] : 280"
             fixed="right"
             align="center"
           >
@@ -344,6 +473,8 @@
       v-model="showCreateDialog"
       :title="editingProduct ? '编辑产品' : '新增产品'"
       class="glass-dialog"
+      append-to-body
+      lock-scroll
       :close-on-click-modal="false"
       destroy-on-close
     >
@@ -558,6 +689,8 @@
       v-model="statusDialogVisible"
       title="修改状态"
       class="glass-dialog dialog-sm"
+      append-to-body
+      lock-scroll
       :close-on-click-modal="false"
     >
       <el-form label-width="80px">
@@ -598,18 +731,28 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <el-image-viewer
+      v-if="previewUrl"
+      :url-list="[previewUrl]"
+      @close="previewUrl = ''"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
+import { View, Hide, Operation, Grid } from '@element-plus/icons-vue'
+import { useRouter } from 'vue-router'
 import { productApi, categoryApi, brandApi, supplierApi, tagApi } from '@/api'
 import { useAuthStore } from '@/stores/auth'
 import { hasPermission } from '@/types/permissions'
+import type { ProductOption, ProposalToken } from '@/types/sales'
 
 const authStore = useAuthStore()
+const router = useRouter()
 const userPermissions = computed(() => authStore.userPermissions)
 const roleCode = computed(() => authStore.userRoleCode)
 
@@ -623,6 +766,7 @@ const canDelete = computed(() => hasPermission(userPermissions.value, 'product:d
 const canExport = computed(() => hasPermission(userPermissions.value, 'product:export'))
 const canClone = computed(() => hasPermission(userPermissions.value, 'product:clone'))
 const canChangeStatus = computed(() => hasPermission(userPermissions.value, 'product:status'))
+const canProposalCreate = computed(() => hasPermission(userPermissions.value, 'proposal:create'))
 
 const statusMap: Record<string, string> = { active: '上架', inactive: '下架', draft: '草稿' }
 const stockStatusMap: Record<string, string> = { in_stock: '有货', out_of_stock: '缺货', preorder: '预售', unknown: '未知' }
@@ -634,6 +778,37 @@ const showCreateDialog = ref(false)
 const editingProduct = ref<any>(null)
 const submitting = ref(false)
 const productFormRef = ref<FormInstance>()
+
+const autoFit = ref(true)
+const costVisible = ref(false)
+const colWidths = ref<Record<string, number>>({})
+const productTableRef = ref()
+const previewUrl = ref('')
+
+// ===== Proposal mode state =====
+const proposalMode = ref(false)
+const selectedIds = ref(new Set<string>())
+const allSelectedProducts = ref<ProductOption[]>([])
+
+const selectedCount = computed(() => selectedIds.value.size)
+
+function getPlaceholderText(name: string): string {
+  if (!name) return '无图'
+  const chineseChars = name.match(/[\u4e00-\u9fa5]/g)
+  if (chineseChars && chineseChars.length >= 2) {
+    return chineseChars.slice(0, 2).join('')
+  }
+  const alnum = name.replace(/[^a-zA-Z0-9]/g, '')
+  if (alnum.length >= 4) return alnum.slice(0, 4).toUpperCase()
+  if (alnum.length > 0) return alnum.toUpperCase()
+  return name.slice(0, 2)
+}
+
+function previewProductImage(row: any) {
+  if (row.primaryImage?.url) {
+    previewUrl.value = row.primaryImage.url
+  }
+}
 
 const brands = ref<any[]>([])
 const suppliers = ref<any[]>([])
@@ -706,11 +881,97 @@ const fetchProducts = async () => {
     const res = await productApi.list(params)
     products.value = (res.data.list || []).map(normalizeProduct)
     total.value = res.data.total
+    if (autoFit.value) computeFillWidths()
   } catch {
     ElMessage.error('加载产品列表失败')
   } finally {
     loading.value = false
   }
+}
+
+// 文本列：按内容自适应（设最小/最大阈值）
+const FIT_TEXT = [
+  { prop: 'productNo', label: '产品编号', min: 110, max: 240 },
+  { prop: 'brandName', label: '品牌', min: 90, max: 200 },
+  { prop: 'categoryName', label: '分类', min: 90, max: 200 },
+]
+// 固定列宽（不参与内容测量）
+const FIXED_WIDTHS: Record<string, number> = {
+  image: 80,
+  facePrice: 90,
+  stockStatus: 90,
+  status: 90,
+  costPrice: 90,
+  operation: 360,
+}
+const NAME_MIN = 140
+const NAME_MAX = 520
+
+const _measureCanvas = document.createElement('canvas')
+const _measureCtx = _measureCanvas.getContext('2d')!
+
+function measureTextWidth(text: string): number {
+  _measureCtx.font = '14px "Helvetica Neue", Helvetica, Arial, "PingFang SC", "Microsoft YaHei", sans-serif'
+  return _measureCtx.measureText(text == null ? '' : String(text)).width
+}
+
+function getTableWidth(): number {
+  const el = productTableRef.value?.$el as HTMLElement | undefined
+  return el ? el.clientWidth : 0
+}
+
+// 确定性填充：所有列宽之和 == 表格容器宽度，productName 作为弹性填充列。
+// 这样不会留下右侧空白，操作列始终吸附右边缘（即便手动拖拽其它列）。
+function computeFillWidths() {
+  if (!autoFit.value) return
+  const container = getTableWidth()
+  if (!container) return
+  const result: Record<string, number> = {}
+  for (const c of FIT_TEXT) {
+    let w = measureTextWidth(c.label) + 28
+    for (const row of products.value) {
+      const txt = row[c.prop] == null ? '' : String(row[c.prop])
+      w = Math.max(w, measureTextWidth(txt) + 24)
+    }
+    result[c.prop] = Math.round(Math.min(Math.max(w, c.min), c.max))
+  }
+  for (const [k, v] of Object.entries(FIXED_WIDTHS)) {
+    if (k === 'costPrice' && !canViewCost.value) continue
+    if (k === 'operation') continue
+    result[k] = v
+  }
+  const others = Object.values(result).reduce((a, b) => a + b, 0)
+  let nameW = container - others - FIXED_WIDTHS.operation
+  nameW = Math.min(Math.max(nameW, NAME_MIN), NAME_MAX)
+  result.productName = Math.round(nameW)
+  result.operation = FIXED_WIDTHS.operation
+  colWidths.value = result
+  nextTick(() => productTableRef.value?.doLayout())
+}
+
+// 手动拖拽列宽后，重新计算填充列使总宽仍等于容器宽度（消除右侧空白）
+function onHeaderDragEnd(newWidth: number, _oldWidth: number, column: any) {
+  if (!autoFit.value) return
+  const prop = column?.property
+  if (!prop || prop === 'productName') {
+    computeFillWidths()
+    return
+  }
+  colWidths.value = { ...colWidths.value, [prop]: Math.round(newWidth) }
+  const container = getTableWidth()
+  const others = Object.entries(colWidths.value)
+    .filter(([k]) => k !== 'productName')
+    .reduce((a, [, v]) => a + (v as number), 0)
+  let nameW = container - others
+  nameW = Math.min(Math.max(nameW, NAME_MIN), NAME_MAX)
+  colWidths.value = { ...colWidths.value, productName: Math.round(nameW) }
+  nextTick(() => productTableRef.value?.doLayout())
+}
+
+function toggleAutoFit() {
+  autoFit.value = !autoFit.value
+  if (autoFit.value) computeFillWidths()
+  nextTick(() => productTableRef.value?.doLayout())
 }
 
 const normalizeProduct = (item: any) => ({
@@ -731,6 +992,14 @@ const normalizeProduct = (item: any) => ({
   tagIds: item.tag_ids || [],
   createTime: item.create_time,
   updateTime: item.update_time,
+  primaryImage: item.cover_image_url
+    ? {
+        id: item.cover_image_id,
+        url: item.cover_image_url,
+        thumbnailUrl: item.cover_image_url,
+        name: item.cover_image_filename,
+      }
+    : null,
 })
 
 const normalizeCategory = (item: any): any => ({
@@ -939,9 +1208,80 @@ const handleExport = async () => {
   }
 }
 
+// ===== Proposal mode =====
+
+function isSelectable(row: { id: string; status: string }): boolean {
+  return row.status === 'active'
+}
+
+const enterProposalMode = () => {
+  proposalMode.value = true
+  selectedIds.value = new Set()
+  allSelectedProducts.value = []
+}
+
+const exitProposalMode = () => {
+  productTableRef.value?.clearSelection()
+  proposalMode.value = false
+  selectedIds.value = new Set()
+  allSelectedProducts.value = []
+}
+
+const buildProductOption = (row: any): ProductOption => ({
+  id: row.id,
+  product_name: row.productName,
+  product_no: row.productNo,
+  face_price: row.facePrice ?? null,
+  stock_status: row.stockStatus ?? null,
+  cover_image_url: row.primaryImage?.url ?? null,
+})
+
+const onSelectionChange = (rows: any[]) => {
+  selectedIds.value = new Set(rows.map((r) => r.id))
+  allSelectedProducts.value = rows.map(buildProductOption)
+}
+
+const toggleMobileSelection = (row: any) => {
+  if (!isSelectable(row)) return
+  const next = new Set(selectedIds.value)
+  const nextProducts = [...allSelectedProducts.value]
+  if (next.has(row.id)) {
+    next.delete(row.id)
+    const index = nextProducts.findIndex((product) => product.id === row.id)
+    if (index >= 0) nextProducts.splice(index, 1)
+  } else {
+    next.add(row.id)
+    nextProducts.push(buildProductOption(row))
+  }
+  selectedIds.value = next
+  allSelectedProducts.value = nextProducts
+}
+
+const finishProposal = () => {
+  if (selectedIds.value.size === 0) return
+  const token: ProposalToken = {
+    productIds: [...selectedIds.value],
+    options: allSelectedProducts.value,
+  }
+  const tokenId = crypto.randomUUID()
+  sessionStorage.setItem(`proposal_token_${tokenId}`, JSON.stringify(token))
+  exitProposalMode()
+  router.push({
+    path: '/proposals',
+    query: { mode: 'create', selection_token: tokenId },
+  })
+}
+
 onMounted(() => {
   fetchMasterData()
   fetchProducts()
+  nextTick(() => computeFillWidths())
+  let resizeTimer: number | undefined
+  window.addEventListener('resize', () => {
+    if (!autoFit.value) return
+    clearTimeout(resizeTimer)
+    resizeTimer = setTimeout(() => computeFillWidths(), 150) as unknown as number
+  })
 })
 </script>
 
@@ -1112,6 +1452,32 @@ onMounted(() => {
   overflow: hidden;
 }
 
+.cost-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.cost-eye {
+  margin: 0;
+  padding: 2px;
+  height: auto;
+  color: var(--text-secondary);
+}
+
+.cost-eye:hover {
+  color: var(--brand-primary);
+}
+
+.product-table :deep(.op-col .cell) {
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
 .product-table :deep(.el-table__header-wrapper) {
   background: var(--brand-lighter);
 }
@@ -1141,6 +1507,41 @@ onMounted(() => {
   color: var(--brand-deep);
   font-weight: 600;
   font-family: monospace;
+}
+
+/* ===== Product Thumb ===== */
+.product-thumb {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.thumb-img {
+  width: 64px;
+  height: 64px;
+  border-radius: 8px;
+  display: block;
+}
+
+.thumb-img :deep(img) {
+  border-radius: 8px;
+  background: #fff;
+}
+
+.thumb-placeholder {
+  width: 64px;
+  height: 64px;
+  border-radius: 8px;
+  background: var(--brand-lighter);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  user-select: none;
 }
 
 .capsule-tag {
@@ -1224,7 +1625,92 @@ onMounted(() => {
   color: var(--text-secondary);
 }
 
-/* ===== Responsive ===== */
+/* ===== Selection Bar ===== */
+.selection-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: rgba(30, 50, 90, 0.06);
+  border-radius: var(--radius-md);
+  margin-bottom: 16px;
+}
+
+.selection-count {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--brand-deep);
+}
+
+.selection-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.proposal-mobile-list {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .proposal-mobile-list {
+    display: grid;
+    gap: 10px;
+    margin: 12px 0;
+  }
+
+  .proposal-mobile-item {
+    width: 100%;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 10px;
+    padding: 12px;
+    border: 1px solid rgba(30, 50, 90, 0.12);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.86);
+    color: var(--text-primary);
+    text-align: left;
+  }
+
+  .proposal-mobile-item.selected {
+    border-color: var(--brand-primary);
+    background: var(--brand-light);
+  }
+
+  .proposal-mobile-item:disabled {
+    opacity: 0.55;
+  }
+
+  .proposal-mobile-check {
+    color: var(--brand-primary);
+    font-weight: 700;
+  }
+
+  .proposal-mobile-product {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .proposal-mobile-product small {
+    margin-top: 4px;
+    color: var(--text-secondary);
+  }
+
+  .selection-bar {
+    flex-direction: column;
+    gap: 8px;
+    align-items: stretch;
+  }
+
+  .selection-actions {
+    justify-content: space-between;
+  }
+
+  .selection-actions .capsule-btn {
+    flex: 1;
+  }
+}
 @media (max-width: 768px) {
   .products-page {
     padding: 8px;

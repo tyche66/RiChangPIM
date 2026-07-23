@@ -1,8 +1,15 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { resolve } from 'path'
 
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '')
+  process.env.VITE_APP_VERSION ||= env.APP_VERSION
+  process.env.VITE_BUILD_ID ||= env.BUILD_ID
+  process.env.VITE_GIT_COMMIT ||= env.GIT_COMMIT
+  process.env.VITE_BUILD_TIME ||= env.BUILD_TIME
+
+  return {
   plugins: [vue()],
   resolve: {
     alias: {
@@ -32,4 +39,5 @@ export default defineConfig({
       },
     },
   },
+  }
 })

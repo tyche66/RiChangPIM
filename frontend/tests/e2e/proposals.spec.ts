@@ -28,7 +28,7 @@ test.describe('Proposal Structured Polish UI', () => {
     await page.route(`**/api/v1/proposals/${proposalId}`, (route: any) => {
       route.fulfill({
         status: 200,
-        json: {
+        json: { code: 200, data: {
           id: proposalId,
           proposal_no: 'PRP-2024-001',
           proposal_name: '夏季护肤方案',
@@ -49,7 +49,7 @@ test.describe('Proposal Structured Polish UI', () => {
           items: [
             { product_id: 'p1', quantity: 100, remark: '首批' },
           ],
-        },
+        } },
       })
     })
 
@@ -75,7 +75,7 @@ test.describe('Proposal Structured Polish UI', () => {
     await page.route(`**/api/v1/proposals/${proposalId}`, (route: any) => {
       route.fulfill({
         status: 200,
-        json: {
+        json: { code: 200, data: {
           id: proposalId,
           proposal_no: 'PRP-2024-002',
           proposal_name: '失败方案',
@@ -83,7 +83,7 @@ test.describe('Proposal Structured Polish UI', () => {
           ai_polished: true,
           ai_polish_content: 'invalid json {broken',
           items: [],
-        },
+        } },
       })
     })
 
@@ -101,7 +101,7 @@ test.describe('Proposal Structured Polish UI', () => {
     await page.route(`**/api/v1/proposals/${proposalId}`, (route: any) => {
       route.fulfill({
         status: 200,
-        json: {
+        json: { code: 200, data: {
           id: proposalId,
           proposal_no: 'PRP-2024-003',
           proposal_name: '待润色方案',
@@ -109,7 +109,7 @@ test.describe('Proposal Structured Polish UI', () => {
           ai_polished: false,
           ai_polish_content: null,
           items: [],
-        },
+        } },
       })
     })
 
@@ -133,7 +133,7 @@ test.describe('Proposal Structured Polish UI', () => {
     await page.route(`**/api/v1/proposals/${proposalId}`, (route: any) => {
       route.fulfill({
         status: 200,
-        json: {
+        json: { code: 200, data: {
           id: proposalId,
           proposal_no: 'PRP-2024-004',
           proposal_name: '失败重试方案',
@@ -141,7 +141,7 @@ test.describe('Proposal Structured Polish UI', () => {
           ai_polished: true,
           ai_polish_content: 'parse error',
           items: [],
-        },
+        } },
       })
     })
 
@@ -161,14 +161,14 @@ test.describe('Proposal Structured Polish UI', () => {
     await page.route(`**/api/v1/proposals/${proposalId}`, (route: any) => {
       route.fulfill({
         status: 200,
-        json: {
+        json: { code: 200, data: {
           id: proposalId,
           proposal_name: 'JSON Toggle Test',
           status: 'draft',
           ai_polished: true,
           ai_polish_content: polishContent,
           items: [],
-        },
+        } },
       })
     })
 

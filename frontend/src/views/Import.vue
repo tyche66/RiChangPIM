@@ -14,10 +14,10 @@
         <template #default>
           <ul style="margin: 8px 0 0 0; padding-left: 20px;">
             <li>请下载模板文件，按照模板格式填写产品数据</li>
-            <li>必填列：product_no（产品编号）、product_name（产品名称）、face_price（面价）</li>
-            <li>可选列：brand_name、supplier_name、category_name、cost_price、material、stock_status、status、tag_names</li>
-            <li>tag_names 支持多个标签用英文逗号分隔</li>
-            <li>brand_name、supplier_name、category_name 必须为系统中已存在的名称</li>
+            <li>必填列：产品编号、产品名称、面价</li>
+            <li>可选列：品牌名称、供应商名称、分类名称、成本价、材质、库存状态、状态、标签名称</li>
+            <li>标签名称支持多个标签用英文逗号分隔</li>
+            <li>品牌名称、供应商名称、分类名称必须为系统中已存在的名称</li>
           </ul>
         </template>
       </el-alert>
@@ -88,15 +88,15 @@
           border
           style="margin-bottom: 16px"
         >
-          <el-descriptions-item label="总行数">
+          <el-descriptions-item label="Total Rows">
             {{ importResult.total }}
           </el-descriptions-item>
-          <el-descriptions-item label="成功数">
+          <el-descriptions-item label="Success">
             <el-tag type="success">
               {{ importResult.successCount }}
             </el-tag>
           </el-descriptions-item>
-          <el-descriptions-item label="失败数">
+          <el-descriptions-item label="Failed">
             <el-tag type="danger">
               {{ importResult.failCount }}
             </el-tag>

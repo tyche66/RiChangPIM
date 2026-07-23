@@ -11,7 +11,7 @@ async def health_check():
         "code": 200,
         "data": {
             "status": "healthy",
-            "version": settings.VERSION,
+            "version": settings.APP_VERSION or settings.VERSION,
             "components": {
                 "db": "unknown",
                 "redis": "unknown",

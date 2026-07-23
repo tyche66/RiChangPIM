@@ -66,6 +66,8 @@
       v-model="showCreateDialog"
       :title="editingItem ? '编辑分类' : '新增分类'"
       width="480px"
+      append-to-body
+      lock-scroll
       :close-on-click-modal="false"
       destroy-on-close
     >
@@ -169,11 +171,18 @@ const categoryTreeForSelect = computed(() => {
   return flatten(categories.value, editingItem.value?.id)
 })
 
+const normalizeCategory = (item: any): any => ({
+  ...item,
+  categoryName: item.category_name,
+  parentId: item.parent_id,
+  children: (item.children || []).map(normalizeCategory),
+})
+
 const fetchCategories = async () => {
   loading.value = true
   try {
     const res = await categoryApi.list()
-    categories.value = res.data || []
+    categories.value = (res.data || []).map(normalizeCategory)
   } catch {
     ElMessage.error('加载分类失败')
   } finally {

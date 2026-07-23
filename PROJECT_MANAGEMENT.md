@@ -21,13 +21,22 @@
 
 **当前结论**: GO。生产 Compose 冷启动通过，六服务 (postgres/redis/minio/gotenberg/backend/nginx) 全部健康，migrate → init_admin → seed_data → uvicorn 顺序执行正常，前端/API/登录/核心链路/分享/PDF/RBAC 全量通过。
 
-### V1-AI Pilot (当前阶段) - AI 效能起飞
+### V1.1 - 内部试点首发 ✅ GO
 
-- AI 智能条件推荐
-- 方案生成与 AI 润色
-- 报价单导出 PDF
-- 访问统计看板
-- 字段级权限
+- 25/25 production regression PASS（详见 docs/v1.1-verification.md）
+- 13 条铭达试点产品 + 待核价占位 + OCR 解析状态 + 字段级 RBAC + 备份脚本与恢复演练
+- AI/OCR 默认 fail-closed (AI_ADAPTER=none / OCR_ADAPTER=none)
+
+### V1.2 - 内部试点运营加固（当前阶段，唯一基线 = docs/v1.2-plan.md）
+
+- CI 与发布门禁升级（完整后端 pytest / 前端 tsc / ESLint / Vitest / build / Compose / migration upgrade / pip-audit / npm audit）
+- 运维可观测性（零依赖 /metrics、扩展 /health/ready、/ops/status、5xx rolling 计数、日志脱敏）
+- 备份自动化（批次 ID + manifest + SHA-256 + 原子 rename + systemd timer / cron + recover drill）
+- 试点数据质量闭环（Quality.vue 看板 + quality-summary/list/export + 列表 quality_flag/completeness_status 筛选）
+- 审计与运营页面加固（时间范围 / 状态徽章 / 重置与分页 / Logs.spec + audit.spec / 后端 redact+5xx 单测）
+- 性能规模与并发基线（seed_scale.py 1x/10x/100x；报价 confirm 真正幂等）
+- 文档与版本治理（v1.2-plan + RELEASE_GATE + TODO/PROJECT_MANAGEMENT/BUILD_LOG 更新至 V1.1 GO）
+- 明确不做：多租户、ERP/CRM、完整审批引擎、向量 RAG 生产启用、Kubernetes 等
 
 ### V2 - 企业集成
 
@@ -184,3 +193,4 @@ docker compose up -d backend
 | 2026-07-16 | MVP 前端全链路集成与 RC 门禁；因 Docker 不可用判定 NO-GO | 主控 Agent |
 | 2026-07-16 | RC 最终验收复跑；Docker 可用且 backend 镜像构建通过，但 Compose 因 host 5432 端口冲突失败，维持 NO-GO | RC 最终验收 Agent |
 | 2026-07-16 | RC 端口冲突解除后全量复跑；Compose 六服务健康，backend migrate/init_admin/seed_data/uvicorn 顺序通过，frontend/API/login/core/share/PDF/RBAC 全量通过，backend 111 passed / frontend 36 passed，判定 GO。MVP-RC 关闭，进入 V1-AI Pilot。 | 主控 Agent |
+| 2026-07-22 | 修复带图片产品详情 500 和前端错误状态；新增版本接口、版本页面及统一构建元数据；修复 Compose 凭据漂移导致的登录 500 和 Alembic 长 revision 兼容。详见 `docs/v1.2-verification.md`。 | 主控 Agent |

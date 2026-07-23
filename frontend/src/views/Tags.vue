@@ -91,6 +91,8 @@
       v-model="showCreateDialog"
       :title="editingItem ? '编辑标签' : '新增标签'"
       width="480px"
+      append-to-body
+      lock-scroll
       :close-on-click-modal="false"
       destroy-on-close
     >
@@ -162,11 +164,18 @@ const rules: FormRules = {
   tagName: [{ required: true, message: '请输入标签名称', trigger: 'blur' }],
 }
 
+const normalizeTag = (item: any) => ({
+  ...item,
+  tagName: item.tag_name,
+  tagType: item.tag_type,
+  createTime: item.create_time,
+})
+
 const fetchTags = async () => {
   loading.value = true
   try {
     const res = await tagApi.list()
-    tags.value = res.data?.list || []
+    tags.value = (res.data?.list || []).map(normalizeTag)
   } catch {
     ElMessage.error('加载标签列表失败')
   } finally {

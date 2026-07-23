@@ -2,13 +2,30 @@
 
 ## 当前状态
 
-- MVP-RC 前端全链路集成: 已完成，判定 GO。
-- 当前阶段: V1-AI Pilot（效能起飞）。
-- MVP-RC 结论: GO。生产 Compose 冷启动通过，六服务 (postgres/redis/minio/gotenberg/backend/nginx) 全部健康，migrate → init_admin → seed_data → uvicorn 顺序执行正常，frontend/API/login/core/share/PDF/RBAC 全量通过。
-- MVP-RC 基线计数: backend 111 passed, frontend 36 passed。
-- V1-AI Pilot 当前判定: **NO-GO**。后端、前端、受控 OpenAI-compatible 协议和生产降级验证已通过；说明书上传/索引浏览器 UI、真实 PDF/DOC Parser、完整历史 25 项生产 HTTP 回归尚未完成。
+- V1.1 已发布并 GO（详见 docs/v1.1-verification.md，25/25 production regression PASS）。
+- 当前阶段: V1.2 内部试点运营加固（详见 docs/v1.2-plan.md）。
+- V1.2 唯一基线: docs/v1.2-plan.md；本文件仅作为任务跟踪辅助，与 plan 冲突时以 plan 为准。
+- 发布门禁: RELEASE_GATE.md。
+- V1-AI Pilot 历史判定已并入 V1.1 GO 状态（见 docs/v1.1-verification.md）。
 
-## V1-AI Pilot
+## V1.2 内部试点运营加固
+
+工作包进度(依据 docs/v1.2-plan.md):
+- [x] M1 基线冻结: 写入 docs/v1.2-plan.md + RELEASE_GATE.md，冻结 migration head 0009、PG16、3 个 Docker volume、AI/OCR=none 默认。
+- [x] M2 工程门禁: .github/workflows/ci.yml 升级为完整后端 pytest + compileall + ruff、前端 vue-tsc + ESLint + Vitest + build、Compose 校验、migration upgrade、pip-audit / npm audit 是 release 阻塞门禁。本地等价命令全部通过。
+- [x] M3 可观测性: 新增 app/observability/metrics.py（零依赖 Prom 1.0 文本）、扩展 /health/ready（G/OCR/volume/版本）、新增 /api/v1/metrics、/api/v1/ops/status（admin RBAC）、AuditMiddleware 写请求/5xx 指标、敏感模块 body 落库为 [redacted]。
+- [x] M3 备份自动化: 重写 scripts/db_backup.sh + scripts/minio_backup.sh（批次ID / manifest.json / SHA-256 / 原子 rename / 状态文件）、新增 scripts/backup.sh wrapper、scripts/ai-pim-backup.service + .timer + .cron 调度样例、scripts/backup.env.example、scripts/restore_drill.sh（独立 PG16 + MinIO 容器，绝不挂载生产卷）。
+- [x] M3 数据质量: 新增 app/services/quality.py + /products/quality-summary / /quality-list / /quality-export 端点；frontend/src/views/Quality.vue 看板；finetuned list_products 支持 completeness_status + quality_flag 过滤；UI/导出始终显示待核价，不裸 99999；不导出 cost_price 与敏感供应商字段。
+- [x] M4 审计页面加固: Logs.vue 增时间范围筛选 / 状态徽章 / 时间本地化 / 加载失败与空状态 / 重置与页码回到第一页；新增 frontend/tests/components/Logs.spec.ts（4 项） + frontend/tests/e2e/audit.spec.ts（3 项：admin 可访问 & body 不进 DOM / sales / viewer 被 RBAC 拦截）；后端 test_audit.py 补敏感模块 redacted 与 5xx rolling counter 单测。
+- [x] M4 性能与并发: 新增 scripts/seed_scale.py（1x = 13 / 10x = 1500 / 100x = 100,000，强制 SEED_DATABASE_URL 含 seed/test/scale/synthetic 标记，永不写生产） quotation confirm 修为真正幂等（重复 confirm 不再写 OperationLog 重复行）。
+- [x] 产品详情稳定性: 修复带产品图片时 Pydantic/ORM 附件字段不匹配导致的 500，显式加载详情序列化关系并补 7 项 PostgreSQL 集成测试。
+- [x] 产品详情错误状态: 前端区分 404/403/401/500/网络错误，服务器与网络错误提供原地重试。
+- [x] 版本可见性: 新增 `/api/v1/version`、`/version` 导航页面、构建元数据注入和前后端一致性判断。
+- [x] 部署凭据与迁移兼容: 开发 Compose 统一读取 PostgreSQL/MinIO 环境变量；修复登录数据库凭据漂移和 0012 长 revision ID。
+- [ ] RC 全量门禁: 当前已本地通过后端 ruff + compileall + pytest 非集成、前端 tsc + eslint + vitest + build + compose 校验；待 RC 阶段执行完整 35-40 项生产回归、迁移升级、恢复演练、secret_scan。
+- [ ] RC 扩展 production_regression: 当前 25 项，需新增 备份状态 / quality 看板 / 审计页面 / migration head / 容量检查 / 非管理员 403 到 35-40 项。
+
+## V1-AI Pilot (历史)
 
 - [x] OpenAI-compatible chat/stream/tool/embed 契约、统一错误映射和 adapter 关闭生命周期。
 - [x] `AI_ADAPTER=none` 返回受控 503，核心 PIM/报价/分享继续运行。
@@ -22,31 +39,20 @@
 - [ ] 接入真实 PDF/DOC Parser（当前仅有 Protocol 和测试适配器，生产不伪装 OCR）。
 - [ ] 增加产品说明书上传、关联、触发索引和 RAG 问答的完整前端 UI。
 - [ ] 完成上传说明书→索引→带来源问答→推荐→方案润色的非 mock 浏览器 E2E。
-- [ ] 重放并记录原有 25 项生产 HTTP/RBAC/PDF 回归。
-
-## P0 阻塞项
-
-- [x] 执行 `docker compose -f docker-compose.yml config --quiet`，命令通过但提示 `version` obsolete warning。
-- [x] 执行 `docker compose build backend`，backend 镜像构建通过。
-- [x] 解除 host `5432` 端口冲突后重新启动 PostgreSQL、Redis、MinIO、Gotenberg、backend、nginx；六服务全部健康。
-- [x] 验证 backend 容器 migrate -> init_admin -> seed_data -> serve 顺序；运行日志确认顺序正确。
-- [x] 注入迁移或 seed 失败场景，验证 backend fail-fast 且不对外服务；entrypoint `set -euo pipefail` 确认。
-- [x] 通过生产 nginx 验证 frontend dist、`/api` 代理、健康检查、登录、产品到方案到分享核心链路。
-- [x] 验证 `/share/:token` H5 公开访问不依赖后台 JWT。
 
 ## P1 后续项
 
 - [x] 处理历史依赖漏洞；本次 `npm audit --json` 为 0 vulnerabilities。
 - [x] 完成 Gotenberg PDF 导出闭环，替换当前 pending task 占位体验。
 - [x] 为 AI、方案和公开分享补充组件测试及 Playwright E2E；说明书 UI E2E 仍列在 V1-AI Pilot 未完成项。
-- [ ] 增加操作日志列表 API 后，将 Logs 页面从统计看板扩展为审计查询。
+- [x] 增加操作日志列表 API 后，将 Logs 页面从统计看板扩展为审计查询。(V1.2 §5.5 已加固时间范围/状态/RBAC。)
 
 ## P2 改进项
 
 - [x] 优化 Vite 大 chunk，添加 Rollup manualChunks 拆分 Vue、Element Plus 和 vendor。
 - [x] 为 Vitest 登录组件测试补 router plugin，消除 router injection warning。
 - [ ] 生产 TLS 不随仓库提交证书/key；当前 nginx HTTP-only，后续由外部终止或独立证书配置完成。
-- [ ] 增加 PostgreSQL 和 MinIO 备份脚本。
+- [x] 增加 PostgreSQL 和 MinIO 备份脚本。(V1.2 §5.3 已升级为批次 + manifest + 调度 + 恢复演练。)
 
 ## 已完成任务
 
@@ -60,33 +66,4 @@
 - [x] 前端 `vue-tsc`、ESLint、Vitest、Vite build 门禁通过。
 - [x] 生产前端产物生成至 `frontend/dist`。
 - [x] 更新 `PROJECT_MANAGEMENT.md` 与 `BUILD_LOG.md`。
-
-## 最近验证统计
-
-| 范围 | 命令 | 结果 |
-| --- | --- | --- |
-| Backend | `venv/bin/python -m compileall -q app tests` | PASS |
-| Backend | `venv/bin/ruff check app tests` | PASS |
-| Backend | `venv/bin/python -m pytest --collect-only -q` | 111 collected |
-| Backend | `venv/bin/python -m pytest -W error::DeprecationWarning` | 111 passed, 0 failed, 0 skipped |
-| Frontend | `npm ci` | PASS, 381 packages installed, 0 vulnerabilities |
-| Frontend | `npx vue-tsc --noEmit` | PASS |
-| Frontend | `npx eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx` | PASS |
-| Frontend | `npm run test` | 36 passed |
-| Frontend | `npm run build` | PASS |
-| Compose | `docker compose -f docker-compose.yml config --quiet` | PASS, obsolete `version` warning |
-| Compose | `docker compose build backend` | PASS, `richangpim-backend:latest` |
-| Compose | `docker compose up -d postgres redis minio gotenberg backend nginx` | PASS, 六服务全部健康 |
-| Runtime | `curl -I http://localhost/` | PASS, 200 |
-| Runtime | `curl -I http://localhost/share/test-token` | PASS, 200 SPA fallback |
-| Runtime | `curl http://localhost/api/v1/health` | PASS, 200 |
-| Runtime | `curl -X POST http://localhost/api/v1/auth/login` | PASS, 返回 JWT |
-| Runtime | 产品 → 方案 → 报价 → 分享核心链路 | PASS |
-| Runtime | 报价单 PDF 导出 (Gotenberg) | PASS, `application/pdf` |
-| Runtime | RBAC 角色权限 CRUD + 49 权限持久化 | PASS |
-| V1 Backend | `venv/bin/python -m pytest -q` | 291 passed, 0 failed, 0 skipped, 4 warnings |
-| V1 Frontend | `npm run test -- --run` | 68 passed, 0 failed |
-| V1 Playwright desktop | `npx playwright test --project=chromium` | 26 passed, 0 failed, 3 skipped |
-| V1 Playwright mobile | 全量后修复响应式失败并定向复跑 | 25 passed, 1 failed, 3 skipped；失败用例修复后 1 passed |
-| V1 AI enabled | 受控 OpenAI-compatible mock | chat 200；embedding 200/1536；5xx→502；timeout→504 |
-| V1 AI disabled | 生产 `AI_ADAPTER=none` | AI chat 503；readiness ready；核心数据保留 |
+- [x] 新增 `docs/v1.2-verification.md`，记录产品详情、版本功能、构建变量、登录故障和迁移兼容修复。

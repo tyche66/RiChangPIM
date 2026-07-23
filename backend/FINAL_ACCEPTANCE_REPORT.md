@@ -1,5 +1,11 @@
 # AI-PIM Backend 总验收报告（最终）
 
+> 2026-07-22 增量说明：本报告主体是 2026-07-16 的历史验收快照，其中 migration head、
+> 权限数量和测试数量不代表当前 V1.2 工作区。近期产品详情 500、版本接口、Compose 登录凭据
+> 漂移和 Alembic 长 revision 兼容修复及其当前验证结果见
+> `../docs/v1.2-verification.md`。V1.2 完整后端套件尚未恢复全绿，因此不得用本报告主体的
+> “105 passed / GO”替代当前 RC 门禁结果。
+
 验收日期：2026-07-16
 项目根：`/home/AI-PIM/RiChangPIM/backend`
 测试库：`ai_pim_test`（PostgreSQL，专用，仅测试使用）
@@ -66,6 +72,17 @@
 
 > 上述 1–3 为既有缺陷，非本次八项阻塞的范围，但因 Task 4 需要真实数据而必然暴露，已一并修复并
 > 纳入门禁验证。修复后 `ruff` / 全量 pytest 仍全绿。
+
+### 2026-07-22 产品详情增量修复
+
+- 带产品图片时，`ProductResponse.model_validate(product)` 会把 `ProductImage` 直接验证为
+  `ProductImageInfo`，但 `file_url/file_name/file_type` 实际位于
+  `ProductImage.attachment`，因此触发 Pydantic `ValidationError` 并返回 500。
+- 详情响应改为显式展平附件字段，查询明确加载 tags、brand、supplier、category、images 和
+  attachment；场景图通过关联表单独查询并过滤软删除记录。
+- 移除对未加载 `product.scene_images` relationship 的赋值，避免异步懒加载风险。
+- `tests/test_product_detail.py` 与 `tests/test_version.py` 在真实 PostgreSQL 上共 10 项通过。
+- 完整根因、前端状态处理和当前非全绿门禁说明见 `../docs/v1.2-verification.md`。
 
 ---
 

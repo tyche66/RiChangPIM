@@ -48,14 +48,15 @@ docker compose up -d
 
 访问地址: https://localhost（开发自签名证书需要浏览器手动信任）
 
-### V1.1 运维
+### V1.2 运维
 
 - OCR 默认关闭：`OCR_ADAPTER=none`。仅在受控环境改为 `tesseract`，扫描 PDF 才会调用内部 OCR 服务。
 - AI 默认关闭：`AI_ADAPTER=none`。外部 AI Key 只能通过未提交的 `.env` 或秘密管理系统注入。
 - PostgreSQL 备份/恢复：`scripts/db_backup.sh`、`scripts/db_restore.sh`。
 - MinIO 备份/恢复：`scripts/minio_backup.sh`、`scripts/minio_restore.sh`。
 - 本地 TLS：`scripts/generate_dev_tls.sh`；生产必须使用受信任证书或外部 TLS 终止。
-- 当前 migration head：`0009_sunon_pilot_product_fields`。
+- 当前 migration head：`0012_product_scene_image_partial_unique`；长 revision ID 兼容说明见
+  `docs/v1.2-verification.md`。
 
 ## 技术栈
 
@@ -96,6 +97,10 @@ RiChangPIM/
 ## API 文档
 
 启动后访问: http://localhost/docs
+
+- 接口总览：`docs/04-api-overview.md`
+- V1.2 近期变更与验证：`docs/v1.2-verification.md`
+- 后端部署与故障排查：`backend/README.md`
 
 ## MVP 功能范围
 

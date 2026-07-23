@@ -11,27 +11,31 @@
       width="248px"
     >
       <div class="logo">
-        <span class="logo-mark">AI</span>
-        <span class="logo-copy">
-          <strong>AI-PIM</strong>
-          <small>Product Intelligence</small>
-        </span>
+        <img
+          class="logo-img"
+          src="/RiChangPIM-white.png"
+          alt="AI-PIM"
+        >
       </div>
       <el-menu
+        ref="menuRef"
         :default-active="activeMenu"
-        router
+        :default-openeds="defaultOpenedMenus"
         background-color="transparent"
         text-color="rgba(255, 255, 255, 0.7)"
         active-text-color="#ffffff"
-        @select="mobileMenuOpen = false"
+        @select="handleMenuSelect"
       >
-        <el-sub-menu index="products">
+        <el-sub-menu index="m-products">
           <template #title>
             <el-icon><Document /></el-icon>
             <span>产品管理</span>
           </template>
           <el-menu-item index="/products">
             产品列表
+          </el-menu-item>
+          <el-menu-item index="/quality">
+            数据质量
           </el-menu-item>
           <el-menu-item index="/categories">
             分类管理
@@ -45,8 +49,14 @@
           <el-menu-item index="/tags">
             标签管理
           </el-menu-item>
+          <el-menu-item index="/media">
+            媒体库
+          </el-menu-item>
+          <el-menu-item index="/scene-images">
+            场景图管理
+          </el-menu-item>
         </el-sub-menu>
-        <el-sub-menu index="sales">
+        <el-sub-menu index="m-sales">
           <template #title>
             <el-icon><DocumentCopy /></el-icon>
             <span>销售管理</span>
@@ -58,7 +68,7 @@
             报价管理
           </el-menu-item>
         </el-sub-menu>
-        <el-sub-menu index="admin">
+        <el-sub-menu index="m-admin">
           <template #title>
             <el-icon><Setting /></el-icon>
             <span>系统管理</span>
@@ -76,7 +86,7 @@
             操作日志
           </el-menu-item>
         </el-sub-menu>
-        <el-sub-menu index="ai">
+        <el-sub-menu index="m-ai">
           <template #title>
             <el-icon><Cpu /></el-icon>
             <span>AI 功能</span>
@@ -91,6 +101,10 @@
             批量导入
           </el-menu-item>
         </el-sub-menu>
+        <el-menu-item index="/version">
+          <el-icon><InfoFilled /></el-icon>
+          <span>版本</span>
+        </el-menu-item>
       </el-menu>
     </el-aside>
     <el-container>
@@ -140,23 +154,69 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Cpu, Document, DocumentCopy, Menu, Setting } from '@element-plus/icons-vue'
+import { Cpu, Document, DocumentCopy, InfoFilled, Menu, Setting } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 const mobileMenuOpen = ref(false)
+const menuRef = ref<{ updateActiveIndex?: (index: string) => void } | null>(null)
 
 const activeMenu = computed(() => route.path)
+
+const subMenuMap: Record<string, string> = {
+  products: 'm-products',
+  quality: 'm-products',
+  categories: 'm-products',
+  brands: 'm-products',
+  suppliers: 'm-products',
+  tags: 'm-products',
+  media: 'm-products',
+  'scene-images': 'm-products',
+  proposals: 'm-sales',
+  quotations: 'm-sales',
+  users: 'm-admin',
+  roles: 'm-admin',
+  shares: 'm-admin',
+  logs: 'm-admin',
+  'ai-select': 'm-ai',
+  manuals: 'm-ai',
+  import: 'm-ai',
+}
+const defaultOpenedMenus = computed(() => {
+  const key = route.path.split('/')[1]
+  const parent = subMenuMap[key]
+  return parent ? [parent] : []
+})
+
+const syncMenuActive = async () => {
+  await nextTick()
+  menuRef.value?.updateActiveIndex?.(route.path)
+}
+
+const handleMenuSelect = async (index: string) => {
+  mobileMenuOpen.value = false
+  if (!index.startsWith('/')) return
+
+  try {
+    await router.push(index)
+  } finally {
+    await syncMenuActive()
+  }
+}
+
 const routeLabels: Record<string, [string, string]> = {
   products: ['产品管理', '产品列表'],
+  quality: ['产品管理', '数据质量'],
   categories: ['产品管理', '分类管理'],
   brands: ['产品管理', '品牌管理'],
   suppliers: ['产品管理', '供应商'],
   tags: ['产品管理', '标签管理'],
+  media: ['产品管理', '媒体库'],
+  'scene-images': ['产品管理', '场景图管理'],
   proposals: ['销售管理', '方案管理'],
   quotations: ['销售管理', '报价管理'],
   users: ['系统管理', '用户管理'],
@@ -166,6 +226,7 @@ const routeLabels: Record<string, [string, string]> = {
   'ai-select': ['AI 功能', '智能选品'],
   manuals: ['AI 功能', '产品知识库'],
   import: ['AI 功能', '批量导入'],
+  version: ['系统信息', '版本'],
 }
 const currentLabels = computed(() => routeLabels[route.path.split('/')[1]] || ['工作台', 'AI-PIM'])
 const pageSection = computed(() => currentLabels.value[0])
@@ -174,6 +235,7 @@ const userInitial = computed(() => (authStore.currentUser?.username || 'AI').sli
 
 watch(() => route.fullPath, () => {
   mobileMenuOpen.value = false
+  syncMenuActive()
 })
 
 const handleLogout = async () => {
@@ -193,6 +255,8 @@ const handleLogout = async () => {
   position: sticky;
   top: 12px;
   height: calc(100vh - 24px);
+  display: flex;
+  flex-direction: column;
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 32px;
   background:
@@ -201,6 +265,19 @@ const handleLogout = async () => {
   color: #fff;
   box-shadow: 0 24px 70px rgba(30, 50, 90, 0.2);
   overflow: hidden;
+}
+
+.sidebar :deep(.el-menu) {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.logo-img {
+  height: 32px;
+  width: auto;
+  display: block;
 }
 
 .logo {
@@ -227,29 +304,6 @@ const handleLogout = async () => {
   background: rgba(255, 255, 255, 0.16);
   font-size: 13px;
   letter-spacing: 0.08em;
-}
-
-.logo-copy {
-  display: grid;
-  gap: 3px;
-}
-
-.logo-copy strong {
-  font-size: 17px;
-  font-weight: 400;
-  letter-spacing: 0.05em;
-}
-
-.logo-copy small {
-  color: rgba(255, 255, 255, 0.48);
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-}
-
-.sidebar :deep(.el-menu) {
-  border-right: 0;
-  padding: 12px;
 }
 
 .sidebar :deep(.el-sub-menu__title),

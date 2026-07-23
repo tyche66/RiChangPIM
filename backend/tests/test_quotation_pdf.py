@@ -17,6 +17,12 @@ class _ScalarResult:
     def scalar_one_or_none(self):
         return self._quotation
 
+    def scalars(self):
+        return self
+
+    def all(self):
+        return [self._quotation]
+
 
 class _DB:
     def __init__(self, quotation):

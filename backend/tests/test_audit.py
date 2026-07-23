@@ -293,5 +293,80 @@ def test_module_imports_clean():
     assert hasattr(mod, "AuditMiddleware")
 
 
+@pytest.mark.anyio
+async def test_sensitive_modules_request_body_is_redacted():
+    """V1.2 §5.2 / §6.5 — auth/users/ai 模块的 body_summary 必须落库为 [redacted]。
+
+    严禁把登录密码、AI Key、用户密码原文写入 operation_log。
+    """
+    from app.middleware.audit import audit_action
+
+    captured = {}
+
+    async def fake_write(**kwargs):
+        captured.update(kwargs)
+
+    @audit_action("login", module="auth")
+    async def handler(request):
+        return {"code": 200}
+
+    req = _Request(
+        state_user_id="u-9",
+        body=b'{"username":"admin","password":"supersecret"}',
+    )
+
+    with (
+        patch("app.middleware.audit._write_operation_log", side_effect=fake_write),
+    ):
+        await handler(request=req)
+
+    assert captured["request_body"] == "[redacted]"
+    assert "supersecret" not in str(captured)
+
+
+@pytest.mark.anyio
+async def test_non_sensitive_module_keeps_body_summary():
+    """非敏感模块（products 等）的 body_summary 仍按既定 V1.1 行为保留前 200 字符。"""
+    from app.middleware.audit import audit_action
+
+    captured = {}
+
+    async def fake_write(**kwargs):
+        captured.update(kwargs)
+
+    @audit_action("product_create", module="products")
+    async def handler(request):
+        return {"code": 200, "data": {"id": "p-1"}}
+
+    req = _Request(
+        state_user_id="u-10",
+        body=b'{"product_no":"P-1","product_name":"desk"}',
+    )
+
+    with (
+        patch("app.middleware.audit._write_operation_log", side_effect=fake_write),
+    ):
+        await handler(request=req)
+
+    # body_summary must NOT be [redacted] for non-sensitive modules.
+    assert captured.get("request_body") != "[redacted]"
+    assert "P-1" in str(captured.get("request_body", ""))
+
+
+def test_rolling_5xx_counter_counts_only_5xx():
+    """V1.2 /ops/status 5xx 报警计数：只有 5xx 状态才入队，4xx 不入队。"""
+    from app.middleware.audit import _record_5xx, http_5xx_last_24h
+
+    # sanity check: counter reports 0 baseline; only 5xx increments it
+    # (we don't insert 4xx or 2xx)
+    _record_5xx(200)
+    _record_5xx(404)
+    _record_5xx(500)
+    _record_5xx(503)
+    # This is a shared global state — other tests may have contributed.
+    # Validate only that the count is >= 2 here (i.e. 2× 5xx from this call).
+    assert http_5xx_last_24h() >= 2
+
+
 if __name__ == "__main__":
     asyncio.run(test_success_records_action_module_user_ip())

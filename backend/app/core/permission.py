@@ -28,7 +28,11 @@ class PermissionChecker:
         request.state.role_code = payload.get("role_code")
         request.state.permissions = payload.get("perms", [])
 
-        if self.required_permission and self.required_permission not in request.state.permissions:
+        if (
+            self.required_permission
+            and request.state.role_code != "admin"
+            and self.required_permission not in request.state.permissions
+        ):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail={"code": 40301, "msg": "无权限访问该资源"},

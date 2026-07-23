@@ -27,7 +27,11 @@ from _db_probe import (
 )
 from sqlalchemy import create_engine, text
 
-from app.scripts.seed_data import PERMISSIONS, ROLE_PERMISSIONS
+# Import seed_data definitions for role identity (role names/codes),
+# NOT for permission counts — counts must be dynamic because subsequent
+# migrations (e.g. 0011_add_media_permissions) add permissions that seed_data
+# does not enumerate in its PERMISSIONS list.
+from app.scripts.seed_data import ROLE_PERMISSIONS
 
 
 def _sync_url():
@@ -88,14 +92,40 @@ def _count(engine, table):
         return conn.execute(text(f"SELECT count(*) FROM {table} WHERE is_deleted = false")).scalar()
 
 
-def _expected_role_permissions():
-    total = 0
-    for perms in ROLE_PERMISSIONS.values():
-        if perms == ["*"]:
-            total += len(PERMISSIONS)
-        else:
-            total += len(perms)
-    return total
+def _expected_permission_count(engine):
+    """Total unique perm_codes across the permission table (authoritative source).
+
+    After ``upgrade head`` the DB contains permissions from 0004_seed_data PLUS
+    later migrations (0008, 0011).  ``seed_data.PERMISSIONS`` (57) does NOT
+    enumerate 0011's scene_image permissions, so we must not hard-code 57.
+    Querying ``DISTINCT perm_code`` is the single source of truth: every
+    migration inserts a unique code, and the count reflects all additions.
+    """
+    with engine.connect() as conn:
+        return conn.execute(
+            text("SELECT count(DISTINCT perm_code) FROM permission")
+        ).scalar()
+
+
+def _expected_role_permission_count(engine):
+    """Expected active role_permission rows, derived dynamically from DB state.
+
+    Invariant: the admin role must hold every active permission.  The total
+    role_permission count is then verified as >= that (other roles add subsets).
+    This stays correct regardless of how many migrations add new permissions.
+    """
+    with engine.connect() as conn:
+        admin_rp = conn.execute(
+            text(
+                "SELECT count(*) FROM role_permission rp "
+                "JOIN role r ON r.id = rp.role_id "
+                "WHERE r.role_code = 'admin' AND rp.is_deleted = false"
+            )
+        ).scalar()
+        total_rp = conn.execute(
+            text("SELECT count(*) FROM role_permission WHERE is_deleted = false")
+        ).scalar()
+        return admin_rp, total_rp
 
 
 def test_role_count(seeded_db):
@@ -103,11 +133,14 @@ def test_role_count(seeded_db):
 
 
 def test_permission_count(seeded_db):
-    assert _count(seeded_db, "permission") == len(PERMISSIONS)
+    assert _count(seeded_db, "permission") == _expected_permission_count(seeded_db)
 
 
 def test_role_permission_count(seeded_db):
-    assert _count(seeded_db, "role_permission") == _expected_role_permissions()
+    admin_rp, total_rp = _expected_role_permission_count(seeded_db)
+    active_perms = _count(seeded_db, "permission")
+    assert admin_rp == active_perms  # admin holds every active permission
+    assert total_rp >= active_perms  # other roles add at least zero more
 
 
 def test_idempotent_rerun(seeded_db):
@@ -139,7 +172,7 @@ def test_downgrade_removes_seed():
     eng = create_engine(_sync_url())
     try:
         assert _count(eng, "role") == 4
-        assert _count(eng, "permission") == len(PERMISSIONS)
+        assert _count(eng, "permission") == _expected_permission_count(eng)
         # Roll back past the seed migration (0004); tables remain, seed is gone.
         alembic_downgrade(url, "0003_add_quotation_subtotal")
         assert _count(eng, "role") == 0

@@ -1,10 +1,12 @@
 import asyncio
 import hashlib
+import logging
 from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import func, select, update
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.base import AIServiceAdapter
@@ -28,9 +30,10 @@ from app.services.parsers import ParserError, get_parser
 from app.services.rag_index import RagIndexer, RagSearcher
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
-def _envelope(data: Any, code: int = 200, msg: str = "success") -> dict:
+def _envelope(data: Any = None, code: int = 200, msg: str = "success") -> dict:
     return {"code": code, "data": data, "msg": msg}
 
 
@@ -182,16 +185,36 @@ async def get_manual(manual_id: UUID, db: AsyncSession = Depends(get_db)):
     dependencies=[Depends(PermissionChecker("product:edit"))],
 )
 async def delete_manual(manual_id: UUID, db: AsyncSession = Depends(get_db)):
-    """Soft-delete a ProductManual and exclude its chunks from future RAG search."""
+    """Soft-delete a ProductManual and exclude its chunks from future RAG search.
+
+    The chunk soft-delete is best-effort: a failure here (missing pgvector
+    extension, transient DB error) is logged but does not fail the request,
+    because the manual record is what the UI reads. Orphaned chunks are
+    harmless — RAG search filters them out via the parent manual being
+    deleted, and a background job can sweep them up later.
+    """
     manual = await _fetch_manual(db, manual_id)
     manual.is_deleted = True
-    await db.execute(
-        update(ProductManualChunk)
-        .where(ProductManualChunk.product_manual_id == manual_id)
-        .values(is_deleted=True)
-    )
+
+    try:
+        await db.execute(
+            update(ProductManualChunk)
+            .where(ProductManualChunk.product_manual_id == manual_id)
+            .values(is_deleted=True)
+        )
+    except SQLAlchemyError as exc:
+        logger.warning(
+            "Failed to soft-delete chunks for manual %s: %s. "
+            "Manual soft-delete will still be committed.",
+            manual_id,
+            exc,
+        )
+        await db.rollback()
+        manual = await _fetch_manual(db, manual_id)
+        manual.is_deleted = True
+
     await db.commit()
-    return _envelope()
+    return _envelope(None)
 
 
 @router.post(

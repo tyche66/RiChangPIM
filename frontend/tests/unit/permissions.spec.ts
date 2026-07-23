@@ -8,8 +8,8 @@ import {
 } from '@/types/permissions'
 
 describe('PERMISSIONS constant', () => {
-  it('contains exactly 49 permission codes', () => {
-    expect(PERMISSIONS).toHaveLength(49)
+  it('contains exactly 57 permission codes', () => {
+    expect(PERMISSIONS).toHaveLength(57)
   })
 
   it('has no duplicate codes', () => {
@@ -19,7 +19,7 @@ describe('PERMISSIONS constant', () => {
 
   it('all codes follow resource:action format', () => {
     PERMISSIONS.forEach((p) => {
-      expect(p).toMatch(/^[a-z]+:[a-z]+$/)
+      expect(p).toMatch(/^[a-z_]+:[a-z]+$/)
     })
   })
 
@@ -89,6 +89,8 @@ describe('RESOURCE_PERMISSIONS', () => {
     expect(resources).toContain('quotation')
     expect(resources).toContain('share')
     expect(resources).toContain('file')
+    expect(resources).toContain('media')
+    expect(resources).toContain('scene_image')
     expect(resources).toContain('stats')
     expect(resources).toContain('ai')
   })
@@ -120,5 +122,33 @@ describe('Viewer role simulation', () => {
     expect(hasPermission(viewerPerms, 'user:view')).toBe(false)
     expect(hasAnyPermission(viewerPerms, ['product:create', 'stats:view'])).toBe(true)
     expect(hasAllPermissions(viewerPerms, ['product:view', 'product:edit'])).toBe(false)
+  })
+})
+
+describe('Media permissions', () => {
+  it('includes all media permission codes', () => {
+    expect(PERMISSIONS).toContain('media:view')
+    expect(PERMISSIONS).toContain('media:upload')
+    expect(PERMISSIONS).toContain('media:delete')
+    expect(PERMISSIONS).toContain('media:replace')
+  })
+
+  it('media resource has 4 permissions', () => {
+    expect(RESOURCE_PERMISSIONS.media).toHaveLength(4)
+    expect(RESOURCE_PERMISSIONS.media).toContain('media:replace')
+  })
+})
+
+describe('Scene image permissions', () => {
+  it('includes all scene_image permission codes', () => {
+    expect(PERMISSIONS).toContain('scene_image:view')
+    expect(PERMISSIONS).toContain('scene_image:create')
+    expect(PERMISSIONS).toContain('scene_image:edit')
+    expect(PERMISSIONS).toContain('scene_image:delete')
+  })
+
+  it('scene_image resource has 4 permissions', () => {
+    expect(RESOURCE_PERMISSIONS.scene_image).toHaveLength(4)
+    expect(RESOURCE_PERMISSIONS.scene_image).toContain('scene_image:delete')
   })
 })

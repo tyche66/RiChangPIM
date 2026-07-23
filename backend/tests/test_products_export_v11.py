@@ -50,4 +50,4 @@ def test_sales_export_hides_sensitive_columns_and_placeholder_value():
     frame = pd.read_excel(BytesIO(content))
     assert "cost_price" not in frame.columns
     assert "supplier_name" not in frame.columns
-    assert frame.loc[0, "face_price"] == "待核价"
+    assert frame.loc[0, "面价"] == "待核价"

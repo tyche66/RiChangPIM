@@ -81,6 +81,8 @@
       v-model="showForm"
       :title="editMode === 'create' ? '新增角色' : editMode === 'edit' ? '编辑角色' : '分配权限'"
       width="600px"
+      append-to-body
+      lock-scroll
       @close="resetForm"
     >
       <el-form
@@ -154,7 +156,7 @@
               :model-value="form.permission_ids.includes(p)"
               @change="togglePerm(p)"
             >
-              {{ p }}
+              {{ PERMISSION_NAMES[p as keyof typeof PERMISSION_NAMES] || p }}
             </el-checkbox>
           </div>
         </div>
@@ -190,7 +192,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { roleApi } from '@/api'
 import { useAuthStore } from '@/stores/auth'
-import { hasPermission, RESOURCE_PERMISSIONS } from '@/types/permissions'
+import { hasPermission, RESOURCE_PERMISSIONS, PERMISSION_NAMES } from '@/types/permissions'
 
 const authStore = useAuthStore()
 
@@ -299,8 +301,9 @@ function handleAssign(row: any) {
   form.role_name = row.role_name
   form.role_code = row.role_code
   form.description = row.description || ''
-  // Backend does not return permission_ids in list; show empty with note
-  form.permission_ids = []
+  // 预填角色已有的权限，便于查看当前拥有哪些权限并保持可编辑
+  form.permission_ids = Array.isArray(row.permission_ids) ? [...row.permission_ids] : []
+  updateCheckAllState()
   showForm.value = true
 }
 

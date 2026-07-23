@@ -1,0 +1,16 @@
+[Unit]
+Description=AI-PIM V1.2 daily backup (PostgreSQL + MinIO, shared batch)
+Documentation=file:///opt/RiChangPIM/docs/v1.2-plan.md
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/RiChangPIM
+EnvironmentFile=/etc/ai-pim/backup.env
+ExecStart=/opt/RiChangPIM/scripts/backup.sh
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+StandardOutput=append:/var/log/ai-pim/backup.log
+StandardError=append:/var/log/ai-pim/backup.err

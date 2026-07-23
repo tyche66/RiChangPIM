@@ -20,7 +20,6 @@
             width="240"
           />
           <el-table-column
-            prop="share_type"
             label="分享类型"
             width="120"
           >
@@ -40,7 +39,7 @@
           >
             <template #default="{ row }">
               <el-tag :type="row.status === 'active' ? 'success' : row.status === 'disabled' ? 'danger' : 'info'">
-                {{ row.status }}
+                {{ shareStatusMap[row.status] || row.status }}
               </el-tag>
             </template>
           </el-table-column>
@@ -93,13 +92,24 @@ function formatDate(dateStr: string | null): string {
   return new Date(dateStr).toLocaleString('zh-CN')
 }
 
+const shareStatusMap: Record<string, string> = { active: '有效', disabled: '已失效', expired: '已过期' }
+
 const loading = ref(false)
-const shares = ref<any[]>([])
+const shares = ref<ShareRecord[]>([])
+
+interface ShareRecord {
+  id: string
+  share_type: 'proposal' | 'quotation'
+  target_id: string
+  creator_id: string
+  status: 'active' | 'disabled' | 'expired'
+  create_time: string | null
+}
 
 const fetchShares = async () => {
   loading.value = true
   try {
-    const res = await shareApi.list()
+    const res = await shareApi.list() as { data?: { list: ShareRecord[] } }
     shares.value = res.data?.list || []
   } catch {
     ElMessage.error('加载分享列表失败')
@@ -108,7 +118,7 @@ const fetchShares = async () => {
   }
 }
 
-const handleRevoke = async (row: any) => {
+const handleRevoke = async (row: ShareRecord) => {
   try {
     await ElMessageBox.confirm(`确定撤销该分享链接？`, '确认撤销')
     await shareApi.revoke(row.id)

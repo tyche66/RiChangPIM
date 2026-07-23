@@ -10,7 +10,8 @@ def test_product_list_uses_joined_load_for_single_parent_relations():
     assert "joinedload(Product.supplier)" in source
     assert "joinedload(Product.category)" in source
     assert "selectinload(Product.tags)" in source
-    assert "items = [_product_list_response(p) for p in products]" in source
+    assert "selectinload(Product.images).joinedload(ProductImage.attachment)" in source
+    assert "items = [_product_list_response(p, request) for p in products]" in source
 
 
 def test_container_avoids_duplicate_uvicorn_access_logs():

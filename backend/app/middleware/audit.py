@@ -21,6 +21,7 @@ from __future__ import annotations
 import functools
 import logging
 import time
+from collections import deque
 from collections.abc import Awaitable, Callable
 from typing import Any
 
@@ -30,6 +31,43 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
 
 logger = logging.getLogger("app.audit")
+
+# Rolling window of (timestamp, status) for 5xx counting in the last 24h.
+# Bounded: at one request per second for 24h this holds ~86k tuples (~few MB);
+# if throughput ever exceeds that, switch to a time-bucketed counter.
+_5XX_WINDOW_SECONDS = 24 * 3600
+_5xx_events: deque[tuple[float, int]] = deque()
+_5xx_lock = None  # lazily created to avoid importing threading at module import time
+
+
+def _rolling_5xx_lock():
+    global _5xx_lock
+    if _5xx_lock is None:
+        import threading
+
+        _5xx_lock = threading.Lock()
+    return _5xx_lock
+
+
+def _record_5xx(status: int) -> None:
+    if status < 500:
+        return
+    now = time.time()
+    with _rolling_5xx_lock():
+        _5xx_events.append((now, status))
+        cutoff = now - _5XX_WINDOW_SECONDS
+        while _5xx_events and _5xx_events[0][0] < cutoff:
+            _5xx_events.popleft()
+
+
+def http_5xx_last_24h() -> int:
+    """Count HTTP 5xx responses in the last 24h (for /ops/status)."""
+    now = time.time()
+    cutoff = now - _5XX_WINDOW_SECONDS
+    with _rolling_5xx_lock():
+        while _5xx_events and _5xx_events[0][0] < cutoff:
+            _5xx_events.popleft()
+        return sum(1 for ts, _ in _5xx_events if ts >= cutoff)
 
 
 def _client_ip(request: Request) -> str | None:
@@ -165,7 +203,10 @@ def audit_action(
             ip = _client_ip(request) if request else None
             user_id = _user_id_from_request(request) if request else None
             body_summary = await _request_body_value(request) if request else None
-            if module == "ai" and body_summary:
+            # V1.2 §5.2 / §6.5: redact request bodies for sensitive modules so
+            # the audit log never persists passwords, AI keys or request-body
+            # payloads from login/AI endpoints.
+            if module in {"ai", "auth", "users"} and body_summary:
                 body_summary = "[redacted]"
 
             try:
@@ -275,6 +316,13 @@ class AuditMiddleware(BaseHTTPMiddleware):
             response = await call_next(request)
         except Exception as exc:  # noqa: BLE001
             elapsed_ms = int((time.perf_counter() - start) * 1000)
+            _record_5xx(500)
+            try:
+                from app.observability import metrics as _metrics
+
+                _metrics.observe_http_request(method, request.url.path, 500, elapsed_ms / 1000.0)
+            except Exception:  # noqa: BLE001
+                pass
             logger.error(
                 "request %s %s ip=%s user_id=%s elapsed=%sms status=500 error=%r",
                 method,
@@ -289,6 +337,15 @@ class AuditMiddleware(BaseHTTPMiddleware):
 
         elapsed_ms = int((time.perf_counter() - start) * 1000)
         user_id = _user_id_from_request(request)
+        _record_5xx(response.status_code)
+        try:
+            from app.observability import metrics as _metrics
+
+            _metrics.observe_http_request(
+                method, request.url.path, response.status_code, elapsed_ms / 1000.0
+            )
+        except Exception:  # noqa: BLE001
+            pass
         logger.info(
             "request %s %s ip=%s user_id=%s elapsed=%sms status=%s",
             method,

@@ -1,0 +1,16 @@
+[Unit]
+Description=AI-PIM V1.2 daily backup trigger (systemd timer)
+Documentation=file:///opt/RiChangPIM/docs/v1.2-plan.md
+
+[Timer]
+# Run at 02:30 local time, every day. 02:30 chosen to avoid midnight-on-
+# minute-hour collisions and to leave peak traffic windows quiet.
+OnCalendar=*-*-* 02:30:00
+# Always restart catching up if we missed iterations during downtime.
+Persistent=true
+# Don't run multiple instances in parallel if the previous run overran.
+AccuracySec=1min
+Unit=ai-pim-backup.service
+
+[Install]
+WantedBy=timers.target

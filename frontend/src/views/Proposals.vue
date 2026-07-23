@@ -98,7 +98,7 @@
                 :type="row.status === 'confirmed' ? 'success' : 'info'"
                 class="capsule-tag"
               >
-                {{ row.status }}
+                {{ proposalStatusMap[row.status] || row.status }}
               </el-tag>
             </template>
           </el-table-column>
@@ -113,7 +113,7 @@
           </el-table-column>
           <el-table-column
             label="操作"
-            width="260"
+            width="320"
             fixed="right"
             align="center"
           >
@@ -126,7 +126,7 @@
                 查看
               </el-button>
               <el-button
-                v-if="hasPerm('quotation:create') && row.status !== 'confirmed'"
+                v-if="hasPerm('quotation:create')"
                 size="small"
                 type="success"
                 class="capsule-btn btn-sm"
@@ -144,6 +144,24 @@
                 分享
               </el-button>
               <el-button
+                v-if="hasPerm('proposal:confirm') && row.status !== 'confirmed'"
+                size="small"
+                type="success"
+                class="capsule-btn btn-sm"
+                @click="handleConfirm(row)"
+              >
+                确认
+              </el-button>
+              <el-button
+                v-if="hasPerm('proposal:edit') && row.status === 'confirmed'"
+                size="small"
+                type="warning"
+                class="capsule-btn btn-sm"
+                @click="handleRevert(row)"
+              >
+                撤销确认
+              </el-button>
+              <el-button
                 v-if="hasPerm('proposal:delete')"
                 size="small"
                 type="danger"
@@ -156,14 +174,28 @@
           </el-table-column>
         </el-table>
       </div>
+
+      <el-pagination
+        v-model:current-page="queryParams.page"
+        v-model:page-size="queryParams.size"
+        :total="total"
+        :page-sizes="[10, 20, 50]"
+        layout="total, sizes, prev, pager, next, jumper"
+        class="pagination-wrap"
+        @current-change="fetchProposals"
+        @size-change="fetchProposals"
+      />
     </el-card>
 
-    <!-- Create Proposal Dialog -->
+    <!-- Create Proposal Dialog with items -->
     <el-dialog
       v-model="showCreateDialog"
       title="新增方案"
       class="glass-dialog"
+      append-to-body
+      lock-scroll
       :close-on-click-modal="false"
+      width="640px"
     >
       <el-form
         ref="createFormRef"
@@ -191,6 +223,11 @@
             class="capsule-input"
           />
         </el-form-item>
+        <el-form-item
+          label="商品明细"
+        >
+          <ProposalItemEditor v-model="createForm.items" />
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button
@@ -215,6 +252,8 @@
       v-model="showShareDialog"
       title="创建分享链接"
       class="glass-dialog"
+      append-to-body
+      lock-scroll
       :close-on-click-modal="false"
     >
       <el-form label-width="120px">
@@ -272,60 +311,28 @@
       </template>
     </el-dialog>
 
-    <!-- Share Result Dialog -->
-    <el-dialog
+    <!-- Share Result with QR code -->
+    <ShareResultDialog
       v-model="showShareResult"
-      title="分享链接已生成"
-      class="glass-dialog"
-      :close-on-click-modal="false"
-    >
-      <el-alert
-        type="success"
-        :closable="false"
-        class="share-alert"
-      >
-        请将以下链接发送给客户
-      </el-alert>
-      <el-input
-        :model-value="shareResultUrl"
-        readonly
-        class="capsule-input share-url-input"
-      >
-        <template #append>
-          <el-button
-            class="capsule-btn capsule-btn-primary"
-            @click="copyShareUrl"
-          >
-            复制
-          </el-button>
-        </template>
-      </el-input>
-      <div
-        v-if="shareResultUrl"
-        class="share-actions"
-      >
-        <el-button
-          type="primary"
-          class="capsule-btn capsule-btn-primary"
-          @click="openShareUrl"
-        >
-          在新窗口打开
-        </el-button>
-      </div>
-    </el-dialog>
+      :share-url="shareResultUrl"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, reactive, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { proposalApi, shareApi } from '@/api'
 import { useAuthStore } from '@/stores/auth'
 import { hasPermission } from '@/types/permissions'
+import type { Proposal, ProposalItem, ShareCreateRequest, ShareForm, ProposalToken } from '@/types/sales'
+import ProposalItemEditor from '@/components/ProposalItemEditor.vue'
+import ShareResultDialog from '@/components/ShareResultDialog.vue'
 
 const router = useRouter()
+const route = useRoute()
 const authStore = useAuthStore()
 
 function hasPerm(perm: string): boolean {
@@ -337,8 +344,11 @@ function formatDate(dateStr: string | null): string {
   return new Date(dateStr).toLocaleString('zh-CN')
 }
 
+const proposalStatusMap: Record<string, string> = { draft: '草稿', confirmed: '已确认' }
+
 const loading = ref(false)
-const proposals = ref<any[]>([])
+const proposals = ref<Proposal[]>([])
+const total = ref(0)
 const showCreateDialog = ref(false)
 const createLoading = ref(false)
 const createFormRef = ref<FormInstance>()
@@ -346,11 +356,14 @@ const createFormRef = ref<FormInstance>()
 const queryParams = reactive({
   keyword: '',
   status: '',
+  page: 1,
+  size: 20,
 })
 
 const createForm = reactive({
   proposal_name: '',
   customer_name: '',
+  items: [] as ProposalItem[],
 })
 
 const createFormRules: FormRules = {
@@ -360,7 +373,7 @@ const createFormRules: FormRules = {
 const showShareDialog = ref(false)
 const showShareResult = ref(false)
 const shareLoading = ref(false)
-const shareForm = reactive({
+const shareForm = reactive<ShareForm>({
   share_type: 'proposal',
   target_id: '',
   creator_id: '',
@@ -373,8 +386,14 @@ const shareResultUrl = ref('')
 const fetchProposals = async () => {
   loading.value = true
   try {
-    const res = await proposalApi.list(queryParams)
-    proposals.value = res.data?.list || []
+    const res = await proposalApi.list({
+      keyword: queryParams.keyword || undefined,
+      status: queryParams.status || undefined,
+      page: queryParams.page,
+      size: queryParams.size,
+    })
+    proposals.value = res.data.list
+    total.value = res.data.total
   } catch {
     ElMessage.error('加载方案列表失败')
   } finally {
@@ -383,46 +402,101 @@ const fetchProposals = async () => {
 }
 
 const handleSearch = () => {
+  queryParams.page = 1
   fetchProposals()
 }
 
 const handleReset = () => {
   queryParams.keyword = ''
   queryParams.status = ''
+  queryParams.page = 1
   fetchProposals()
 }
 
-const handleView = (row: any) => {
+const handleView = (row: Proposal) => {
   router.push(`/proposals/${row.id}`)
 }
 
-const handleCreateQuotation = (row: any) => {
+const handleCreateQuotation = (row: Proposal) => {
   router.push(`/quotations?proposal_id=${row.id}`)
 }
 
-const handleShare = (row: any) => {
+const handleShare = (row: Proposal) => {
   shareForm.target_id = row.id
   shareForm.creator_id = authStore.user?.id || ''
   showShareDialog.value = true
+}
+
+const handleConfirm = async (row: Proposal) => {
+  try {
+    await proposalApi.confirm(row.id)
+    ElMessage.success('方案已确认')
+    fetchProposals()
+  } catch {
+    // error handled by interceptor
+  }
+}
+
+const handleRevert = async (row: Proposal) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要撤销方案 "${row.proposal_name}" 的确认状态吗？撤销后可重新编辑。`,
+      '撤销确认',
+      {
+        confirmButtonText: '撤销',
+        cancelButtonText: '取消',
+        type: 'warning',
+      },
+    )
+    await proposalApi.revertConfirmation(row.id)
+    ElMessage.success('已撤销确认')
+    fetchProposals()
+  } catch (e: unknown) {
+    if (e !== 'cancel') {
+      // error handled by interceptor
+    }
+  }
 }
 
 const handleCreateSubmit = async () => {
   if (!createFormRef.value) return
   await createFormRef.value.validate(async (valid) => {
     if (!valid) return
+    // Validate at least one item
+    if (createForm.items.length === 0) {
+      ElMessage.warning('请至少添加一项商品')
+      return
+    }
+    // Validate quantities are positive integers
+    for (const item of createForm.items) {
+      if (!Number.isInteger(item.quantity) || item.quantity < 1) {
+        ElMessage.warning(`商品 "${item.product_name || item.product_id}" 的数量必须为正整数`)
+        return
+      }
+    }
+    await authStore.ensureUser()
+    const creatorId = authStore.userId
+    if (!creatorId) {
+      ElMessage.warning('用户信息尚未加载，请稍后重试')
+      return
+    }
     createLoading.value = true
     try {
-      const creatorId = authStore.user?.id
       await proposalApi.create({
         proposal_name: createForm.proposal_name,
         customer_name: createForm.customer_name,
         creator_id: creatorId,
-        items: [],
+        items: createForm.items.map((item) => ({
+          product_id: item.product_id,
+          quantity: item.quantity,
+          remark: item.remark,
+        })),
       })
       ElMessage.success('创建成功')
       showCreateDialog.value = false
       createForm.proposal_name = ''
       createForm.customer_name = ''
+      createForm.items = []
       fetchProposals()
     } catch {
       // error handled by interceptor
@@ -435,18 +509,16 @@ const handleCreateSubmit = async () => {
 const handleShareSubmit = async () => {
   shareLoading.value = true
   try {
-    const payload: Record<string, unknown> = {
+    const payload: ShareCreateRequest = {
       share_type: shareForm.share_type,
       target_id: shareForm.target_id,
-      creator_id: shareForm.creator_id,
     }
     if (shareForm.password) payload.password = shareForm.password
     if (shareForm.expire_hours) payload.expire_hours = shareForm.expire_hours
     if (shareForm.max_access_count) payload.max_access_count = shareForm.max_access_count
 
     const res = await shareApi.create(payload)
-    const data = res.data
-    shareResultUrl.value = window.location.origin + data.share_url
+    shareResultUrl.value = res.data.share_url || '/'
     showShareDialog.value = false
     showShareResult.value = true
   } catch {
@@ -456,30 +528,55 @@ const handleShareSubmit = async () => {
   }
 }
 
-const copyShareUrl = () => {
-  navigator.clipboard.writeText(shareResultUrl.value).then(() => {
-    ElMessage.success('已复制到剪贴板')
-  }).catch(() => {
-    ElMessage.error('复制失败')
-  })
-}
-
-const openShareUrl = () => {
-  window.open(shareResultUrl.value, '_blank')
-}
-
-const handleDelete = async (row: any) => {
+const handleDelete = async (row: Proposal) => {
   try {
     await ElMessageBox.confirm(`确定删除方案 "${row.proposal_name}"？`, '确认删除')
     await proposalApi.delete(row.id)
     ElMessage.success('删除成功')
     fetchProposals()
-  } catch (e: any) {
+  } catch (e: unknown) {
     if (e !== 'cancel') {
       // error handled by interceptor
     }
   }
 }
+
+watch(
+  () => route.query.selection_token,
+  async (selectionToken) => {
+    if (route.query.mode !== 'create' || typeof selectionToken !== 'string') return
+    const storageKey = `proposal_token_${selectionToken}`
+    const raw = sessionStorage.getItem(storageKey)
+    if (!raw) {
+      ElMessage.warning('未找到制作方案数据，请从产品列表重新选择')
+      await router.replace('/proposals')
+      return
+    }
+
+    sessionStorage.removeItem(storageKey)
+    const token: ProposalToken = JSON.parse(raw)
+    if (token.options.length === 0) {
+      ElMessage.warning('方案数据已使用，请从产品列表重新选择')
+      await router.replace('/proposals')
+      return
+    }
+
+    createForm.proposal_name = ''
+    createForm.customer_name = ''
+    createForm.items = token.options.map((opt) => ({
+      product_id: opt.id,
+      quantity: 1,
+      product_name: opt.product_name,
+      product_no: opt.product_no,
+      face_price: opt.face_price,
+      stock_status: opt.stock_status,
+      cover_image_url: opt.cover_image_url,
+    }))
+    showCreateDialog.value = true
+    await router.replace('/proposals')
+  },
+  { immediate: true },
+)
 
 onMounted(fetchProposals)
 </script>
@@ -665,6 +762,35 @@ onMounted(fetchProposals)
   font-size: 12px;
 }
 
+/* ===== Pagination ===== */
+.pagination-wrap {
+  margin-top: 20px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.pagination-wrap :deep(.el-pager li),
+.pagination-wrap :deep(.el-pagination .btn-prev),
+.pagination-wrap :deep(.el-pagination .btn-next) {
+  border-radius: 50%;
+  min-width: 32px;
+  height: 32px;
+  line-height: 32px;
+  transition: var(--transition-fast);
+}
+
+.pagination-wrap :deep(.el-pager li.active),
+.pagination-wrap :deep(.el-pager li.active:hover) {
+  background: var(--brand-primary);
+  color: #fff;
+}
+
+.pagination-wrap :deep(.el-pager li:hover:not(.active)),
+.pagination-wrap :deep(.el-pagination .btn-prev:hover),
+.pagination-wrap :deep(.el-pagination .btn-next:hover) {
+  background: var(--brand-light);
+}
+
 /* ===== Glass Dialog ===== */
 .glass-dialog :deep(.el-dialog) {
   border-radius: var(--radius-lg) !important;
@@ -782,6 +908,10 @@ onMounted(fetchProposals)
 
   .glass-dialog :deep(.el-dialog__body) {
     padding: 16px;
+  }
+
+  .pagination-wrap {
+    justify-content: center;
   }
 }
 </style>

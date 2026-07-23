@@ -39,6 +39,7 @@
 | 16 | POST | /api/v1/users/{user_id}/disable | N | user:disable | user_disable | §7.1 |
 | 17 | POST | /api/v1/proposals/{proposal_id}/confirm | N | proposal:confirm | proposal_confirm | §7.2 |
 | 18 | GET | /api/v1/audit/operation-logs | N | audit:view | — | §7.3 |
+| 19 | GET | /api/v1/version | N | stats:view | — | §8.1 |
 
 ---
 
@@ -214,7 +215,38 @@
 
 ---
 
-## 七、docs/04 路由集合 vs EXPECTED_NEW_ROUTES（机器验证）
+## 八、版本信息
+
+### §8.1 GET /api/v1/version
+
+- 公开：否 ｜ 权限：`stats:view` ｜ 审计：通用请求日志。
+- 语义：返回当前后端运行实例的版本与构建元数据，不查询产品、媒体或其他业务表。
+- 成功响应：
+
+```json
+{
+  "code": 200,
+  "data": {
+    "app_name": "AI-PIM",
+    "backend_version": "1.2.0",
+    "frontend_version": "1.2.0",
+    "build_id": "1.2.0-abc1234",
+    "git_commit": "abc1234",
+    "build_time": "2026-07-22T12:00:00Z",
+    "environment": "production",
+    "api_version": "v1"
+  }
+}
+```
+
+- 缺省语义：未注入构建信息时 `build_id=dev-local`，`git_commit/build_time=unknown`，
+  接口仍返回 200。
+- 安全约束：不返回数据库连接、JWT secret、MinIO 凭据、AI Key 或内部服务地址。
+- 主要错误码：40101/40102/40301。
+
+---
+
+## 九、docs/04 路由集合 vs EXPECTED_NEW_ROUTES（机器验证）
 
 `tests/test_contract.py::EXPECTED_NEW_ROUTES`（14 条）：
 ```
@@ -239,7 +271,7 @@ get  /api/v1/products/export
 
 ---
 
-## 八、无法确认 / 需交付确认项
+## 十、无法确认 / 需交付确认项
 1. `GET /products/export` 在 `app/core/permission.PermissionChecker` 未声明 §7.3 专属
    审计动作名（仅通用 `AuditMiddleware` 请求日志），如需专属 `audit_action` 需补。
 2. 报价 PDF 已接入 Gotenberg；仍需生产环境真实 PDF 端到端回归。

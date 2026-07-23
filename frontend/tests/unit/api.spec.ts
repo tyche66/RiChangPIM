@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 
 // Test the API module by importing it directly (no axios mock needed
 // since we only test exported function signatures and skipAuth behavior).
-import api, { authApi, shareApi, productApi, categoryApi, brandApi, supplierApi, tagApi, proposalApi, quotationApi, userApi, roleApi, fileApi, statsApi, aiApi } from '@/api'
+import api, { authApi, shareApi, productApi, categoryApi, brandApi, supplierApi, tagApi, proposalApi, quotationApi, userApi, roleApi, fileApi, statsApi, aiApi, versionApi } from '@/api'
 
 describe('API client module', () => {
   it('exports api instance with request and response interceptors', () => {
@@ -85,6 +85,7 @@ describe('API client module', () => {
     expect(typeof aiApi.ragSearch).toBe('function')
     expect(typeof aiApi.polishProposal).toBe('function')
     expect(typeof aiApi.recommend).toBe('function')
+    expect(typeof versionApi.get).toBe('function')
   })
 })
 

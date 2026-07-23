@@ -170,4 +170,64 @@ describe('AuthStore', () => {
     await store.init()
     expect(store.isAuthenticated).toBe(false)
   })
+
+  it('init keeps permissions/role when /auth/me fails (token still valid)', async () => {
+    const token = makeToken({
+      sub: 'u1',
+      role_code: 'purchaser',
+      perms: ['product:view', 'proposal:create'],
+      exp: Math.floor(Date.now() / 1000) + 3600,
+    })
+    localStorage.setItem('token', token)
+    localStorage.setItem('refresh_token', 'RT')
+    ;(authApi.getCurrentUser as any).mockRejectedValue({
+      response: { status: 500, data: { detail: { msg: 'boom' } } },
+    })
+    const store = useAuthStore()
+    await store.init()
+    // Token + permissions are still authoritative even when /auth/me is down.
+    expect(store.isAuthenticated).toBe(true)
+    expect(store.roleCode).toBe('purchaser')
+    expect(store.permissions).toEqual(['product:view', 'proposal:create'])
+    // userId falls back to the JWT 'sub' so dependent actions still work.
+    expect(store.userId).toBe('u1')
+  })
+
+  it('ensureUser() hydrates the profile and caches it', async () => {
+    const token = makeToken({
+      sub: 'u7',
+      role_code: 'admin',
+      perms: ['*'],
+      exp: Math.floor(Date.now() / 1000) + 3600,
+    })
+    localStorage.setItem('token', token)
+    localStorage.setItem('refresh_token', 'RT')
+    ;(authApi.getCurrentUser as any).mockResolvedValue({
+      data: { id: 'u7', username: 'alice' },
+    })
+    const store = useAuthStore()
+    const profile = await store.ensureUser()
+    expect(profile?.id).toBe('u7')
+    expect(store.userId).toBe('u7')
+    // second call is a cache hit, no extra API call
+    await store.ensureUser()
+    expect((authApi.getCurrentUser as any).mock.calls.length).toBe(1)
+  })
+
+  it('ensureUser() returns null but preserves userId from JWT when /auth/me fails', async () => {
+    const token = makeToken({
+      sub: 'u9',
+      role_code: 'admin',
+      perms: ['*'],
+      exp: Math.floor(Date.now() / 1000) + 3600,
+    })
+    localStorage.setItem('token', token)
+    localStorage.setItem('refresh_token', 'RT')
+    ;(authApi.getCurrentUser as any).mockRejectedValue(new Error('network down'))
+    const store = useAuthStore()
+    const profile = await store.ensureUser()
+    expect(profile).toBeNull()
+    expect(store.userId).toBe('u9')
+    expect(store.isAuthenticated).toBe(true)
+  })
 })

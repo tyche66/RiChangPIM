@@ -138,7 +138,7 @@ def test_fresh_db_upgrade_head_has_consistent_schema():
         assert _has_partial_unique_index(eng, "share_token", "idx_share_token_token")
         with eng.connect() as conn:
             ver = conn.execute(text("SELECT version_num FROM alembic_version")).scalar()
-        assert ver == "0008_v11_audit_workflow_ocr"
+        assert ver == "0012_product_scene_image_partial_unique"
     finally:
         _reset_schema(url)
 
@@ -192,7 +192,7 @@ def test_teardown_leaves_consistent_empty_schema_and_upgrade_restores():
         assert EXPECTED_TABLES <= _table_names(eng)
         with eng.connect() as conn:
             ver = conn.execute(text("SELECT version_num FROM alembic_version")).scalar()
-        assert ver == "0008_v11_audit_workflow_ocr"
+        assert ver == "0012_product_scene_image_partial_unique"
     finally:
         _reset_schema(url)
 

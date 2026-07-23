@@ -4,6 +4,29 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
+class ProductImageInfo(BaseModel):
+    id: UUID
+    attachment_id: UUID
+    file_url: str
+    file_name: str
+    file_type: str
+    sort: int
+    is_cover: bool
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class SceneImageInfo(BaseModel):
+    id: UUID
+    name: str
+    attachment_id: UUID
+    file_url: str
+    file_name: str
+    sort: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class ProductBase(BaseModel):
     product_no: str
     product_name: str
@@ -65,7 +88,16 @@ class ProductResponse(ProductBase):
     brand_name: str | None = None
     category_name: str | None = None
     supplier_name: str | None = None
+    supplier_id: UUID | None = None
+    cost_price: float | None = None
+    margin: float | None = None
+    profit: float | None = None
     tags: list[str] = []
+    images: list[ProductImageInfo] = []
+    cover_image_id: UUID | None = None
+    cover_image_url: str | None = None
+    cover_image_filename: str | None = None
+    scene_images: list[SceneImageInfo] = []
 
     @field_validator("tags", mode="before")
     @classmethod
@@ -141,7 +173,7 @@ class SupplierResponse(SupplierBase):
 
 
 class TagBase(BaseModel):
-    tag_name: str
+    tag_name: str = Field(min_length=1)
     tag_type: str | None = None
 
 

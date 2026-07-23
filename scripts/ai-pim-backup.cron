@@ -1,0 +1,10 @@
+# AI-PIM V1.2 backup — cron alternative (use only when systemd timers are unavailable).
+#
+# Drop into /etc/cron.d/ai-pim-backup with mode 0640 and root ownership.
+#
+# Secrets MUST live in /etc/ai-pim/backup.env (mode 0600); never inline them
+# here.  The wrapper scripts/backup.sh loads ENV_FILE automatically.
+
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+30 2 * * * root ENV_FILE=/etc/ai-pim/backup.env /opt/RiChangPIM/scripts/backup.sh >> /var/log/ai-pim/backup.log 2>&1

@@ -2,44 +2,270 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, "release/**"]
   pull_request:
-    branches: [main]
+    branches: [main, "release/**"]
+
+# Workflow-level defaults. Secrets MUST NOT appear here. Per-job env blocks
+# purposefully use placeholder values only required for Compose/static analysis.
+# DB/Redis/MinIO credentials for integration tests come from the service
+# containers started in `backend-test`, not from here.
+env:
+  PYTHON_VERSION: "3.11"
+  NODE_VERSION: "20"
+  PG16_IMAGE: pgvector/pgvector:pg16
 
 jobs:
+  # ---------------------------------------------------------------------------
+  # Backend: ruff + compileall + full pytest (with PG16/Redis/MinIO services)
+  # ---------------------------------------------------------------------------
   backend-lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-      - name: Install dependencies
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.txt
+      - name: Install ruff
+        working-directory: backend
+        run: pip install "ruff>=0.4"
+      - name: Ruff check (no fix)
+        working-directory: backend
+        run: ruff check app/
+      - name: compileall
+        working-directory: backend
+        run: python -m compileall app -q
+
+  backend-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: pim
+          POSTGRES_PASSWORD: pim_password
+          POSTGRES_DB: ai_pim
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pim"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 12
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 12
+      minio:
+        image: minio/minio
+        env:
+          MINIO_ROOT_USER: minio
+          MINIO_ROOT_PASSWORD: minio12345
+        ports:
+          - 9000:9000
+        options: >-
+          --health-cmd "curl -fs http://localhost:9000/minio/health/live"
+          --health-interval 15s
+          --health-timeout 10s
+          --health-retries 12
+    env:
+      DATABASE_URL: postgresql://pim:pim_password@localhost:5432/ai_pim
+      TEST_DATABASE_URL: postgresql+asyncpg://pim:pim_password@localhost:5432/ai_pim_test
+      REDIS_URL: redis://localhost:6379/0
+      MINIO_ENDPOINT: localhost:9000
+      MINIO_ACCESS_KEY: minio
+      MINIO_SECRET_KEY: minio12345
+      JWT_SECRET: ci-jwt-secret-placeholder-not-for-prod
+      AI_ADAPTER: none
+      OCR_ADAPTER: none
+      AI_PIM_TEST_DB_APPROVED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.txt
+      - name: Install backend deps
         working-directory: backend
         run: |
-          pip install ruff
-          ruff check app/
-      - name: Syntax check
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+          pip install pip-audit
+      - name: Prepare ai_pim_test database
+        run: |
+          PGPASSWORD=pim_password psql -h localhost -U pim -d postgres -c "CREATE DATABASE ai_pim_test" || true
+      - name: Run pytest (full)
         working-directory: backend
-        run: python3 -c "import ast, sys; [ast.parse(open(f).read()) for f in __import__('pathlib').Path('app').glob('**/*.py')]"
+        run: |
+          python -m pytest -q --junitxml=pytest.xml
+      - name: Upload backend test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-pytest-results
+          path: backend/pytest.xml
+      - name: pip-audit (HIGH/CRITICAL fail)
+        working-directory: backend
+        run: |
+          # Audit the declared requirements, not the resolved environment;
+          # avoids false positives on locally-installed path/dist-info packages.
+          pip-audit -r requirements.txt --strict
+
+
+  # ---------------------------------------------------------------------------
+  # Backend: migration upgrade from empty PG16 (no editing of 0001..0009)
+  # ---------------------------------------------------------------------------
+  migration-upgrade:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: pim
+          POSTGRES_PASSWORD: pim_password
+          POSTGRES_DB: ai_pim_ci_empty
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U pim"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      DATABASE_URL: postgresql://pim:pim_password@localhost:5433/ai_pim_ci_empty
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.txt
+      - name: Install backend deps (alembic + sqlalchemy only is enough)
+        working-directory: backend
+        run: |
+          pip install -r requirements.txt
+      - name: Verify Alembic chain from empty PG16
+        working-directory: backend
+        run: |
+          alembic current
+          alembic upgrade head
+          alembic current
+      - name: Snapshot migration hashes (0001..0009 must be immutable)
+        working-directory: backend
+        run: |
+          set -e
+          mkdir -p migration_baseline
+          sha256sum alembic/versions/0001_initial.py \
+                    alembic/versions/0002_rag_polish.py \
+                    alembic/versions/0003_add_quotation_subtotal.py \
+                    alembic/versions/0004_seed_data.py \
+                    alembic/versions/0005_fix_partial_unique.py \
+                    alembic/versions/0006_add_manual_indexing.py \
+                    alembic/versions/0007_add_manual_parse_metadata.py \
+                    alembic/versions/0008_v11_audit_workflow_ocr.py \
+                    alembic/versions/0009_sunon_pilot_product_fields.py \
+                    > migration_baseline/hashes.txt
+          cat migration_baseline/hashes.txt
+      - name: Upload migration baseline
+        uses: actions/upload-artifact@v4
+        with:
+          name: migration-baseline-hashes
+          path: backend/migration_baseline/hashes.txt
+
+  # ---------------------------------------------------------------------------
+  # Frontend: typecheck + lint (no --fix) + vitest + production build + audit
+  # ---------------------------------------------------------------------------
+  frontend-typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install
+        working-directory: frontend
+        run: npm ci
+      - name: vue-tsc --noEmit
+        working-directory: frontend
+        run: npx vue-tsc --noEmit
+
+  frontend-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install
+        working-directory: frontend
+        run: npm ci
+      - name: ESLint (no --fix, max-warnings=0)
+        working-directory: frontend
+        run: npx eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx --max-warnings=0
+
+  frontend-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install
+        working-directory: frontend
+        run: npm ci
+      - name: Vitest run
+        working-directory: frontend
+        run: npx vitest run --reporter=default --reporter=junit --outputFile=vitest-results.xml
+      - name: Upload vitest results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-vitest-results
+          path: frontend/vitest-results.xml
 
   frontend-build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Node
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-      - name: Install and build
+      - name: Install
         working-directory: frontend
-        run: |
-          npm ci
-          npm run build
+        run: npm ci
+      - name: Production build
+        working-directory: frontend
+        run: npm run build
+      - name: npm audit (HIGH/CRITICAL fail) --production deps only
+        working-directory: frontend
+        run: npm audit --omit=dev --audit-level=high
+        continue-on-error: false
+      - name: Upload dist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
 
+  # ---------------------------------------------------------------------------
+  # Compose static validation (no real DB env required)
+  # ---------------------------------------------------------------------------
   compose-validation:
     runs-on: ubuntu-latest
     env:
@@ -50,8 +276,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Set up Docker Compose
-        run: |
-          docker compose version
+        run: docker compose version
       - name: Validate docker-compose.yml
         run: docker compose -f docker-compose.yml config --quiet
       - name: Validate docker-compose.dev.yml

@@ -37,6 +37,29 @@ FIELD_MAP = {
     "update_time": "update_time",
 }
 
+# 导出 Excel 列头中文映射（键与 FIELD_MAP 保持一致）。
+HEADER_MAP = {
+    "product_id": "产品ID",
+    "product_no": "产品编号",
+    "product_name": "产品名称",
+    "brand_name": "品牌",
+    "supplier_name": "供应商",
+    "category_name": "分类",
+    "face_price": "面价",
+    "cost_price": "成本价",
+    "material": "材质",
+    "stock_status": "库存状态",
+    "status": "状态",
+    "description": "描述",
+    "specification": "规格",
+    "colors": "颜色",
+    "data_source": "数据来源",
+    "completeness_status": "完整度状态",
+    "create_time": "创建时间",
+    "update_time": "更新时间",
+    "tags": "标签",
+}
+
 
 def _build_query(
     *,
@@ -190,6 +213,8 @@ def build_excel_bytes(rows: list[dict], role_code: str = "admin") -> bytes:
         fields = [field for field in fields if field not in {"cost_price", "supplier_name"}]
 
     df = df[fields + ["tags"]]
+
+    df = df.rename(columns=HEADER_MAP)
 
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:

@@ -97,6 +97,8 @@
       v-model="showCreateDialog"
       :title="editingItem ? '编辑供应商' : '新增供应商'"
       width="520px"
+      append-to-body
+      lock-scroll
       :close-on-click-modal="false"
       destroy-on-close
     >
@@ -201,11 +203,20 @@ const rules: FormRules = {
   cooperationStatus: [{ required: true, message: '请选择合作状态', trigger: 'change' }],
 }
 
+const normalizeSupplier = (item: any) => ({
+  ...item,
+  supplierName: item.supplier_name,
+  contact: item.contact,
+  phone: item.phone,
+  cooperationStatus: item.cooperation_status,
+  createTime: item.create_time,
+})
+
 const fetchSuppliers = async () => {
   loading.value = true
   try {
     const res = await supplierApi.list()
-    suppliers.value = res.data?.list || []
+    suppliers.value = (res.data?.list || []).map(normalizeSupplier)
   } catch {
     ElMessage.error('加载供应商列表失败')
   } finally {

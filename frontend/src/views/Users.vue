@@ -155,6 +155,8 @@
       v-model="showCreate"
       title="新增用户"
       width="500px"
+      append-to-body
+      lock-scroll
       @close="resetCreateForm"
     >
       <el-form
@@ -238,6 +240,8 @@
       v-model="showEdit"
       title="编辑用户"
       width="500px"
+      append-to-body
+      lock-scroll
       @close="resetEditForm"
     >
       <el-form

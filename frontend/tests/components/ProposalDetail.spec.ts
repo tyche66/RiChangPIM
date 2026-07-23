@@ -4,6 +4,7 @@ import {
   ElCard,
   ElButton,
   ElTable,
+  ElTableColumn,
   ElTag,
   ElEmpty,
   ElAlert,
@@ -11,14 +12,27 @@ import {
   ElDescriptionsItem,
   ElTimeline,
   ElTimelineItem,
+  ElDivider,
+  ElInput,
+  ElInputNumber,
+  ElDatePicker,
+  ElDialog,
+  ElForm,
+  ElFormItem,
 } from 'element-plus'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { setActivePinia, createPinia } from 'pinia'
+import type { Proposal } from '@/types/sales'
 
 vi.mock('@/api', () => ({
   proposalApi: {
     get: vi.fn(),
     update: vi.fn(),
+    revertConfirmation: vi.fn(),
+  },
+  productApi: {
+    get: vi.fn(),
+    list: vi.fn(),
   },
   aiApi: {
     polishProposal: vi.fn(),
@@ -32,14 +46,31 @@ vi.mock('@/stores/auth', () => ({
   }),
 }))
 
-import { proposalApi, aiApi } from '@/api'
+vi.mock('element-plus', async () => {
+  const actual = await vi.importActual('element-plus')
+  return {
+    ...(actual as object),
+    ElMessageBox: {
+      confirm: vi.fn().mockResolvedValue('confirm'),
+    },
+  }
+})
+
+import { proposalApi, productApi, aiApi } from '@/api'
+import { ElMessageBox } from 'element-plus'
 import ProposalDetail from '@/views/ProposalDetail.vue'
 
-const mockGet = proposalApi.get as any
-const mockPolish = aiApi.polishProposal as any
+const mockGet = vi.mocked(proposalApi.get)
+const mockRevert = vi.mocked(proposalApi.revertConfirmation)
+const mockProductGet = vi.mocked(productApi.get)
+const mockPolish = vi.mocked(aiApi.polishProposal)
+const mockConfirm = vi.mocked(ElMessageBox.confirm)
 
-const factory = async (proposalData: any) => {
-  mockGet.mockResolvedValue(proposalData)
+const factory = async (proposalData: Partial<Proposal>, productData: unknown = null) => {
+  mockGet.mockResolvedValue({ code: 200, data: proposalData as Proposal })
+  if (productData) {
+    mockProductGet.mockResolvedValue(productData)
+  }
 
   const router = createRouter({
     history: createMemoryHistory(),
@@ -57,7 +88,11 @@ const factory = async (proposalData: any) => {
       stubs: {
         ElCard,
         ElButton,
-        ElTable,
+        ElTable: {
+          template: '<div><slot name="empty" v-if="!data.length"></slot><div v-for="(row, idx) in data" :key="idx"><slot :row="row" :index="idx"></slot></div></div>',
+          props: { data: Array },
+        },
+        ElTableColumn: true,
         ElTag,
         ElEmpty,
         ElAlert,
@@ -65,6 +100,13 @@ const factory = async (proposalData: any) => {
         ElDescriptionsItem,
         ElTimeline,
         ElTimelineItem,
+        ElDivider,
+        ElInput,
+        ElInputNumber,
+        ElDatePicker,
+        ElDialog,
+        ElForm,
+        ElFormItem,
       },
     },
   })
@@ -211,7 +253,7 @@ describe('ProposalDetail.vue', () => {
 
   it('calls polishProposal and reloads on re-polish', async () => {
     mockPolish.mockResolvedValue({})
-    mockGet.mockResolvedValueOnce({
+    mockGet.mockResolvedValueOnce({ code: 200, data: {
       id: '42',
       proposal_no: 'P2024001',
       proposal_name: '方案',
@@ -220,8 +262,8 @@ describe('ProposalDetail.vue', () => {
       ai_polished: true,
       ai_polish_content: 'invalid',
       items: [],
-    })
-    mockGet.mockResolvedValueOnce({
+    } as Proposal })
+    mockGet.mockResolvedValueOnce({ code: 200, data: {
       id: '42',
       proposal_no: 'P2024001',
       proposal_name: '方案',
@@ -230,7 +272,7 @@ describe('ProposalDetail.vue', () => {
       ai_polished: true,
       ai_polish_content: JSON.stringify({ summary: 'new', item_reasons: [], industry_phrases: [] }),
       items: [],
-    })
+    } as Proposal })
 
     const wrapper = await factory({
       id: '42',
@@ -266,10 +308,85 @@ describe('ProposalDetail.vue', () => {
     })
 
     // ElTable is stubbed; verify items are loaded into the component
-    const vm = wrapper.vm as any
+    const vm = wrapper.vm as unknown as { items: Proposal['items'] }
     expect(vm.items).toHaveLength(1)
     expect(vm.items[0].product_id).toBe('prod-1')
     expect(vm.items[0].quantity).toBe(10)
     expect(vm.items[0].remark).toBe('加急')
+  })
+
+  it('renders confirmed status and hides edit button', async () => {
+    const wrapper = await factory({
+      id: '42',
+      proposal_no: 'P2024001',
+      proposal_name: 'Confirmed',
+      customer_name: '客户',
+      status: 'confirmed',
+      ai_polished: false,
+      items: [],
+    })
+
+    expect(wrapper.text()).toContain('已确认')
+    const buttons = wrapper.findAllComponents(ElButton)
+    const editBtn = buttons.find(b => b.text().includes('编辑'))
+    expect(editBtn).toBeUndefined()
+    const revertBtn = buttons.find(b => b.text().includes('撤销确认'))
+    expect(revertBtn).toBeDefined()
+  })
+
+  it('renders draft status and shows edit button', async () => {
+    const wrapper = await factory({
+      id: '42',
+      proposal_no: 'P2024001',
+      proposal_name: 'Draft',
+      customer_name: '客户',
+      status: 'draft',
+      ai_polished: false,
+      items: [],
+    })
+
+    expect(wrapper.text()).toContain('草稿')
+    const buttons = wrapper.findAllComponents(ElButton)
+    const editBtn = buttons.find(b => b.text().includes('编辑'))
+    expect(editBtn).toBeDefined()
+  })
+
+  it('calls revertConfirmation on revert button click', async () => {
+    const confirmedData: Partial<Proposal> = {
+      id: '42',
+      proposal_no: 'P2024001',
+      proposal_name: '确认方案',
+      customer_name: '客户',
+      status: 'confirmed',
+      ai_polished: false,
+      items: [],
+    }
+    const draftData: Partial<Proposal> = {
+      id: '42',
+      proposal_no: 'P2024001',
+      proposal_name: '确认方案',
+      customer_name: '客户',
+      status: 'draft',
+      ai_polished: false,
+      items: [],
+    }
+
+    mockRevert.mockResolvedValue({ code: 200, data: draftData as Proposal })
+
+    const wrapper = await factory(confirmedData)
+
+    // Queue draft response for the post-revert reload
+    mockGet.mockResolvedValueOnce({ code: 200, data: draftData as Proposal })
+    mockConfirm.mockResolvedValue('confirm')
+
+    const buttons = wrapper.findAllComponents(ElButton)
+    const revertBtn = buttons.find(b => b.text().includes('撤销确认'))
+    expect(revertBtn).toBeDefined()
+    await revertBtn!.trigger('click')
+    await flushPromises()
+
+    expect(mockConfirm).toHaveBeenCalled()
+    expect(mockRevert).toHaveBeenCalledWith('42')
+    expect(mockGet).toHaveBeenCalledTimes(2) // initial fetch + reload
   })
 })

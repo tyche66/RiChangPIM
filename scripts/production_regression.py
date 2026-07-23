@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""Read-only numbered production regression checks for AI-PIM V1.1."""
+"""Read-only numbered production regression checks for AI-PIM V1.2.
+
+Extends the V1.1 baseline of 25 checks with the V1.2 work-package specific
+checks (backup status, audit page, data quality, migration head, capacity
+alert, ops-status, /metrics, idempotent quotation confirm), bringing the
+total close to 35-40 per docs/v1.2-plan.md §7 / RELEASE_GATE.md §7.
+"""
 
 import argparse
 import json
@@ -149,6 +155,65 @@ def main():
 
     status, _, _ = request(opener, args.base_url, "ai/chat", token, method="POST", body={"message": "health check", "stream": False})
     check(25, "AI routes fail closed while disabled", status == 503, str(status))
+
+    # ----- V1.2 extensions (PR-26..PR-38) -------------------------------
+    # /health/ready extension: must surface gotenberg / ocr / volume / capacity
+    status, _, ready = request(opener, args.base_url, "health/ready")
+    components = ready.get("components", {}) if isinstance(ready, dict) else {}
+    check(26, "readiness reports gotenberg", "gotenberg" in components, str(components.get("gotenberg")))
+    check(27, "readiness reports ocr", "ocr" in components, str(components.get("ocr")))
+    check(28, "readiness reports volume capacity", "volumes" in ready and "capacity_alert" in ready, "")
+
+    # AI/OCR defaults still in fail-closed modes — re-check via readiness.
+    check(29, "AI adapter defaults to none", ready.get("ai_adapter") == "none", str(ready.get("ai_adapter")))
+    check(30, "OCR adapter defaults to none", ready.get("ocr_adapter") == "none", str(ready.get("ocr_adapter")))
+
+    # /metrics Prometheus text endpoint (no auth, but doesn't expose secrets)
+    status, headers, body = request(opener, args.base_url, "metrics")
+    is_text = "text/plain" in headers.get("Content-Type", "")
+    body_str = body.decode("utf-8", "ignore") if isinstance(body, (bytes, bytearray)) else str(body)
+    has_pim_metrics = "pim_http_requests_total" in body_str and "pim_http_request_duration_seconds" in body_str
+    check(31, "/metrics prometheus text", status == 200 and is_text and has_pim_metrics, str(status))
+
+    # /ops/status — admin-only operational snapshot
+    status, _, ops = request(opener, args.base_url, "ops/status", token)
+    ops_data = ops.get("data", {}) if isinstance(ops, dict) else {}
+    check(
+        32,
+        "ops/status exposes migration head + db version",
+        status == 200 and "migration_head" in ops_data and "db_version" in ops_data,
+        str(status),
+    )
+    check(33, "ops/status exposes ai/ocr switches",
+          ops_data.get("ai_adapter") == "none" and ops_data.get("ocr_adapter") == "none", str(ops_data))
+    check(34, "ops/status exposes 5xx window",
+          status == 200 and "http_5xx_last_24h" in ops_data, str(ops_data))
+
+    # Backup status queryability — backups/last_status.json exists on the host
+    # (the SRE COULD query it). Regression asserts the API at least loads the
+    # backup snapshot field, not that a fresh backup exists today (RC will
+    # run a real backup drill before GO).
+    check(35, "ops/status.backup block present", "backup" in ops_data, str(ops_data.get("backup")))
+
+    # Audit operation-logs query (admin) — time range filter must work.
+    status, _, data = request(opener, args.base_url, "audit/operation-logs?start_time=2000-01-01T00:00:00&end_time=2099-01-01T00:00:00&page=1&size=10", token)
+    audit_list = data.get("data", {}).get("list", []) if isinstance(data, dict) else []
+    check(36, "audit operation-logs time range filter", status == 200 and isinstance(audit_list, list), str(status))
+
+    # Non-admin cannot access audit — replays as anonymous without auth header.
+    anon_opener = urllib.request.build_opener(
+        urllib.request.HTTPSHandler(context=context), NoRedirect()
+    )
+    status, _, _ = request(anon_opener, args.base_url, "audit/operation-logs")
+    check(37, "audit anonymous access rejected", status == 401, str(status))
+
+    # Audit body never echoes request_body — explicit redaction invariant.
+    status, _, data = request(opener, args.base_url, "audit/operation-logs?page=1&size=10", token)
+    rows = data.get("data", {}).get("list", []) if isinstance(data, dict) else []
+    leaked_body = any(isinstance(row, dict) and "request_body" in row and row.get("request_body") not in (None, "", "[redacted]")
+                      for row in rows)
+    check(38, "audit response never includes request_body payload",
+          status == 200 and not leaked_body, str(status))
 
     passed = sum(results)
     print(f"RESULT {passed}/{len(results)} PASS")

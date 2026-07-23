@@ -9,22 +9,30 @@
           <span class="page-title">方案详情</span>
           <div class="header-actions">
             <el-button
-              v-if="hasPerm('proposal:edit')"
+              v-if="hasPerm('proposal:edit') && proposal?.status !== 'confirmed'"
               class="capsule-btn"
               @click="handleEdit"
             >
               编辑
             </el-button>
             <el-button
-              v-if="hasPerm('quotation:create') && proposal?.status !== 'confirmed'"
+              v-if="hasPerm('quotation:create')"
               type="success"
               class="capsule-btn capsule-btn-primary"
               @click="handleCreateQuotation"
             >
               生成报价单
             </el-button>
-            <el-button
-              v-if="hasPerm('ai:use')"
+             <el-button
+               v-if="hasPerm('proposal:edit') && proposal?.status === 'confirmed'"
+               type="warning"
+               class="capsule-btn capsule-btn-warn"
+               @click="handleRevertConfirmation"
+             >
+               撤销确认
+             </el-button>
+             <el-button
+               v-if="hasPerm('ai:use')"
               type="warning"
               :loading="polishLoading"
               class="capsule-btn capsule-btn-warn"
@@ -56,8 +64,11 @@
             :type="proposal.status === 'confirmed' ? 'success' : 'info'"
             class="capsule-tag"
           >
-            {{ proposal.status }}
+            {{ proposalStatusMap[proposal.status] || proposal.status }}
           </el-tag>
+        </el-descriptions-item>
+        <el-descriptions-item label="总面价">
+          <span class="price-text">¥{{ proposal.total_face_value?.toFixed(2) ?? '-' }}</span>
         </el-descriptions-item>
         <el-descriptions-item label="AI 润色">
           <el-tag
@@ -92,25 +103,61 @@
       <div class="table-wrapper">
         <el-table
           v-loading="itemsLoading"
-          :data="items"
+          :data="enrichedItems"
           border
           stripe
           class="items-table"
         >
           <el-table-column
-            prop="product_id"
-            label="商品ID"
-            width="240"
-          />
+            label="商品信息"
+            min-width="260"
+          >
+            <template #default="{ row }">
+              <div class="product-cell">
+                <img
+                  v-if="row.cover_image_url && !row._imgError"
+                  :src="row.cover_image_url"
+                  class="product-thumb-img"
+                  @error="onImgError(row)"
+                />
+                <div class="product-thumb-placeholder" v-else>
+                  {{ row.product_name ? row.product_name.slice(0, 2) : '无图' }}
+                </div>
+                <div class="product-cell-info">
+                  <span class="product-cell-name">{{ row.product_name || '-' }}</span>
+                  <span class="product-cell-no">{{ row.product_no || '-' }}</span>
+                </div>
+              </div>
+            </template>
+          </el-table-column>
+          <el-table-column
+            label="面价"
+            width="120"
+            align="right"
+          >
+            <template #default="{ row }">
+              <span class="price-text">¥{{ row.face_price?.toFixed(2) ?? '-' }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column
+            label="库存"
+            width="80"
+            align="center"
+          >
+            <template #default="{ row }">
+              {{ row.stock ?? '-' }}
+            </template>
+          </el-table-column>
           <el-table-column
             prop="quantity"
             label="数量"
-            width="100"
+            width="80"
             align="center"
           />
           <el-table-column
             prop="remark"
             label="备注"
+            min-width="140"
           />
         </el-table>
       </div>
@@ -248,7 +295,10 @@
       v-model="showEditDialog"
       title="编辑方案"
       class="glass-dialog"
+      append-to-body
+      lock-scroll
       :close-on-click-modal="false"
+      width="640px"
     >
       <el-form
         ref="editFormRef"
@@ -274,6 +324,11 @@
             class="capsule-input"
           />
         </el-form-item>
+        <el-form-item
+          label="商品明细"
+        >
+          <ProposalItemEditor v-model="editForm.items" />
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button
@@ -298,7 +353,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { DocumentChecked, List, ChatDotRound } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { proposalApi, aiApi } from '@/api'
@@ -306,6 +361,8 @@ import { useAuthStore } from '@/stores/auth'
 import { hasPermission } from '@/types/permissions'
 import type { PolishContent } from '@/types/ai'
 import { tryParseJson, isPolishFailed } from '@/types/ai'
+import type { Proposal, ProposalItem } from '@/types/sales'
+import ProposalItemEditor from '@/components/ProposalItemEditor.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -320,11 +377,13 @@ function formatDate(dateStr: string | null): string {
   return new Date(dateStr).toLocaleString('zh-CN')
 }
 
+const proposalStatusMap: Record<string, string> = { draft: '草稿', confirmed: '已确认' }
+
 const proposalId = computed(() => route.params.id as string)
 const loading = ref(false)
 const itemsLoading = ref(false)
-const proposal = ref<any>(null)
-const items = ref<any[]>([])
+const proposal = ref<Proposal | null>(null)
+const items = ref<ProposalItem[]>([])
 const showEditDialog = ref(false)
 const editLoading = ref(false)
 const polishLoading = ref(false)
@@ -334,6 +393,7 @@ const editFormRef = ref<FormInstance>()
 const editForm = reactive({
   proposal_name: '',
   customer_name: '',
+  items: [] as ProposalItem[],
 })
 
 const editFormRules: FormRules = {
@@ -355,22 +415,28 @@ const showPolishSection = computed<boolean>(() => {
   return proposal.value?.ai_polished || polishLoading.value
 })
 
+const enrichedItems = ref<ProposalItem[]>([])
+
 const fetchProposal = async () => {
   loading.value = true
+  itemsLoading.value = true
   try {
-    const res = await proposalApi.get(proposalId.value) as any
-    proposal.value = res
-    items.value = res.items || []
+    const res = await proposalApi.get(proposalId.value)
+    proposal.value = res.data
+    items.value = res.data.items
+    enrichedItems.value = res.data.items
   } catch {
     ElMessage.error('加载方案详情失败')
   } finally {
     loading.value = false
+    itemsLoading.value = false
   }
 }
 
 const handleEdit = () => {
   editForm.proposal_name = proposal.value?.proposal_name || ''
   editForm.customer_name = proposal.value?.customer_name || ''
+  editForm.items = [...(enrichedItems.value || items.value)]
   showEditDialog.value = true
 }
 
@@ -378,11 +444,28 @@ const handleEditSubmit = async () => {
   if (!editFormRef.value) return
   await editFormRef.value.validate(async (valid) => {
     if (!valid) return
+    // Validate at least one item
+    if (editForm.items.length === 0) {
+      ElMessage.warning('请至少添加一项商品')
+      return
+    }
+    // Validate quantities
+    for (const item of editForm.items) {
+      if (!Number.isInteger(item.quantity) || item.quantity < 1) {
+        ElMessage.warning(`商品 "${item.product_name || item.product_id}" 的数量必须为正整数`)
+        return
+      }
+    }
     editLoading.value = true
     try {
       await proposalApi.update(proposalId.value, {
         proposal_name: editForm.proposal_name,
         customer_name: editForm.customer_name,
+        items: editForm.items.map((item) => ({
+          product_id: item.product_id,
+          quantity: item.quantity,
+          remark: item.remark,
+        })),
       })
       ElMessage.success('更新成功')
       showEditDialog.value = false
@@ -410,6 +493,31 @@ const handlePolish = async () => {
   } finally {
     polishLoading.value = false
   }
+}
+
+const handleRevertConfirmation = async () => {
+  try {
+    await ElMessageBox.confirm(
+      '确定要撤销方案确认状态吗？撤销后可重新编辑。',
+      '撤销确认',
+      {
+        confirmButtonText: '撤销',
+        cancelButtonText: '取消',
+        type: 'warning',
+      },
+    )
+    await proposalApi.revertConfirmation(proposalId.value)
+    ElMessage.success('已撤销确认')
+    await fetchProposal()
+  } catch (e: unknown) {
+    if (e !== 'cancel') {
+      // error handled by interceptor
+    }
+  }
+}
+
+const onImgError = (row: ProposalItem) => {
+  row._imgError = true
 }
 
 // Reset showRaw when proposal changes
@@ -539,6 +647,12 @@ onMounted(fetchProposal)
   font-size: 12px;
 }
 
+.price-text {
+  color: var(--brand-deep);
+  font-weight: 600;
+  font-family: monospace;
+}
+
 /* ===== Descriptions ===== */
 .glass-descriptions {
   margin-top: 16px;
@@ -592,6 +706,51 @@ onMounted(fetchProposal)
 
 .items-table :deep(.el-table__row:hover td) {
   background: var(--brand-lighter);
+}
+
+/* Product cell */
+.product-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.product-thumb-img,
+.product-thumb-placeholder {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: var(--brand-lighter);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: #999;
+}
+
+.product-cell-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.product-cell-name {
+  font-weight: 600;
+  color: var(--brand-deep);
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.product-cell-no {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-family: monospace;
 }
 
 /* ===== Polish Section ===== */

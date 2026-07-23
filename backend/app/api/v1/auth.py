@@ -31,6 +31,13 @@ async def _load_role_and_user(user_id, db: AsyncSession):
     if not row:
         return None, None, []
     u, role_code = row
+    if role_code == "admin":
+        perm_result = await db.execute(
+            select(Permission.perm_code).where(Permission.is_deleted.is_(False))
+        )
+        perms: list[str] = [r.perm_code for r in perm_result.fetchall()]
+        return u, role_code, perms
+
     perm_result = await db.execute(
         select(Permission.perm_code)
         .join(RolePermission, RolePermission.permission_id == Permission.id)

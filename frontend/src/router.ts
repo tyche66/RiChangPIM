@@ -109,6 +109,30 @@ const routes = [
         component: () => import('@/views/Logs.vue'),
         meta: { permissions: ['stats:view'] },
       },
+      {
+        path: 'quality',
+        name: 'Quality',
+        component: () => import('@/views/Quality.vue'),
+        meta: { permissions: ['product:view'] },
+      },
+      {
+        path: 'media',
+        name: 'MediaLibrary',
+        component: () => import('@/views/MediaLibrary.vue'),
+        meta: { permissions: ['media:view'] },
+      },
+      {
+        path: 'scene-images',
+        name: 'SceneImages',
+        component: () => import('@/views/SceneImages.vue'),
+        meta: { permissions: ['scene_image:view'] },
+      },
+      {
+        path: 'version',
+        name: 'Version',
+        component: () => import('@/views/Version.vue'),
+        meta: { permissions: ['stats:view'] },
+      },
     ],
   },
   {
@@ -159,12 +183,24 @@ router.beforeEach(async (to, _from, next) => {
   const requiredPerms: string[] = (to.meta.permissions as string[]) || []
   if (requiredPerms.length > 0) {
     const mode = (to.meta.permissionsMode as 'any' | 'all') || 'any'
-    const userPerms = authStore.permissions
-
-    const hasAccess =
-      mode === 'all'
+    const getHasAccess = () => {
+      if (authStore.userRoleCode === 'admin') return true
+      const userPerms = authStore.permissions
+      return mode === 'all'
         ? requiredPerms.every((p) => userPerms.includes(p))
         : requiredPerms.some((p) => userPerms.includes(p))
+    }
+
+    let hasAccess = getHasAccess()
+
+    // Existing sessions can hold a token issued before new permissions were added.
+    // Refresh once so route decisions use the latest role-permission mapping.
+    if (!hasAccess) {
+      const refreshed = await authStore.refresh()
+      if (refreshed) {
+        hasAccess = getHasAccess()
+      }
+    }
 
     if (!hasAccess) {
       next({ name: 'Products' })

@@ -8,7 +8,9 @@ from sqlalchemy import (
     Index,
     Integer,
     String,
+    Table,
     Text,
+    func,
 )
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import relationship
@@ -114,7 +116,16 @@ class Product(CommonBase):
     supplier = relationship("Supplier")
     category = relationship("Category")
     tags = relationship("Tag", secondary="product_tag", back_populates="products")
-    images = relationship("ProductImage", back_populates="product", cascade="all, delete-orphan")
+    images = relationship(
+        "ProductImage",
+        back_populates="product",
+        cascade="all, delete-orphan",
+        primaryjoin=(
+            "and_(Product.id == ProductImage.product_id, "
+            "ProductImage.is_deleted.is_(False))"
+        ),
+        order_by="ProductImage.sort",
+    )
     manuals = relationship("ProductManual", back_populates="product", cascade="all, delete-orphan")
     chunks = relationship(
         "ProductManualChunk",
@@ -122,6 +133,15 @@ class Product(CommonBase):
         cascade="all, delete-orphan",
         primaryjoin="ProductManualChunk.product_id==Product.id",
     )
+    scene_images = relationship("SceneImage", secondary="product_scene_image", back_populates="products")
+
+    @property
+    def cover_image(self):
+        """获取显式设置的产品主图。"""
+        for img in self.images:
+            if img.is_cover:
+                return img
+        return None
 
 
 class ProductTag(CommonBase):
@@ -164,6 +184,38 @@ class ProductImage(CommonBase):
 
     product = relationship("Product", back_populates="images")
     attachment = relationship("Attachment")
+
+
+product_scene_image = Table(
+    "product_scene_image",
+    CommonBase.metadata,
+    Column("product_id", PGUUID(as_uuid=True), ForeignKey("product.id", ondelete="CASCADE"), primary_key=True),
+    Column("scene_image_id", PGUUID(as_uuid=True), ForeignKey("scene_image.id", ondelete="CASCADE"), primary_key=True),
+    Column("sort", Integer, default=0),
+    Column("create_time", DateTime(timezone=True), server_default=func.now(), nullable=False),
+    Column("update_time", DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False),
+    Column("deleted_at", DateTime(timezone=True), nullable=True),
+    Column("is_deleted", Boolean, default=False, nullable=False),
+)
+
+Index(
+    "idx_product_scene_image_active",
+    product_scene_image.c.product_id,
+    product_scene_image.c.scene_image_id,
+    unique=True,
+    postgresql_where=text("is_deleted = false"),
+)
+
+
+class SceneImage(CommonBase):
+    __tablename__ = "scene_image"
+
+    name = Column(String(128), nullable=False)
+    attachment_id = Column(PGUUID(as_uuid=True), ForeignKey("attachment.id"), nullable=False)
+    sort = Column(Integer, default=0)
+
+    attachment = relationship("Attachment")
+    products = relationship("Product", secondary="product_scene_image", back_populates="scene_images")
 
 
 class ProductManual(CommonBase):

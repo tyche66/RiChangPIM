@@ -68,18 +68,30 @@
             width="180"
           />
           <el-table-column
-            prop="proposal_id"
-            label="方案ID"
-            width="240"
-          />
+            label="方案编号/名称"
+            min-width="220"
+          >
+            <template #default="{ row }">
+              <span class="proposal-no">{{ row.proposal_no || '-' }}</span>
+              <span class="proposal-name">{{ row.proposal_name || '-' }}</span>
+            </template>
+          </el-table-column>
           <el-table-column
-            prop="total_amount"
             label="总金额"
-            width="120"
+            width="130"
             align="right"
           >
             <template #default="{ row }">
-              <span class="price-text">¥{{ row.total_amount?.toFixed(2) }}</span>
+              <span class="price-text">¥{{ row.total_amount?.toFixed(2) ?? '-' }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column
+            label="税率"
+            width="80"
+            align="center"
+          >
+            <template #default="{ row }">
+              {{ (row.tax_rate * 100).toFixed(0) }}%
             </template>
           </el-table-column>
           <el-table-column
@@ -93,7 +105,7 @@
                 :type="row.status === 'confirmed' ? 'success' : 'info'"
                 class="capsule-tag"
               >
-                {{ row.status }}
+                {{ quotationStatusMap[row.status] || row.status }}
               </el-tag>
             </template>
           </el-table-column>
@@ -108,7 +120,7 @@
           </el-table-column>
           <el-table-column
             label="操作"
-            width="220"
+            width="300"
             fixed="right"
             align="center"
           >
@@ -129,7 +141,16 @@
                 编辑
               </el-button>
               <el-button
-                v-if="hasPerm('share:create')"
+                v-if="hasPerm('quotation:confirm') && row.status !== 'confirmed'"
+                size="small"
+                type="success"
+                class="capsule-btn btn-sm"
+                @click="handleConfirm(row)"
+              >
+                确认
+              </el-button>
+              <el-button
+                v-if="hasPerm('share:create') && row.status === 'confirmed'"
                 size="small"
                 type="warning"
                 class="capsule-btn btn-sm"
@@ -167,7 +188,10 @@
       v-model="showQuotationDialog"
       :title="quotationMode === 'create' ? '创建报价单' : '编辑报价单'"
       class="glass-dialog"
+      append-to-body
+      lock-scroll
       :close-on-click-modal="false"
+      width="760px"
     >
       <el-form
         ref="quotationFormRef"
@@ -186,7 +210,7 @@
           />
         </el-form-item>
         <el-form-item
-          label="税率"
+          label="整单税率"
           prop="tax_rate"
         >
           <el-input-number
@@ -219,6 +243,92 @@
             class="capsule-date full-width"
           />
         </el-form-item>
+
+        <!-- Quotation items -->
+        <el-divider content-position="left">商品明细</el-divider>
+        <div class="quote-items-header">
+          <span class="quote-col-product">商品</span>
+          <span class="quote-col-qty">数量</span>
+          <span class="quote-col-price">单价</span>
+          <span class="quote-col-tax">税率</span>
+          <span class="quote-col-subtotal">未税小计</span>
+          <span class="quote-col-total">含税小计</span>
+        </div>
+        <div
+          v-for="(item, idx) in quotationForm.items"
+          :key="idx"
+          class="quote-item-row"
+        >
+          <div class="quote-col-product quote-item-name">
+            <span class="product-cover">
+              <img
+                v-if="item.cover_image_url"
+                :src="item.cover_image_url"
+                class="product-thumb-img"
+                @error="onCoverError"
+              />
+            </span>
+            <div>
+              <span class="quote-product-name">{{ item.product_name || '-' }}</span>
+              <span class="quote-product-no">{{ item.product_no || '-' }}</span>
+              <span class="quote-face-price">面价 ¥{{ item.face_price?.toFixed(2) ?? '-' }}</span>
+            </div>
+          </div>
+          <div class="quote-col-qty">
+            <el-input-number
+              :model-value="item.quantity"
+              :min="1"
+              :precision="0"
+              controls-position="right"
+              class="capsule-number"
+              @update:model-value="setQuantity(idx, $event)"
+            />
+          </div>
+          <div class="quote-col-price">
+            <el-input-number
+              :model-value="item.unit_price"
+              :min="0"
+              :precision="2"
+              :step="1"
+              controls-position="right"
+              class="capsule-number"
+              @update:model-value="setUnitPrice(idx, $event)"
+            />
+          </div>
+          <div class="quote-col-tax">
+            <el-input-number
+              :model-value="item.tax_rate"
+              :min="0"
+              :max="1"
+              :step="0.01"
+              :precision="2"
+              controls-position="right"
+              class="capsule-number"
+              @update:model-value="setTaxRate(idx, $event)"
+            />
+          </div>
+          <div class="quote-col-subtotal">
+            <span class="subtotal-text">¥{{ (item.quantity * item.unit_price).toFixed(2) }}</span>
+          </div>
+          <div class="quote-col-total">
+            <span class="subtotal-text">¥{{ (item.quantity * item.unit_price * (1 + item.tax_rate)).toFixed(2) }}</span>
+          </div>
+        </div>
+
+        <div class="quote-totals">
+          <div class="totals-row">
+            <span class="totals-label">未税合计</span>
+            <span class="totals-value">¥{{ subtotalTotal.toFixed(2) }}</span>
+          </div>
+          <div class="totals-row">
+            <span class="totals-label">折扣后</span>
+            <span class="totals-value">¥{{ (subtotalTotal * quotationForm.discount).toFixed(2) }}</span>
+          </div>
+          <div class="totals-row totals-final">
+            <span class="totals-label">含税总额</span>
+            <span class="totals-value">¥{{ totalAmount.toFixed(2) }}</span>
+          </div>
+        </div>
       </el-form>
       <template #footer>
         <el-button
@@ -238,11 +348,91 @@
       </template>
     </el-dialog>
 
+    <!-- View Quotation Dialog -->
+    <el-dialog
+      v-model="showViewDialog"
+      title="报价详情"
+      class="glass-dialog"
+      append-to-body
+      lock-scroll
+      :close-on-click-modal="false"
+      width="760px"
+    >
+      <el-descriptions :column="2" border class="glass-descriptions">
+        <el-descriptions-item label="报价单号">
+          <span class="mono-text">{{ viewQuotation?.quotation_no }}</span>
+        </el-descriptions-item>
+        <el-descriptions-item label="状态">
+          <el-tag :type="viewQuotation?.status === 'confirmed' ? 'success' : 'info'" class="capsule-tag">
+            {{ quotationStatusMap[viewQuotation?.status || ''] || viewQuotation?.status }}
+          </el-tag>
+        </el-descriptions-item>
+        <el-descriptions-item label="方案编号">
+          <span class="mono-text">{{ viewQuotation?.proposal_no || '-' }}</span>
+        </el-descriptions-item>
+        <el-descriptions-item label="方案名称">
+          {{ viewQuotation?.proposal_name || '-' }}
+        </el-descriptions-item>
+        <el-descriptions-item label="税率">
+          {{ viewQuotation?.tax_rate !== undefined ? (viewQuotation.tax_rate * 100).toFixed(0) + '%' : '-' }}
+        </el-descriptions-item>
+        <el-descriptions-item label="折扣">
+          {{ viewQuotation?.discount !== undefined ? (viewQuotation.discount * 100).toFixed(0) + '%' : '-' }}
+        </el-descriptions-item>
+        <el-descriptions-item label="有效期">
+          {{ viewQuotation?.valid_until ? formatDate(viewQuotation.valid_until) : '-' }}
+        </el-descriptions-item>
+        <el-descriptions-item label="含税总额">
+          <span class="price-text">¥{{ viewQuotation?.total_amount?.toFixed(2) ?? '-' }}</span>
+        </el-descriptions-item>
+      </el-descriptions>
+
+      <el-divider content-position="left">商品明细</el-divider>
+      <div class="table-wrapper">
+        <el-table :data="viewQuotation?.items || []" border stripe class="items-table">
+          <el-table-column label="商品信息" min-width="220">
+            <template #default="{ row }">
+              <div class="product-cell">
+                <img
+                  v-if="row.cover_image_url"
+                  :src="row.cover_image_url"
+                  class="product-thumb-img"
+                  @error="onCoverError"
+                />
+                <div>
+                  <span class="product-cell-name">{{ row.product_name || '-' }}</span>
+                  <span class="product-cell-no">{{ row.product_no || '-' }}</span>
+                </div>
+              </div>
+            </template>
+          </el-table-column>
+          <el-table-column prop="quantity" label="数量" width="80" align="center" />
+          <el-table-column label="单价" width="100" align="right">
+            <template #default="{ row }">
+              <span class="price-text">¥{{ row.unit_price?.toFixed(2) ?? '-' }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="税率" width="80" align="center">
+            <template #default="{ row }">
+              {{ row.tax_rate !== undefined ? (row.tax_rate * 100).toFixed(0) + '%' : '-' }}
+            </template>
+          </el-table-column>
+          <el-table-column label="未税小计" width="120" align="right">
+            <template #default="{ row }">
+              <span class="subtotal-text">¥{{ row.subtotal?.toFixed(2) ?? '-' }}</span>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+    </el-dialog>
+
     <!-- Share Dialog -->
     <el-dialog
       v-model="showShareDialog"
       title="创建分享链接"
       class="glass-dialog"
+      append-to-body
+      lock-scroll
       :close-on-click-modal="false"
     >
       <el-form label-width="120px">
@@ -301,45 +491,10 @@
     </el-dialog>
 
     <!-- Share Result -->
-    <el-dialog
+    <ShareResultDialog
       v-model="showShareResult"
-      title="分享链接已生成"
-      class="glass-dialog"
-    >
-      <el-alert
-        type="success"
-        :closable="false"
-        class="share-alert"
-      >
-        请将以下链接发送给客户
-      </el-alert>
-      <el-input
-        :model-value="shareResultUrl"
-        readonly
-        class="capsule-input share-url-input"
-      >
-        <template #append>
-          <el-button
-            class="capsule-btn capsule-btn-primary"
-            @click="copyShareUrl"
-          >
-            复制
-          </el-button>
-        </template>
-      </el-input>
-      <div
-        v-if="shareResultUrl"
-        class="share-actions"
-      >
-        <el-button
-          type="primary"
-          class="capsule-btn capsule-btn-primary"
-          @click="openShareUrl"
-        >
-          在新窗口打开
-        </el-button>
-      </div>
-    </el-dialog>
+      :share-url="shareResultUrl"
+    />
   </div>
 </template>
 
@@ -348,9 +503,18 @@ import { ref, reactive, onMounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
-import { quotationApi, shareApi } from '@/api'
+import { quotationApi, proposalApi, shareApi } from '@/api'
 import { useAuthStore } from '@/stores/auth'
 import { hasPermission } from '@/types/permissions'
+import type {
+  Quotation,
+  QuotationCreateRequest,
+  QuotationItem,
+  QuotationUpdateRequest,
+  ShareCreateRequest,
+  ShareForm,
+} from '@/types/sales'
+import ShareResultDialog from '@/components/ShareResultDialog.vue'
 
 const route = useRoute()
 const authStore = useAuthStore()
@@ -364,17 +528,24 @@ function formatDate(dateStr: string | null): string {
   return new Date(dateStr).toLocaleString('zh-CN')
 }
 
+const quotationStatusMap: Record<string, string> = { draft: '草稿', confirmed: '已确认' }
+
 const loading = ref(false)
-const quotations = ref<any[]>([])
+const quotations = ref<Quotation[]>([])
 const total = ref(0)
 const showQuotationDialog = ref(false)
 const quotationMode = ref<'create' | 'edit'>('create')
 const quotationLoading = ref(false)
 const quotationFormRef = ref<FormInstance>()
+const quotationEditId = ref('')
+
 const showShareDialog = ref(false)
 const showShareResult = ref(false)
 const shareLoading = ref(false)
 const shareResultUrl = ref('')
+
+const showViewDialog = ref(false)
+const viewQuotation = ref<Quotation | null>(null)
 
 const queryParams = reactive({
   proposal_id: '',
@@ -388,13 +559,14 @@ const quotationForm = reactive({
   tax_rate: 0.13,
   discount: 1.0,
   valid_until: null as Date | null,
+  items: [] as QuotationItem[],
 })
 
 const quotationFormRules: FormRules = {
   proposal_id: [{ required: true, message: '请输入方案ID', trigger: 'blur' }],
 }
 
-const shareForm = reactive({
+const shareForm = reactive<ShareForm>({
   share_type: 'quotation',
   target_id: '',
   creator_id: '',
@@ -403,15 +575,49 @@ const shareForm = reactive({
   max_access_count: 100,
 })
 
+// Computed totals
+const subtotalTotal = computed(() =>
+  quotationForm.items.reduce((sum, item) => sum + item.quantity * item.unit_price, 0)
+)
+const totalAmount = computed(() =>
+  quotationForm.items.reduce(
+    (sum, item) => sum + item.quantity * item.unit_price * (1 + item.tax_rate),
+    0,
+  ) * quotationForm.discount
+)
+
+const setItemField = (idx: number, field: keyof QuotationItem, value: unknown) => {
+  quotationForm.items = quotationForm.items.map((item, i) => {
+    if (i !== idx) return item
+    return { ...item, [field]: value }
+  })
+}
+
+const setQuantity = (idx: number, val: number | null) =>
+  setItemField(idx, 'quantity', Math.max(1, Math.round(val ?? 1)))
+
+const setUnitPrice = (idx: number, val: number | null) =>
+  setItemField(idx, 'unit_price', Math.max(0, val ?? 0))
+
+const setTaxRate = (idx: number, val: number | null) =>
+  setItemField(idx, 'tax_rate', Math.max(0, Math.min(1, val ?? 0)))
+
+const onCoverError = (e: Event) => {
+  const img = e.target as HTMLImageElement
+  if (img) img.style.display = 'none'
+}
+
 const fetchQuotations = async () => {
   loading.value = true
   try {
-    const params: Record<string, unknown> = { ...queryParams }
-    if (!params.proposal_id) delete params.proposal_id
-    if (!params.status) delete params.status
-    const res = await quotationApi.list(params)
-    quotations.value = res.data?.list || []
-    total.value = res.data?.total || 0
+    const res = await quotationApi.list({
+      proposal_id: queryParams.proposal_id || undefined,
+      status: queryParams.status || undefined,
+      page: queryParams.page,
+      size: queryParams.size,
+    })
+    quotations.value = res.data.list
+    total.value = res.data.total
   } catch {
     ElMessage.error('加载报价列表失败')
   } finally {
@@ -431,20 +637,45 @@ const handleReset = () => {
   fetchQuotations()
 }
 
-const handleView = (row: any) => {
-  ElMessage.info(`查看报价单: ${row.quotation_no}`)
+const handleView = async (row: Quotation) => {
+  try {
+    const res = await quotationApi.get(row.id)
+    viewQuotation.value = res.data
+    showViewDialog.value = true
+  } catch {
+    ElMessage.error('加载报价详情失败')
+  }
 }
 
-const handleEdit = (row: any) => {
+const handleEdit = async (row: Quotation) => {
   quotationMode.value = 'edit'
-  quotationForm.proposal_id = row.proposal_id
-  quotationForm.tax_rate = row.tax_rate
-  quotationForm.discount = row.discount
-  quotationForm.valid_until = row.valid_until ? new Date(row.valid_until) : null
-  showQuotationDialog.value = true
+  quotationEditId.value = row.id
+  try {
+    // Always GET the current quotation before edit
+    const res = await quotationApi.get(row.id)
+    const q = res.data
+    quotationForm.proposal_id = q.proposal_id
+    quotationForm.tax_rate = q.tax_rate
+    quotationForm.discount = q.discount
+    quotationForm.valid_until = q.valid_until ? new Date(q.valid_until) : null
+    quotationForm.items = q.items.map((item) => ({ ...item }))
+    showQuotationDialog.value = true
+  } catch {
+    ElMessage.error('加载报价数据失败')
+  }
 }
 
-const handleShare = (row: any) => {
+const handleConfirm = async (row: Quotation) => {
+  try {
+    await quotationApi.confirm(row.id)
+    ElMessage.success('报价已确认')
+    fetchQuotations()
+  } catch {
+    // error handled by interceptor
+  }
+}
+
+const handleShare = (row: Quotation) => {
   shareForm.target_id = row.id
   shareForm.creator_id = authStore.user?.id || ''
   showShareDialog.value = true
@@ -454,19 +685,51 @@ const handleQuotationSubmit = async () => {
   if (!quotationFormRef.value) return
   await quotationFormRef.value.validate(async (valid) => {
     if (!valid) return
+    // Validate at least one item
+    if (quotationForm.items.length === 0) {
+      ElMessage.warning('请至少添加一项商品')
+      return
+    }
+    // Validate items
+    for (const item of quotationForm.items) {
+      if (!item.product_id) {
+        ElMessage.warning('商品 ID 不能为空')
+        return
+      }
+      if (!Number.isInteger(item.quantity) || item.quantity < 1) {
+        ElMessage.warning(`商品 "${item.product_name || item.product_id}" 的数量必须为正整数`)
+        return
+      }
+      if (item.unit_price < 0) {
+        ElMessage.warning(`商品 "${item.product_name || item.product_id}" 的单价不能为负`)
+        return
+      }
+    }
     quotationLoading.value = true
     try {
-      const payload: Record<string, unknown> = {
-        proposal_id: quotationForm.proposal_id,
+      const itemPayload = quotationForm.items.map((item) => ({
+        product_id: item.product_id,
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        tax_rate: item.tax_rate,
+      }))
+      const commonPayload: QuotationUpdateRequest = {
         tax_rate: quotationForm.tax_rate,
         discount: quotationForm.discount,
-        items: [],
+        valid_until: quotationForm.valid_until?.toISOString() ?? null,
+        items: itemPayload,
       }
-      if (quotationForm.valid_until) {
-        payload.valid_until = quotationForm.valid_until.toISOString()
+
+      if (quotationMode.value === 'edit' && quotationEditId.value) {
+        await quotationApi.update(quotationEditId.value, commonPayload)
+      } else {
+        const payload: QuotationCreateRequest = {
+          ...commonPayload,
+          proposal_id: quotationForm.proposal_id,
+        }
+        await quotationApi.create(payload)
       }
-      await quotationApi.create(payload)
-      ElMessage.success('操作成功')
+      ElMessage.success(quotationMode.value === 'edit' ? '更新成功' : '创建成功')
       showQuotationDialog.value = false
       fetchQuotations()
     } catch {
@@ -480,18 +743,16 @@ const handleQuotationSubmit = async () => {
 const handleShareSubmit = async () => {
   shareLoading.value = true
   try {
-    const payload: Record<string, unknown> = {
+    const payload: ShareCreateRequest = {
       share_type: shareForm.share_type,
       target_id: shareForm.target_id,
-      creator_id: shareForm.creator_id,
     }
     if (shareForm.password) payload.password = shareForm.password
     if (shareForm.expire_hours) payload.expire_hours = shareForm.expire_hours
     if (shareForm.max_access_count) payload.max_access_count = shareForm.max_access_count
 
     const res = await shareApi.create(payload)
-    const data = res.data
-    shareResultUrl.value = window.location.origin + data.share_url
+    shareResultUrl.value = res.data.share_url || '/'
     showShareDialog.value = false
     showShareResult.value = true
   } catch {
@@ -501,7 +762,7 @@ const handleShareSubmit = async () => {
   }
 }
 
-const handleExportPdf = async (row: any) => {
+const handleExportPdf = async (row: Quotation) => {
   try {
     const pdf = await quotationApi.exportPdf(row.id)
     const url = URL.createObjectURL(new Blob([pdf], { type: 'application/pdf' }))
@@ -516,26 +777,34 @@ const handleExportPdf = async (row: any) => {
   }
 }
 
-const copyShareUrl = () => {
-  navigator.clipboard.writeText(shareResultUrl.value).then(() => {
-    ElMessage.success('已复制到剪贴板')
-  }).catch(() => {
-    ElMessage.error('复制失败')
-  })
-}
-
-const openShareUrl = () => {
-  window.open(shareResultUrl.value, '_blank')
-}
-
 const prefillProposalId = computed(() => route.query.proposal_id as string | undefined)
 
 onMounted(() => {
-  if (prefillProposalId.value) {
-    queryParams.proposal_id = prefillProposalId.value
-    quotationForm.proposal_id = prefillProposalId.value
+  const pid = prefillProposalId.value
+  if (pid) {
+    quotationForm.proposal_id = pid
     quotationMode.value = 'create'
-    showQuotationDialog.value = true
+    // Fetch proposal to prefill items
+    Promise.resolve().then(async () => {
+      try {
+        const res = await proposalApi.get(pid)
+        quotationForm.items = res.data.items.map((item) => ({
+          product_id: item.product_id,
+          quantity: item.quantity,
+          unit_price: item.face_price ?? 0,
+          tax_rate: quotationForm.tax_rate,
+          subtotal: (item.face_price ?? 0) * item.quantity,
+          product_name: item.product_name,
+          product_no: item.product_no,
+          face_price: item.face_price,
+          cover_image_url: item.cover_image_url,
+        }))
+        showQuotationDialog.value = true
+      } catch {
+        ElMessage.warning('预填方案数据失败，请手动填写')
+        showQuotationDialog.value = true
+      }
+    })
   }
   fetchQuotations()
 })
@@ -732,6 +1001,18 @@ onMounted(() => {
   font-size: 12px;
 }
 
+.proposal-no {
+  font-family: monospace;
+  font-size: 13px;
+  color: var(--text-primary);
+  margin-right: 6px;
+}
+
+.proposal-name {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
 /* ===== Pagination ===== */
 .pagination-wrap {
   margin-top: 20px;
@@ -791,6 +1072,180 @@ onMounted(() => {
 
 .full-width {
   width: 100%;
+}
+
+/* ===== Quotation items table ===== */
+.quote-items-header,
+.quote-item-row {
+  display: grid;
+  grid-template-columns: 2fr 0.6fr 0.8fr 0.7fr 0.9fr 0.9fr;
+  gap: 8px;
+  align-items: center;
+}
+
+.quote-items-header {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(30, 50, 90, 0.08);
+  margin-bottom: 6px;
+}
+
+.quote-items-header .quote-col-product,
+.quote-item-row .quote-col-product { padding-right: 8px; }
+.quote-items-header .quote-col-qty,
+.quote-item-row .quote-col-qty { text-align: center; }
+.quote-items-header .quote-col-price,
+.quote-item-row .quote-col-price { text-align: right; }
+.quote-items-header .quote-col-tax,
+.quote-item-row .quote-col-tax { text-align: center; }
+.quote-items-header .quote-col-subtotal,
+.quote-item-row .quote-col-subtotal { text-align: right; }
+.quote-items-header .quote-col-total,
+.quote-item-row .quote-col-total { text-align: right; }
+
+.quote-item-row {
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(30, 50, 90, 0.04);
+}
+
+.quote-item-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.product-cover {
+  flex-shrink: 0;
+}
+
+.product-thumb-img {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: var(--brand-lighter);
+}
+
+.quote-product-name {
+  font-weight: 600;
+  color: var(--brand-deep);
+  font-size: 13px;
+  display: block;
+}
+
+.quote-product-no {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-family: monospace;
+  display: block;
+}
+
+.quote-face-price {
+  font-size: 11px;
+  color: var(--text-secondary);
+  display: block;
+}
+
+.subtotal-text {
+  font-family: monospace;
+  color: var(--brand-deep);
+  font-weight: 600;
+}
+
+/* ===== Quotation totals ===== */
+.quote-totals {
+  margin-top: 12px;
+  padding: 12px 16px;
+  background: var(--brand-lighter);
+  border-radius: var(--radius-sm);
+}
+
+.totals-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+}
+
+.totals-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.totals-value {
+  font-family: monospace;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.totals-final .totals-label {
+  font-weight: 600;
+  color: var(--brand-deep);
+}
+
+.totals-final .totals-value {
+  font-weight: 700;
+  color: var(--brand-deep);
+  font-size: 16px;
+}
+
+/* ===== View dialog ===== */
+.glass-descriptions {
+  margin-top: 16px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.glass-descriptions :deep(.el-descriptions__label) {
+  background: var(--brand-lighter);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.glass-descriptions :deep(.el-descriptions__content) {
+  color: var(--text-primary);
+}
+
+.items-table {
+  width: 100%;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.items-table :deep(.el-table__header-wrapper) {
+  background: var(--brand-lighter);
+}
+
+.items-table :deep(.el-table__header th) {
+  background: var(--brand-lighter);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.items-table :deep(.el-table__row:hover td) {
+  background: var(--brand-lighter);
+}
+
+.product-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.product-cell-name {
+  font-weight: 600;
+  color: var(--brand-deep);
+  font-size: 13px;
+  display: block;
+}
+
+.product-cell-no {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-family: monospace;
+  display: block;
 }
 
 /* ===== Share ===== */
@@ -876,6 +1331,18 @@ onMounted(() => {
 
   .pagination-wrap {
     justify-content: center;
+  }
+
+  /* Mobile: stack quotation items */
+  .quote-items-header,
+  .quote-item-row {
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+
+  .quote-items-header .quote-col-product,
+  .quote-items-header .quote-col-qty {
+    grid-column: span 2;
   }
 }
 </style>

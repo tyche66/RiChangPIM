@@ -20,6 +20,11 @@ class Settings(BaseSettings):
     APP_NAME: str = "AI-PIM"
     DEBUG: bool = False
     VERSION: str = "0.1.0"
+    APP_VERSION: str | None = None
+    BUILD_ID: str = "dev-local"
+    GIT_COMMIT: str = "unknown"
+    BUILD_TIME: str = "unknown"
+    APP_ENV: str = "development"
 
     DATABASE_URL: str
     DB_POOL_SIZE: int = 10
@@ -54,6 +59,8 @@ class Settings(BaseSettings):
     AI_RAG_MIN_SCORE: float = 0.65
     AI_RAG_CHUNK_SIZE: int = 600
     AI_RAG_CHUNK_OVERLAP: int = 80
+
+    SHARE_IMAGE_URL_EXPIRE_HOURS: int = 24
 
 
 settings = Settings()

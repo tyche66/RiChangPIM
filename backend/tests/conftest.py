@@ -214,19 +214,51 @@ async def client(_engine, _sessionmaker, integration_setup_db):
 
     # 让审计等直接用 AsyncSessionLocal 的模块也指向「当前测试 loop」的引擎，
     # 否则跨 loop 使用异步引擎会抛 MissingGreenlet。
-    _db_mod.engine = _engine
-    _db_mod.AsyncSessionLocal = _sessionmaker
+    _original_engine = _db_mod.engine
+    _original_sessionmaker = _db_mod.AsyncSessionLocal
+    try:
+        _db_mod.engine = _engine
+        _db_mod.AsyncSessionLocal = _sessionmaker
 
-    async def override_get_db():
-        async with _sessionmaker() as session:
-            yield session
+        async def override_get_db():
+            async with _sessionmaker() as session:
+                yield session
 
-    app.dependency_overrides[get_db] = override_get_db
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as ac:
-        yield ac
-    app.dependency_overrides.pop(get_db, None)
+        app.dependency_overrides[get_db] = override_get_db
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as ac:
+            yield ac
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+        # 恢复原始全局引用，防止已 dispose 的引擎/连接在后续测试中引发
+        # 跨 event-loop 的关闭错误。
+        _db_mod.engine = _original_engine
+        _db_mod.AsyncSessionLocal = _original_sessionmaker
+
+
+@pytest.fixture
+async def db(_sessionmaker):
+    """Async DB session with auto-rollback for integration tests.
+
+    Each test gets a session with auto-rollback on teardown. Tests that
+    explicitly call ``await db.commit()`` will persist changes — use sparingly.
+    """
+    session = _sessionmaker()
+    try:
+        yield session
+    finally:
+        # 仅在有活跃事务时回滚，避免已 commit 后再次 rollback 引发 PendingRollbackError；
+        # 用 try/except 吞掉 teardown 阶段可能的跨 loop/引擎已 dispose 异常。
+        try:
+            if session.get_transaction():
+                await session.rollback()
+        except Exception:
+            pass
+        try:
+            await session.close()
+        except Exception:
+            pass
 
 
 @pytest.mark.anyio

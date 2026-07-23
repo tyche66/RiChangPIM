@@ -40,10 +40,13 @@ def upgrade() -> None:
             sa.text(
                 """
                 INSERT INTO permission (id, perm_code, perm_name, resource, action, type, is_deleted)
-                SELECT :id, :perm_code, :perm_name, :resource, :action, :type, false
-                WHERE NOT EXISTS (
-                    SELECT 1 FROM permission WHERE perm_code = :perm_code AND is_deleted = false
-                )
+                VALUES (:id, :perm_code, :perm_name, :resource, :action, :type, false)
+                ON CONFLICT (perm_code) DO UPDATE
+                SET is_deleted = false,
+                    perm_name = EXCLUDED.perm_name,
+                    resource = EXCLUDED.resource,
+                    action = EXCLUDED.action,
+                    type = EXCLUDED.type
                 """
             ),
             {

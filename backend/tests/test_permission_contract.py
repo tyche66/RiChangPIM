@@ -40,10 +40,11 @@ EXPECTED_ROUTE_PERMISSIONS = {
     ("POST", "/api/v1/quotations"): "quotation:create",
     ("PUT", "/api/v1/quotations/{quotation_id}"): "quotation:edit",
     ("POST", "/api/v1/quotations/{quotation_id}/confirm"): "quotation:confirm",
-    ("POST", "/api/v1/files/upload"): "file:upload",
-    ("DELETE", "/api/v1/files/{attachment_id}"): "file:delete",
-    ("GET", "/api/v1/files/{attachment_id}/download"): "file:view",
-    ("GET", "/api/v1/files/{attachment_id}/preview"): "file:view",
+    ("POST", "/api/v1/files/upload"): "media:upload",
+    ("DELETE", "/api/v1/files/{attachment_id}"): "media:delete",
+    ("GET", "/api/v1/files/{attachment_id}/download"): "media:view",
+    ("GET", "/api/v1/files/{attachment_id}/preview"): "media:view",
+    ("GET", "/api/v1/files"): "media:view",
     ("GET", "/api/v1/stats/shares"): "stats:view",
     ("GET", "/api/v1/stats/products/hot"): "stats:view",
     ("POST", "/api/v1/products/{product_id}/clone"): "product:clone",
@@ -94,12 +95,13 @@ def _migration_permissions():
     """从 seed migration 和后续权限 migration 加载 PERMISSIONS。"""
     versions_dir = pathlib.Path(__file__).resolve().parent.parent / "alembic" / "versions"
     permissions = []
-    for filename in ("0004_seed_data.py", "0008_v11_audit_workflow_ocr.py"):
+    for filename in ("0004_seed_data.py", "0008_v11_audit_workflow_ocr.py", "0011_add_media_permissions.py"):
         path = versions_dir / filename
         spec = importlib.util.spec_from_file_location(f"_mig_{filename}", path)
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
         permissions.extend(getattr(mod, "PERMISSIONS", []))
+        permissions.extend(getattr(mod, "NEW_PERMISSIONS", []))
     return permissions
 
 
@@ -136,11 +138,11 @@ def test_route_permissions_are_subset_of_seed_permissions():
 
 
 def test_route_permissions_are_subset_of_migration_permissions():
-    """自动化断言：新增路由引用的权限码 ⊆ 0004 迁移 PERMISSIONS。"""
+    """自动化断言：新增路由引用的权限码 ⊆ 已发布迁移 PERMISSIONS。"""
     mig_codes = {p[0] for p in _migration_permissions()}
     used = set(EXPECTED_ROUTE_PERMISSIONS.values())
     missing = used - mig_codes
-    assert not missing, f"以下权限码不在 0004_seed_data 迁移 PERMISSIONS 中: {missing}"
+    assert not missing, f"以下权限码不在已发布迁移 PERMISSIONS 中: {missing}"
 
 
 def test_products_export_registered_before_dynamic_id():

@@ -215,7 +215,7 @@ async def test_share_access_route_writes_log_and_filters_cost_price(client):
             "items": [{"product_id": str(product_id), "quantity": 2}],
         },
     )
-    proposal_id = proposal["id"]
+    proposal_id = proposal["data"]["id"]
 
     share = await _create(
         client,
