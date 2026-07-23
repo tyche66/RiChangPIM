@@ -4,10 +4,26 @@ from datetime import UTC
 import pytest
 from sqlalchemy import select
 
+from app.api.v1.share_token import _create_share_content_url
+from app.core.security import decode_access_token
 from app.models.audit import OperationLog, Share, ShareLog, ShareToken
 from app.models.user import User
 
 pytestmark = pytest.mark.anyio
+
+
+def test_share_content_url_uses_backend_proxy():
+    attachment_id = uuid.uuid4()
+
+    url = _create_share_content_url(attachment_id)
+
+    assert url.startswith(f"/api/v1/files/{attachment_id}/content?token=")
+    assert "minio" not in url
+    token = url.split("token=", 1)[1]
+    payload = decode_access_token(token)
+    assert payload is not None
+    assert payload["scope"] == "file_content"
+    assert payload["attachment_id"] == str(attachment_id)
 
 
 async def _seed_admin_user_id(session):
