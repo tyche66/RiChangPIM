@@ -15,7 +15,50 @@ env:
   NODE_VERSION: "20"
   PG16_IMAGE: pgvector/pgvector:pg16
 
+# Generate build metadata once for the entire workflow
 jobs:
+  build-metadata:
+    runs-on: ubuntu-latest
+    outputs:
+      app_version: ${{ steps.meta.outputs.app_version }}
+      build_id: ${{ steps.meta.outputs.build_id }}
+      git_commit: ${{ steps.meta.outputs.git_commit }}
+      build_time: ${{ steps.meta.outputs.build_time }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Generate build metadata
+        id: meta
+        run: |
+          # Version from package.json (frontend) or git tag
+          if git describe --tags --exact-match 2>/dev/null; then
+            APP_VERSION=$(git describe --tags --exact-match)
+          elif git describe --tags --always 2>/dev/null; then
+            APP_VERSION=$(git describe --tags --always)
+          else
+            APP_VERSION="1.0.3"
+          fi
+
+          # Build ID: use GitHub run ID for CI builds
+          BUILD_ID="ci-${{ github.run_id }}"
+
+          # Git commit (short)
+          GIT_COMMIT=$(git rev-parse --short HEAD)
+
+          # Build time (ISO 8601 UTC)
+          BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+          echo "app_version=${APP_VERSION}" >> $GITHUB_OUTPUT
+          echo "build_id=${BUILD_ID}" >> $GITHUB_OUTPUT
+          echo "git_commit=${GIT_COMMIT}" >> $GITHUB_OUTPUT
+          echo "build_time=${BUILD_TIME}" >> $GITHUB_OUTPUT
+
+          echo "APP_VERSION=${APP_VERSION}"
+          echo "BUILD_ID=${BUILD_ID}"
+          echo "GIT_COMMIT=${GIT_COMMIT}"
+          echo "BUILD_TIME=${BUILD_TIME}"
+
   # ---------------------------------------------------------------------------
   # Backend: ruff + compileall + full pytest (with PG16/Redis/MinIO services)
   # ---------------------------------------------------------------------------
@@ -181,7 +224,7 @@ jobs:
           name: migration-baseline-hashes
           path: backend/migration_baseline/hashes.txt
 
-  # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
   # Frontend: typecheck + lint (no --fix) + vitest + production build + audit
   # ---------------------------------------------------------------------------
   frontend-typecheck:
@@ -240,6 +283,12 @@ jobs:
 
   frontend-build:
     runs-on: ubuntu-latest
+    needs: build-metadata
+    env:
+      APP_VERSION: ${{ needs.build-metadata.outputs.app_version }}
+      BUILD_ID: ${{ needs.build-metadata.outputs.build_id }}
+      GIT_COMMIT: ${{ needs.build-metadata.outputs.git_commit }}
+      BUILD_TIME: ${{ needs.build-metadata.outputs.build_time }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -252,6 +301,11 @@ jobs:
         run: npm ci
       - name: Production build
         working-directory: frontend
+        env:
+          VITE_APP_VERSION: ${{ env.APP_VERSION }}
+          VITE_BUILD_ID: ${{ env.BUILD_ID }}
+          VITE_GIT_COMMIT: ${{ env.GIT_COMMIT }}
+          VITE_BUILD_TIME: ${{ env.BUILD_TIME }}
         run: npm run build
       - name: npm audit (HIGH/CRITICAL fail) --production deps only
         working-directory: frontend
@@ -264,15 +318,50 @@ jobs:
           path: frontend/dist
 
   # ---------------------------------------------------------------------------
+  # Backend: Docker build with build metadata
+  # ---------------------------------------------------------------------------
+  backend-build:
+    runs-on: ubuntu-latest
+    needs: build-metadata
+    env:
+      APP_VERSION: ${{ needs.build-metadata.outputs.app_version }}
+      BUILD_ID: ${{ needs.build-metadata.outputs.build_id }}
+      GIT_COMMIT: ${{ needs.build-metadata.outputs.git_commit }}
+      BUILD_TIME: ${{ needs.build-metadata.outputs.build_time }}
+      APP_ENV: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build backend Docker image
+        working-directory: backend
+        run: |
+          docker build \
+            --build-arg APP_VERSION="${APP_VERSION}" \
+            --build-arg BUILD_ID="${BUILD_ID}" \
+            --build-arg GIT_COMMIT="${GIT_COMMIT}" \
+            --build-arg BUILD_TIME="${BUILD_TIME}" \
+            --build-arg APP_ENV="${APP_ENV}" \
+            -t ai-pim-backend:${APP_VERSION} \
+            -t ai-pim-backend:${BUILD_ID} \
+            .
+
+  # ---------------------------------------------------------------------------
   # Compose static validation (no real DB env required)
   # ---------------------------------------------------------------------------
   compose-validation:
     runs-on: ubuntu-latest
+    needs: build-metadata
     env:
       POSTGRES_PASSWORD: ci-placeholder
       MINIO_ROOT_USER: ci-placeholder
       MINIO_ROOT_PASSWORD: ci-placeholder
       JWT_SECRET: ci-placeholder
+      APP_VERSION: ${{ needs.build-metadata.outputs.app_version }}
+      BUILD_ID: ${{ needs.build-metadata.outputs.build_id }}
+      GIT_COMMIT: ${{ needs.build-metadata.outputs.git_commit }}
+      BUILD_TIME: ${{ needs.build-metadata.outputs.build_time }}
+      APP_ENV: production
     steps:
       - uses: actions/checkout@v4
       - name: Set up Docker Compose

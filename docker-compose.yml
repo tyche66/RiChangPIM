@@ -22,6 +22,8 @@ services:
         GIT_COMMIT: ${GIT_COMMIT:-unknown}
         BUILD_TIME: ${BUILD_TIME:-unknown}
         APP_ENV: ${APP_ENV:-production}
+    ports:
+      - "8000:8000"
     environment:
       - DATABASE_URL=postgresql://pim:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/ai_pim
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}

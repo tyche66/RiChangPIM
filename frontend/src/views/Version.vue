@@ -69,10 +69,10 @@
             <span>FRONTEND</span><strong>前端构建</strong>
           </template>
           <dl>
-            <div><dt>版本</dt><dd>{{ frontendBuild.version }}</dd></div>
-            <div><dt>构建 ID</dt><dd>{{ frontendBuild.buildId }}</dd></div>
-            <div><dt>Git commit</dt><dd>{{ frontendBuild.gitCommit }}</dd></div>
-            <div><dt>构建时间</dt><dd>{{ frontendBuild.buildTime }}</dd></div>
+            <div><dt>版本</dt><dd>{{ formatValue(frontendBuild.version) }}</dd></div>
+            <div><dt>构建 ID</dt><dd>{{ formatValue(frontendBuild.buildId) }}</dd></div>
+            <div><dt>Git commit</dt><dd>{{ formatValue(frontendBuild.gitCommit) }}</dd></div>
+            <div><dt>构建时间</dt><dd>{{ formatValue(frontendBuild.buildTime) }}</dd></div>
           </dl>
         </el-card>
         <el-card
@@ -83,12 +83,12 @@
             <span>BACKEND</span><strong>后台运行实例</strong>
           </template>
           <dl>
-            <div><dt>版本</dt><dd>{{ backend?.backend_version || 'unknown' }}</dd></div>
-            <div><dt>构建 ID</dt><dd>{{ backend?.build_id || 'unknown' }}</dd></div>
-            <div><dt>Git commit</dt><dd>{{ backend?.git_commit || 'unknown' }}</dd></div>
-            <div><dt>构建时间</dt><dd>{{ backend?.build_time || 'unknown' }}</dd></div>
-            <div><dt>环境</dt><dd>{{ backend?.environment || 'unknown' }}</dd></div>
-            <div><dt>API</dt><dd>{{ backend?.api_version || 'unknown' }}</dd></div>
+            <div><dt>版本</dt><dd>{{ formatValue(backend?.backend_version) }}</dd></div>
+            <div><dt>构建 ID</dt><dd>{{ formatValue(backend?.build_id) }}</dd></div>
+            <div><dt>Git commit</dt><dd>{{ formatValue(backend?.git_commit) }}</dd></div>
+            <div><dt>构建时间</dt><dd>{{ formatValue(backend?.build_time) }}</dd></div>
+            <div><dt>环境</dt><dd>{{ formatValue(backend?.environment) }}</dd></div>
+            <div><dt>API</dt><dd>{{ formatValue(backend?.api_version) }}</dd></div>
           </dl>
         </el-card>
       </div>
@@ -117,6 +117,14 @@ const backend = ref<BackendVersion | null>(null)
 const loading = ref(false)
 const error = ref(false)
 const lastChecked = ref('')
+
+function formatValue(value: string | undefined | null): string {
+  if (!value || value === 'unknown' || value === 'undefined' || value === 'dev' || value === 'dev-local') {
+    return '—'
+  }
+  return value
+}
+
 const comparison = computed<'match' | 'mismatch' | 'unknown'>(() => {
   if (!backend.value) return 'unknown'
   return compareBuilds(frontendBuild, backend.value)

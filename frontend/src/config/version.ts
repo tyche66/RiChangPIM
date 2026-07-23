@@ -3,15 +3,15 @@ import packageInfo from '../../package.json'
 const configuredVersion = import.meta.env.VITE_APP_VERSION
 
 export const frontendBuild = {
-  version: configuredVersion || packageInfo.version || 'dev',
-  buildId: import.meta.env.VITE_BUILD_ID || 'dev-local',
-  gitCommit: import.meta.env.VITE_GIT_COMMIT || 'unknown',
-  buildTime: import.meta.env.VITE_BUILD_TIME || 'unknown',
+  version: configuredVersion && configuredVersion !== 'undefined' ? configuredVersion : packageInfo.version || 'dev',
+  buildId: (import.meta.env.VITE_BUILD_ID && import.meta.env.VITE_BUILD_ID !== 'undefined') ? import.meta.env.VITE_BUILD_ID : 'dev-local',
+  gitCommit: (import.meta.env.VITE_GIT_COMMIT && import.meta.env.VITE_GIT_COMMIT !== 'undefined') ? import.meta.env.VITE_GIT_COMMIT : 'unknown',
+  buildTime: (import.meta.env.VITE_BUILD_TIME && import.meta.env.VITE_BUILD_TIME !== 'undefined') ? import.meta.env.VITE_BUILD_TIME : 'unknown',
 }
 
 export type VersionStatus = 'match' | 'mismatch' | 'unknown'
 
-const missing = (value?: string) => !value || ['unknown', 'dev', 'dev-local'].includes(value.toLowerCase())
+const missing = (value?: string) => !value || ['unknown', 'dev', 'dev-local', 'undefined'].includes(value.toLowerCase())
 
 export function compareBuilds(
   frontend: { version?: string; buildId?: string; gitCommit?: string },
