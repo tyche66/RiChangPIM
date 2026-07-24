@@ -25,6 +25,9 @@ export default defineConfig(({ mode }) => {
       },
     },
   },
+  preview: {
+    allowedHosts: ['.tail7a5d7a.ts.net', 'localhost', '127.0.0.1'],
+  },
   build: {
     outDir: 'dist',
     sourcemap: false,
