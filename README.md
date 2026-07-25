@@ -108,6 +108,33 @@ npm install
 npm run dev
 ```
 
+### 演示模式（Tailscale 公网）
+
+如果需要把完整 PIM 演示到公网，推荐使用仓库内置的演示服务器：
+
+```bash
+# WSL / Linux 侧启动演示服务器
+./scripts/start_demo.sh
+
+# 停止演示服务器
+./scripts/stop_demo.sh
+```
+
+Windows 管理员 PowerShell 侧执行端口转发：
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+.\scripts\windows_demo_ports.ps1
+```
+
+然后在 Windows 侧启动 Funnel：
+
+```powershell
+tailscale funnel 3001
+```
+
+公网入口会落到前端，同源 `/api` 会由演示服务器转发到后端，因此产品图片、文件上传、分享页等功能都可以走完整链路。
+
 开发环境默认端口：
 
 - 前端：Vite 默认端口，通常为 `5173`

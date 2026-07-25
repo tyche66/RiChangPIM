@@ -97,6 +97,9 @@
           <el-menu-item index="/manuals">
             产品知识库
           </el-menu-item>
+          <el-menu-item index="/knowledge-debug">
+            Gateway 调试
+          </el-menu-item>
           <el-menu-item index="/import">
             批量导入
           </el-menu-item>
@@ -184,6 +187,7 @@ const subMenuMap: Record<string, string> = {
   logs: 'm-admin',
   'ai-select': 'm-ai',
   manuals: 'm-ai',
+  'knowledge-debug': 'm-ai',
   import: 'm-ai',
 }
 const defaultOpenedMenus = computed(() => {
@@ -225,6 +229,7 @@ const routeLabels: Record<string, [string, string]> = {
   logs: ['系统管理', '操作日志'],
   'ai-select': ['AI 功能', '智能选品'],
   manuals: ['AI 功能', '产品知识库'],
+  'knowledge-debug': ['AI 功能', 'Gateway 调试'],
   import: ['AI 功能', '批量导入'],
   version: ['系统信息', '版本'],
 }

@@ -59,6 +59,19 @@ class Settings(BaseSettings):
     AI_RAG_MIN_SCORE: float = 0.65
     AI_RAG_CHUNK_SIZE: int = 600
     AI_RAG_CHUNK_OVERLAP: int = 80
+    AI_QUOTA_CHECK_ENABLED: bool = False
+    AI_QUOTA_CHECKER_BACKEND: str = "noop"
+    AI_LIMIT_TPS: int | None = None
+    AI_LIMIT_CONCURRENT_STREAMS: int | None = None
+    AI_LIMIT_USER_PER_MIN: int | None = None
+    AI_LIMIT_USER_PER_DAY: int | None = None
+    AI_LIMIT_USER_DAILY_TOKENS: int | None = None
+    AI_LIMIT_USER_DAILY_COST_USD: float | None = None
+    AI_LIMIT_SYSTEM_DAILY_COST_USD: float | None = None
+    AI_BUDGET_NOTIFY_RATIO: float = 0.8
+    AI_BUDGET_DISABLE_RATIO: float = 1.0
+    AI_ESTIMATED_PRICE_TABLE_PATH: str | None = None
+    AI_PRICING_BACKEND: str | None = None
 
     SHARE_IMAGE_URL_EXPIRE_HOURS: int = 24
 

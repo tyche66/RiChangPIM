@@ -16,6 +16,7 @@ from app.api.v1 import (
     auth,
     categories,
     health,
+    knowledge,
     observability,
     products,
     proposals,
@@ -196,6 +197,7 @@ app.include_router(proposals.router, prefix="/api/v1/proposals", tags=["proposal
 app.include_router(shares.router, prefix="/api/v1/shares", tags=["shares"])
 app.include_router(share_token.router, prefix="/api/v1", tags=["shares"])
 app.include_router(ai.router, prefix="/api/v1/ai", tags=["ai"])
+app.include_router(knowledge.router, prefix="/api/v1/knowledge", tags=["knowledge"])
 app.include_router(audit.router, prefix="/api/v1/audit", tags=["audit"])
 app.include_router(quotations_router, prefix="/api/v1/quotations", tags=["quotations"])
 app.include_router(files_router, prefix="/api/v1/files", tags=["files"])

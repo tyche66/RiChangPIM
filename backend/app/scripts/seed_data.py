@@ -95,6 +95,13 @@ PERMISSIONS = [
     ("stats:view", "统计查看", "stats", "view", "read"),
     ("audit:view", "审计日志查看", "audit", "view", "read"),
     ("ai:use", "AI 能力使用", "ai", "use", "write"),
+    ("ai:access", "AI 助手访问", "ai", "access", "read"),
+    ("ai:product", "AI 产品查询", "ai", "product", "read"),
+    ("ai:knowledge", "AI 知识问答", "ai", "knowledge", "read"),
+    ("ai:quality", "AI 质量查询", "ai", "quality", "read"),
+    ("ai:procurement", "AI 采购查询", "ai", "procurement", "read"),
+    ("knowledge:manage", "知识索引管理", "knowledge", "manage", "write"),
+    ("knowledge:debug", "知识调试", "knowledge", "debug", "read"),
 ]
 
 # 角色 -> 权限映射；"*" 表示全部权限点
@@ -132,6 +139,11 @@ ROLE_PERMISSIONS = {
         "media:delete",
         "media:replace",
         "stats:view",
+        "ai:access",
+        "ai:product",
+        "ai:knowledge",
+        "ai:quality",
+        "ai:procurement",
     ],
     "sales": [
         "product:view",
@@ -151,6 +163,9 @@ ROLE_PERMISSIONS = {
         "file:upload",
         "stats:view",
         "ai:use",
+        "ai:access",
+        "ai:product",
+        "ai:knowledge",
         "scene_image:view",
         "scene_image:create",
         "scene_image:edit",
@@ -161,6 +176,8 @@ ROLE_PERMISSIONS = {
         "stats:view",
         "media:view",
         "scene_image:view",
+        "ai:access",
+        "ai:knowledge",
     ],
 }
 
