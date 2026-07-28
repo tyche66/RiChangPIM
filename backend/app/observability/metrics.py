@@ -218,6 +218,64 @@ _volume_threshold_bytes = _Gauge(
     ("target",),
 )
 
+_knowledge_query_total = _Counter(
+    "pim_ai_query_total",
+    "Knowledge Gateway queries by intent and status.",
+    ("intent", "status"),
+)
+_knowledge_query_duration_seconds = _Histogram(
+    "pim_ai_query_duration_seconds",
+    "Knowledge Gateway query duration in seconds.",
+)
+_knowledge_retrieval_duration_seconds = _Histogram(
+    "pim_ai_retrieval_duration_seconds",
+    "Knowledge retrieval duration in seconds.",
+)
+_knowledge_retrieval_candidates = _Gauge(
+    "pim_ai_retrieval_candidates",
+    "Knowledge retrieval candidate count by channel.",
+    ("channel",),
+)
+_knowledge_retrieval_no_result_total = _Counter(
+    "pim_ai_retrieval_no_result_total",
+    "Knowledge retrieval empty-result count.",
+    (),
+)
+_knowledge_citation_count = _Gauge(
+    "pim_ai_citation_count",
+    "Number of citations attached to the latest observed response per outcome bucket.",
+    ("status",),
+)
+_knowledge_insufficient_sources_total = _Counter(
+    "pim_ai_insufficient_sources_total",
+    "Knowledge responses marked insufficient_sources.",
+    (),
+)
+_knowledge_jobs_total = _Counter(
+    "pim_knowledge_jobs_total",
+    "Knowledge indexing jobs by operation and terminal status.",
+    ("operation", "status"),
+)
+_knowledge_job_duration_seconds = _Histogram(
+    "pim_knowledge_job_duration_seconds",
+    "Knowledge indexing stage duration in seconds.",
+)
+_knowledge_queue_depth = _Gauge(
+    "pim_knowledge_queue_depth",
+    "Knowledge pending queue depth by priority bucket.",
+    ("priority",),
+)
+_knowledge_dead_jobs = _Gauge(
+    "pim_knowledge_dead_jobs",
+    "Number of dead knowledge jobs.",
+    (),
+)
+_knowledge_chunks_active = _Gauge(
+    "pim_knowledge_chunks_active",
+    "Number of active knowledge chunks.",
+    (),
+)
+
 
 # ---------------------------------------------------------------------------
 # Public API
@@ -258,6 +316,41 @@ def set_volume_free(target: str, free_bytes: int, threshold_bytes: int) -> None:
     _volume_threshold_bytes.set({"target": target}, float(threshold_bytes))
 
 
+def observe_ai_query(intent: str, status: str, duration_seconds: float) -> None:
+    _knowledge_query_total.inc({"intent": intent, "status": status})
+    _knowledge_query_duration_seconds.observe(duration_seconds)
+
+
+def observe_retrieval(channel: str, duration_seconds: float, candidates: int) -> None:
+    _knowledge_retrieval_duration_seconds.observe(duration_seconds)
+    _knowledge_retrieval_candidates.set({"channel": channel}, float(candidates))
+    if candidates <= 0:
+        _knowledge_retrieval_no_result_total.inc({})
+
+
+def set_citation_count(status: str, count: int) -> None:
+    _knowledge_citation_count.set({"status": status}, float(count))
+    if count <= 0:
+        _knowledge_insufficient_sources_total.inc({})
+
+
+def observe_knowledge_job(operation: str, status: str, duration_seconds: float) -> None:
+    _knowledge_jobs_total.inc({"operation": operation, "status": status})
+    _knowledge_job_duration_seconds.observe(duration_seconds)
+
+
+def set_knowledge_queue_depth(priority: str, depth: int) -> None:
+    _knowledge_queue_depth.set({"priority": priority}, float(depth))
+
+
+def set_knowledge_dead_jobs(count: int) -> None:
+    _knowledge_dead_jobs.set({}, float(count))
+
+
+def set_knowledge_chunks_active(count: int) -> None:
+    _knowledge_chunks_active.set({}, float(count))
+
+
 def render_text() -> str:
     """Full Prometheus exposition text payload (version 1.0)."""
     parts: list[str] = []
@@ -272,6 +365,18 @@ def render_text() -> str:
     parts.extend(_backup_status.render())
     parts.extend(_volume_free_bytes.render())
     parts.extend(_volume_threshold_bytes.render())
+    parts.extend(_knowledge_query_total.render())
+    parts.extend(_knowledge_query_duration_seconds.render())
+    parts.extend(_knowledge_retrieval_duration_seconds.render())
+    parts.extend(_knowledge_retrieval_candidates.render())
+    parts.extend(_knowledge_retrieval_no_result_total.render())
+    parts.extend(_knowledge_citation_count.render())
+    parts.extend(_knowledge_insufficient_sources_total.render())
+    parts.extend(_knowledge_jobs_total.render())
+    parts.extend(_knowledge_job_duration_seconds.render())
+    parts.extend(_knowledge_queue_depth.render())
+    parts.extend(_knowledge_dead_jobs.render())
+    parts.extend(_knowledge_chunks_active.render())
     parts.append("")
     return "\n".join(parts)
 
@@ -286,7 +391,14 @@ __all__ = [
     "reset",
     "set_backup_status",
     "set_db_pool",
+    "set_citation_count",
+    "set_knowledge_chunks_active",
+    "set_knowledge_dead_jobs",
+    "set_knowledge_queue_depth",
     "set_volume_free",
+    "observe_ai_query",
+    "observe_knowledge_job",
+    "observe_retrieval",
 ]
 
 
@@ -308,3 +420,18 @@ def reset() -> None:
     _backup_status.values.clear()
     _volume_free_bytes.values.clear()
     _volume_threshold_bytes.values.clear()
+    _knowledge_query_total.values.clear()
+    _knowledge_query_duration_seconds.counts = {ub: 0 for ub in _knowledge_query_duration_seconds.buckets}
+    _knowledge_query_duration_seconds.sums = 0.0
+    _knowledge_retrieval_duration_seconds.counts = {ub: 0 for ub in _knowledge_retrieval_duration_seconds.buckets}
+    _knowledge_retrieval_duration_seconds.sums = 0.0
+    _knowledge_retrieval_candidates.values.clear()
+    _knowledge_retrieval_no_result_total.values.clear()
+    _knowledge_citation_count.values.clear()
+    _knowledge_insufficient_sources_total.values.clear()
+    _knowledge_jobs_total.values.clear()
+    _knowledge_job_duration_seconds.counts = {ub: 0 for ub in _knowledge_job_duration_seconds.buckets}
+    _knowledge_job_duration_seconds.sums = 0.0
+    _knowledge_queue_depth.values.clear()
+    _knowledge_dead_jobs.values.clear()
+    _knowledge_chunks_active.values.clear()

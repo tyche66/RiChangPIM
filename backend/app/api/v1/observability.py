@@ -14,6 +14,7 @@ import shutil
 import time
 
 from fastapi import APIRouter, Depends
+from sqlalchemy import text
 
 from app.core.config import settings
 from app.core.permission import PermissionChecker
@@ -42,6 +43,11 @@ async def metrics_endpoint():
     return PlainTextResponse(metrics.render_text(), media_type=metrics.CONTENT_TYPE)
 
 
+@router.get("/observability/metrics")
+async def metrics_endpoint_alias():
+    return await metrics_endpoint()
+
+
 @router.get("/ops/status")
 async def ops_status(_user=Depends(PermissionChecker("audit:view"))):
     """Operational snapshot for SREs and pilot runners.
@@ -65,6 +71,7 @@ async def ops_status(_user=Depends(PermissionChecker("audit:view"))):
     payload["volumes"] = _capacity_snapshot({
         "backups": os.environ.get("BACKUP_DIR", "backups"),
     })
+    payload["knowledge"] = await _knowledge_status_snapshot()
 
     # 5xx count in last 24h (best-effort; reads from a rolling counter that
     # the audit middleware populates — see app.middleware.audit).
@@ -108,6 +115,49 @@ async def _current_db_version() -> str:
             return str(row[0]) if row else "unknown"
     except Exception:  # noqa: BLE001
         return "unknown"
+
+
+async def _knowledge_status_snapshot() -> dict[str, object]:
+    try:
+        from app.core.database import engine
+
+        async with engine.connect() as conn:
+            pending = (
+                await conn.execute(
+                    text(
+                        "SELECT priority, count(*) FROM knowledge_index_job "
+                        "WHERE is_deleted=false AND status IN ('pending','dispatched','failed') "
+                        "GROUP BY priority"
+                    )
+                )
+            ).fetchall()
+            dead_jobs = (
+                await conn.execute(
+                    text(
+                        "SELECT count(*) FROM knowledge_index_job "
+                        "WHERE is_deleted=false AND status='dead'"
+                    )
+                )
+            ).scalar() or 0
+            active_chunks = (
+                await conn.execute(
+                    text(
+                        "SELECT count(*) FROM knowledge_chunk "
+                        "WHERE is_deleted=false"
+                    )
+                )
+            ).scalar() or 0
+        for priority, count in pending:
+            metrics.set_knowledge_queue_depth(str(priority), int(count))
+        metrics.set_knowledge_dead_jobs(int(dead_jobs))
+        metrics.set_knowledge_chunks_active(int(active_chunks))
+        return {
+            "queue_depth": {str(priority): int(count) for priority, count in pending},
+            "dead_jobs": int(dead_jobs),
+            "active_chunks": int(active_chunks),
+        }
+    except Exception:  # noqa: BLE001
+        return {"queue_depth": {}, "dead_jobs": -1, "active_chunks": -1}
 
 
 def _backup_status_snapshot() -> dict[str, object]:

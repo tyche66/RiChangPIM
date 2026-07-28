@@ -4,6 +4,8 @@ from app.api.v1.categories import router as categories_router
 from app.api.v1.files import router as files_router
 from app.api.v1.health import router as health_router
 from app.api.v1.knowledge import router as knowledge_router
+from app.api.v1.knowledge_sources import router as knowledge_sources_router
+from app.api.v1.pending_actions import router as pending_actions_router
 from app.api.v1.products import router as products_router
 from app.api.v1.proposals import router as proposals_router
 from app.api.v1.quotations import router as quotations_router
@@ -30,6 +32,8 @@ __all__ = [
     "shares_router",
     "health_router",
     "knowledge_router",
+    "knowledge_sources_router",
+    "pending_actions_router",
     "share_token_router",
     "quotations_router",
     "files_router",

@@ -8,7 +8,7 @@ from sqlalchemy.orm import selectinload
 
 from app.knowledge.tools.base import ToolContext, ToolDefinition
 from app.knowledge.tools.product import _product_card
-from app.models.product import Product
+from app.models.product import Product, ProductImage
 
 
 class QualitySummaryInput(BaseModel):
@@ -66,7 +66,13 @@ class QualityListIssuesTool:
     )
 
     async def run(self, params: QualityListIssuesInput, context: ToolContext) -> dict[str, Any]:
-        stmt = select(Product).options(selectinload(Product.brand), selectinload(Product.category), selectinload(Product.supplier), selectinload(Product.images), selectinload(Product.manuals)).where(Product.is_deleted.is_(False)).limit(params.limit)
+        stmt = select(Product).options(
+            selectinload(Product.brand),
+            selectinload(Product.category),
+            selectinload(Product.supplier),
+            selectinload(Product.images).joinedload(ProductImage.attachment),
+            selectinload(Product.manuals),
+        ).where(Product.is_deleted.is_(False)).limit(params.limit)
         rows = (await context.db.execute(stmt)).scalars().all()
         issues: list[dict[str, Any]] = []
         products: list[dict[str, Any]] = []
@@ -77,7 +83,7 @@ class QualityListIssuesTool:
                 product_issues = [i for i in product_issues if i["issue_type"] in wanted]
             if product_issues:
                 issues.extend(product_issues)
-                products.append(_product_card(p))
+                products.append(_product_card(p, context.current_user))
         return {"issues": issues[:100], "products": products[:100], "sources": [{"source_id": "db_quality_issues", "source_type": "database_fact", "title": "产品质量问题列表", "access_policy": "role_projected"}]}
 
 

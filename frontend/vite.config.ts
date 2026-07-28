@@ -10,6 +10,7 @@ export default defineConfig(({ mode }) => {
   process.env.VITE_BUILD_TIME ||= env.BUILD_TIME
 
   return {
+  base: process.env.VITE_BASE_PATH || '/',
   plugins: [vue()],
   resolve: {
     alias: {

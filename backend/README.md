@@ -37,8 +37,8 @@ alembic upgrade head
 
 `0004_seed_data` 为**数据迁移**，幂等：重复执行不会重复插入角色/权限/映射。
 
-当前 migration head 为 `0012_product_scene_image_partial_unique`。该 revision 会先将 Alembic
-版本列扩展为 `VARCHAR(64)`，以兼容长 revision ID；不要重命名已在运行数据库中记录的
+当前 migration head 为 `0014_knowledge_tables`。`0012_product_scene_image_partial_unique`
+会先将 Alembic 版本列扩展为 `VARCHAR(64)`，以兼容长 revision ID；不要重命名已在运行数据库中记录的
 revision ID。
 
 ## 4. 初始管理员
@@ -167,4 +167,39 @@ python -m app.scripts.seed_data
 ```bash
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 # API 文档: http://localhost:8000/docs
+```
+
+## 9. 测试基线
+
+后端测试统一从 `backend/` 目录执行：
+
+```bash
+PYTHONPATH=. pytest
+```
+
+测试夹具的行为边界：
+
+- 无可达 `TEST_DATABASE_URL` 时，仅 DB 集成测试跳过。
+- 测试目标库名必须包含 `test`，或显式设置 `AI_PIM_TEST_DB_APPROVED=1`。
+- `app.core.database` 要求可导入真实 `pgvector` SQLAlchemy 类型；缺失依赖时直接失败，不再静默退回普通 SQLAlchemy 类型。
+
+本地拉起测试库的最短路径：
+
+```bash
+docker compose -f ../docker-compose.dev.yml up -d postgres redis minio
+TEST_DATABASE_URL=postgresql+asyncpg://pim:${POSTGRES_PASSWORD:-pim_password}@localhost:5432/ai_pim_test \
+PYTHONPATH=. pytest
+```
+
+知识索引基线脚本：
+
+```bash
+# 派发待处理 knowledge_index_job 到 dispatched
+python -m app.scripts.knowledge_dispatcher
+
+# 处理一条 job 后退出
+python -m app.scripts.knowledge_worker --once
+
+# 持续轮询处理
+python -m app.scripts.knowledge_worker
 ```

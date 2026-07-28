@@ -9,10 +9,30 @@ from app.knowledge.entities import QueryEntities
 from app.knowledge.intent import KnowledgeIntent
 from app.knowledge.schemas import KnowledgeQueryRequest
 
-UUID_RE = re.compile(r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b")
-PRODUCT_NO_RE = re.compile(r"\b[A-Za-z][A-Za-z0-9-]{2,31}\b")
+UUID_RE = re.compile(
+    r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b"
+)
+PRODUCT_NO_RE = re.compile(r"\b[A-Za-z][A-Za-z0-9./_-]{2,63}\b")
 PRICE_RE = re.compile(r"(?:(\d+(?:\.\d+)?)\s*(?:元|块|rmb|RMB|以内|以下|以下)?)")
-SECURITY_TERMS = ("sql", "select ", "drop ", "delete ", "shell", "curl", "http://", "https://", "执行", "改库", "写入数据库")
+SECURITY_TERMS = (
+    "sql",
+    "select ",
+    "drop ",
+    "delete ",
+    "shell",
+    "curl",
+    "http://",
+    "https://",
+    "执行",
+    "改库",
+    "写入数据库",
+    "忽略权限",
+    "系统提示词",
+    "api_key",
+    "jwt_secret",
+    "连接字符串",
+    "输出所有用户的密码",
+)
 QUALITY_TERMS = {
     "待核价": "face_price_status",
     "库存未知": "stock_unknown",
@@ -23,6 +43,29 @@ QUALITY_TERMS = {
     "资料待完善": "pending",
     "待完善": "pending",
 }
+BUSINESS_TERMS = (
+    "铭达",
+    "圣奥",
+    "办公桌",
+    "班台",
+    "总裁桌",
+    "会议桌",
+    "办公椅",
+    "背柜",
+)
+KEYWORD_STOP_TERMS = (
+    "找出",
+    "找一下",
+    "帮我找",
+    "推荐",
+    "最便宜",
+    "便宜",
+    "最低价",
+    "价格最低",
+    "最长",
+    "最短",
+    "的",
+)
 
 
 class QueryPlan(BaseModel):
@@ -31,6 +74,7 @@ class QueryPlan(BaseModel):
     intent: KnowledgeIntent
     entities: QueryEntities = Field(default_factory=QueryEntities)
     required_tools: list[str] = Field(default_factory=list)
+    tool_params: dict[str, dict] = Field(default_factory=dict)
     retrieval: dict = Field(default_factory=lambda: {"enabled": False, "topics": []})
     answer_mode: str = "direct"
     proposed_action: None = None
@@ -56,7 +100,35 @@ class RuleBasedPlanner:
         prices = [float(x) for x in PRICE_RE.findall(msg) if float(x) != 99999]
         if prices:
             entities.price_max = max(prices)
+        if any(x in msg for x in ("最便宜", "最低价", "价格最低")):
+            entities.price_sort = "asc"
+        if any(x in msg for x in ("最贵", "最高价", "价格最高")):
+            entities.price_sort = "desc"
+        if any(x in msg for x in ("最长", "最大尺寸", "尺寸最大")):
+            entities.specification_sort = "desc"
+        if any(x in msg for x in ("最短", "最小尺寸", "尺寸最小")):
+            entities.specification_sort = "asc"
 
+        if any(x in msg for x in ("采购", "供应商", "交期", "供货", "供应")) and any(
+            x in msg for x in ("比较", "对比", "哪个", "选择")
+        ):
+            return QueryPlan(
+                intent=KnowledgeIntent.PROCUREMENT_COMPARE,
+                entities=entities,
+                required_tools=["supplier.compare"],
+                answer_mode="procurement",
+            )
+        if any(x in msg for x in ("创建方案", "生成方案", "方案草稿", "加入方案", "方案篮")):
+            return QueryPlan(
+                intent=KnowledgeIntent.PROPOSAL_DRAFT,
+                entities=entities,
+                required_tools=[
+                    "product.get_many"
+                    if (entities.product_ids or entities.product_nos)
+                    else "product.search"
+                ],
+                answer_mode="action_proposal_draft",
+            )
         if any(x in msg for x in ("比较", "哪个更适合", "区别", "差别")):
             return QueryPlan(
                 intent=KnowledgeIntent.PRODUCT_COMPARE,
@@ -65,10 +137,19 @@ class RuleBasedPlanner:
                 retrieval={"enabled": True, "topics": entities.keywords[:5]},
                 answer_mode="comparison",
             )
-        if any(x in msg for x in ("缺什么", "哪些产品待核价", "待完善", "质量", "缺图", "缺说明书", "库存未知")):
-            tool = "quality.list_issues" if ("哪些" in msg or "列表" in msg or "产品" in msg) else "quality.summary"
+        if any(
+            x in msg
+            for x in ("缺什么", "哪些产品待核价", "待完善", "质量", "缺图", "缺说明书", "库存未知")
+        ):
+            tool = (
+                "quality.list_issues"
+                if ("哪些" in msg or "列表" in msg or "产品" in msg)
+                else "quality.summary"
+            )
             return QueryPlan(
-                intent=KnowledgeIntent.QUALITY_LIST_ISSUES if tool.endswith("list_issues") else KnowledgeIntent.QUALITY_SUMMARY,
+                intent=KnowledgeIntent.QUALITY_LIST_ISSUES
+                if tool.endswith("list_issues")
+                else KnowledgeIntent.QUALITY_SUMMARY,
                 entities=entities,
                 required_tools=[tool],
                 answer_mode="quality",
@@ -85,16 +166,20 @@ class RuleBasedPlanner:
             return QueryPlan(
                 intent=KnowledgeIntent.KNOWLEDGE_QUESTION,
                 entities=entities,
-                required_tools=["product.search"],
+                required_tools=["product.search"] if entities.keywords else [],
                 retrieval={"enabled": True, "topics": entities.keywords[:5]},
                 answer_mode="knowledge",
             )
         return QueryPlan(
-            intent=KnowledgeIntent.PRODUCT_SEARCH,
+            intent=(
+                KnowledgeIntent.PRODUCT_SEARCH
+                if entities.keywords
+                else KnowledgeIntent.KNOWLEDGE_QUESTION
+            ),
             entities=entities,
-            required_tools=["product.search"],
-            retrieval={"enabled": False, "topics": []},
-            answer_mode="search",
+            required_tools=["product.search"] if entities.keywords else [],
+            retrieval={"enabled": True, "topics": entities.keywords[:5]},
+            answer_mode="search" if entities.keywords else "knowledge",
         )
 
 
@@ -114,8 +199,25 @@ def _keywords(message: str, product_nos: list[str]) -> list[str]:
     text = message
     for no in product_nos:
         text = text.replace(no, " ")
+    for term in KEYWORD_STOP_TERMS:
+        text = text.replace(term, " ")
+    # Chinese natural-language questions are not safe database search terms.
+    # Only retain explicit tokens and recognized product taxonomy terms here;
+    # the complete question is sent to semantic retrieval separately.
     words = [w.strip(" ，。！？,.;：:") for w in re.split(r"\s+", text) if len(w.strip()) >= 2]
-    return [w for w in words if w not in {"比较", "哪个", "产品", "适合", "帮我", "一下"}][:10]
+    out = [
+        w
+        for w in words
+        if w not in {"比较", "哪个", "产品", "适合", "帮我", "一下"}
+        and not re.search(r"[\u4e00-\u9fff]", w)
+    ]
+    for term in BUSINESS_TERMS:
+        if term in text and term not in out:
+            out.append(term)
+    compact = re.sub(r"[\s，。！？,.;：:]", "", text)
+    if not out and re.fullmatch(r"[\u4e00-\u9fff]{2,12}", compact):
+        out.append(compact)
+    return out[:10]
 
 
 def get_planner() -> Planner:

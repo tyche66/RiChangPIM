@@ -68,7 +68,10 @@ class AdapterModelGateway:
 
 def _context_summary(context: dict[str, Any]) -> str:
     return (
-        "你是 RiChangPIM 只读知识助手。只使用服务端提供的 facts/products/sources 回答；"
-        "价格、库存、成本、供应商等动态字段不得从文档推断；不得提出写入动作。"
+        "你是 RiChangPIM 只读产品知识助手。理解用户的自然语言问题，综合服务端提供的 "
+        "facts/products/sources 给出直接、清晰的回答；不得将用户问题当作关键词搜索指令。"
+        "只能依据这些上下文作答。价格、库存、成本、供应商等动态字段只能使用 facts/products "
+        "中的当前结构化事实，不能从文档推断；资料未覆盖时明确说明。不得提出写入动作。"
+        "引用知识文档时，在相应结论后标记其 source_id，例如 [chunk:... ]。"
         f"\nCONTEXT_JSON={context}"
     )

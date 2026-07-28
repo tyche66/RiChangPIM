@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
 
@@ -15,28 +15,86 @@ class PermissionPool:
 
 POOL_ADMIN = PermissionPool(
     name="pool_admin",
-    ai_permissions=frozenset({"ai:access", "ai:product", "ai:knowledge", "ai:quality", "ai:procurement", "knowledge:manage", "knowledge:debug", "ai:use"}),
-    allowed_tools=frozenset({"product.search", "product.get_many", "product.compare", "quality.summary", "quality.list_issues"}),
+    ai_permissions=frozenset(
+        {
+            "ai:access",
+            "ai:product",
+            "ai:knowledge",
+            "ai:quality",
+            "ai:procurement",
+            "knowledge:manage",
+            "knowledge:debug",
+            "ai:use",
+        }
+    ),
+    allowed_tools=frozenset(
+        {
+            "product.search",
+            "product.get_many",
+            "product.compare",
+            "quality.summary",
+            "quality.list_issues",
+            "supplier.compare",
+        }
+    ),
     hidden_fields=frozenset(),
     debug=True,
 )
 POOL_PURCHASER = PermissionPool(
     name="pool_purchaser",
-    ai_permissions=frozenset({"ai:access", "ai:product", "ai:knowledge", "ai:quality", "ai:procurement"}),
-    allowed_tools=frozenset({"product.search", "product.get_many", "product.compare", "quality.summary", "quality.list_issues"}),
-    hidden_fields=frozenset({"customer_name", "quotation_item_unit_price", "proposal_cost_details"}),
+    ai_permissions=frozenset(
+        {"ai:access", "ai:product", "ai:knowledge", "ai:quality", "ai:procurement"}
+    ),
+    allowed_tools=frozenset(
+        {
+            "product.search",
+            "product.get_many",
+            "product.compare",
+            "quality.summary",
+            "quality.list_issues",
+            "supplier.compare",
+        }
+    ),
+    hidden_fields=frozenset(
+        {"customer_name", "quotation_item_unit_price", "proposal_cost_details"}
+    ),
 )
 POOL_SALES = PermissionPool(
     name="pool_sales",
     ai_permissions=frozenset({"ai:access", "ai:product", "ai:knowledge", "ai:use"}),
     allowed_tools=frozenset({"product.search", "product.get_many"}),
-    hidden_fields=frozenset({"cost_price", "supplier_id", "supplier_name", "margin", "profit", "quotation_item_cost", "proposal_cost_details"}),
+    hidden_fields=frozenset(
+        {
+            "cost_price",
+            "supplier_id",
+            "supplier_name",
+            "margin",
+            "profit",
+            "quotation_item_cost",
+            "proposal_cost_details",
+        }
+    ),
 )
 POOL_KNOWLEDGE = PermissionPool(
     name="pool_knowledge",
-    ai_permissions=frozenset({"ai:access", "ai:knowledge"}),
-    allowed_tools=frozenset({"product.search"}),
-    hidden_fields=frozenset({"cost_price", "supplier_id", "supplier_name", "margin", "profit", "material", "specification", "colors", "data_source", "completeness_status", "stock_status"}),
+    ai_permissions=frozenset({"ai:access", "ai:knowledge", "ai:product", "product:view"}),
+    allowed_tools=frozenset({"product.search", "product.get_many"}),
+    hidden_fields=frozenset(
+        {
+            "cost_price",
+            "supplier_id",
+            "supplier_name",
+            "margin",
+            "profit",
+            "material",
+            "specification",
+            "specification_length_mm",
+            "colors",
+            "data_source",
+            "completeness_status",
+            "stock_status",
+        }
+    ),
 )
 
 ROLE_POOL_MAP = {

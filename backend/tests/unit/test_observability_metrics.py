@@ -95,3 +95,21 @@ def test_label_escaping_disallows_quote_and_backslash_injection():
     # that would split the Prometheus line.
     line = [ln for ln in rendered if "pim_test_escape{" in ln][0]
     assert 'k="a\\"b\\\\c"' in line
+
+
+def test_knowledge_metrics_render_without_high_cardinality_labels():
+    metrics.observe_ai_query("knowledge_question", "ok", 0.42)
+    metrics.observe_retrieval("vector", 0.03, 8)
+    metrics.set_citation_count("ok", 2)
+    metrics.observe_knowledge_job("upsert", "succeeded", 1.2)
+    metrics.set_knowledge_queue_depth("normal", 4)
+    metrics.set_knowledge_dead_jobs(1)
+    metrics.set_knowledge_chunks_active(99)
+    text = metrics.render_text()
+    assert "pim_ai_query_total" in text
+    assert "pim_ai_retrieval_candidates" in text
+    assert "pim_ai_citation_count" in text
+    assert "pim_knowledge_jobs_total" in text
+    assert "product_id" not in text
+    assert "source_id" not in text
+    assert "user_id" not in text

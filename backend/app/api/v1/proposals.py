@@ -12,7 +12,7 @@ from app.core.security import create_access_token
 from app.middleware.audit import audit_action
 from app.models.product import Product, ProductImage
 from app.models.sales import Proposal, ProposalItem
-from app.schemas.proposal import ProposalCreate, ProposalResponse, ProposalUpdate
+from app.schemas.proposal import ProposalCreate, ProposalUpdate
 
 router = APIRouter()
 
@@ -23,21 +23,16 @@ def _round(value: float) -> float:
     return round(float(value), 2)
 
 
-async def _validate_proposal_items(
-    item_ids: list[UUID], db: AsyncSession
-) -> dict[UUID, Product]:
+async def _validate_proposal_items(item_ids: list[UUID], db: AsyncSession) -> dict[UUID, Product]:
     """校验产品存在、未删除、status=active，并返回去重后的产品映射。"""
     seen: set[UUID] = set()
     for pid in item_ids:
         if pid in seen:
-            raise HTTPException(
-                status_code=422, detail={"code": 42201, "msg": f"重复产品 {pid}"}
-            )
+            raise HTTPException(status_code=422, detail={"code": 42201, "msg": f"重复产品 {pid}"})
         seen.add(pid)
 
     result = await db.execute(
-        select(Product)
-        .where(
+        select(Product).where(
             Product.id.in_(item_ids),
             Product.is_deleted.is_(False),
             Product.status == "active",
@@ -61,8 +56,7 @@ async def _cover_urls(
         return {}
     rows = (
         await db.execute(
-            select(ProductImage.product_id, ProductImage.attachment_id)
-            .where(
+            select(ProductImage.product_id, ProductImage.attachment_id).where(
                 ProductImage.product_id.in_(product_ids),
                 ProductImage.is_deleted.is_(False),
                 ProductImage.is_cover.is_(True),
@@ -118,6 +112,9 @@ def _proposal_to_dict(proposal: Proposal) -> dict:
         "ai_polish_content": proposal.ai_polish_content,
         "ai_polish_at": _iso(proposal.ai_polish_at),
         "ai_polish_model": proposal.ai_polish_model,
+        "ai_generation_version": proposal.ai_generation_version,
+        "ai_source_ids": proposal.ai_source_ids,
+        "ai_confirmed_by": str(proposal.ai_confirmed_by) if proposal.ai_confirmed_by else None,
         "total_face_value": proposal.total_face_value,
         "create_time": _iso(proposal.create_time),
     }
@@ -138,9 +135,7 @@ async def list_proposals(
     db: AsyncSession = Depends(get_db),
 ):
     stmt = (
-        select(Proposal)
-        .options(selectinload(Proposal.items))
-        .where(Proposal.is_deleted.is_(False))
+        select(Proposal).options(selectinload(Proposal.items)).where(Proposal.is_deleted.is_(False))
     )
     if keyword is not None:
         kw = f"%{keyword}%"
@@ -153,9 +148,7 @@ async def list_proposals(
         )
     if status is not None:
         if status not in VALID_STATUSES:
-            raise HTTPException(
-                status_code=422, detail={"code": 42201, "msg": "非法状态值"}
-            )
+            raise HTTPException(status_code=422, detail={"code": 42201, "msg": "非法状态值"})
         stmt = stmt.where(Proposal.status == status)
 
     total_result = await db.execute(select(func.count()).select_from(stmt.subquery()))
@@ -180,9 +173,7 @@ async def list_proposals(
     response_model=dict,
     dependencies=[Depends(PermissionChecker("proposal:view"))],
 )
-async def get_proposal(
-    request: Request, proposal_id: UUID, db: AsyncSession = Depends(get_db)
-):
+async def get_proposal(request: Request, proposal_id: UUID, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(Proposal)
         .options(selectinload(Proposal.items))
@@ -196,9 +187,7 @@ async def get_proposal(
     prod_map: dict[UUID, Product] = {}
     if product_ids:
         prod_result = await db.execute(
-            select(Product).where(
-                Product.id.in_(product_ids), Product.is_deleted.is_(False)
-            )
+            select(Product).where(Product.id.in_(product_ids), Product.is_deleted.is_(False))
         )
         prod_map = {p.id: p for p in prod_result.scalars().all()}
 
@@ -220,9 +209,7 @@ async def get_proposal(
 async def create_proposal(
     request: Request, proposal_data: ProposalCreate, db: AsyncSession = Depends(get_db)
 ):
-    products = await _validate_proposal_items(
-        [i.product_id for i in proposal_data.items], db
-    )
+    products = await _validate_proposal_items([i.product_id for i in proposal_data.items], db)
 
     proposal = Proposal(
         proposal_no=f"PR-2026-{str(uuid4())[:8].upper()}",
@@ -244,9 +231,7 @@ async def create_proposal(
         )
         db.add(item)
         items.append((item, prod))
-    proposal.total_face_value = _round(
-        sum(prod.face_price * it.quantity for it, prod in items)
-    )
+    proposal.total_face_value = _round(sum(prod.face_price * it.quantity for it, prod in items))
 
     await db.commit()
     result = await db.execute(
@@ -285,9 +270,7 @@ async def update_proposal(
         raise HTTPException(status_code=404, detail={"code": 40401, "msg": "方案不存在"})
 
     if proposal.status == "confirmed":
-        raise HTTPException(
-            status_code=422, detail={"code": 42201, "msg": "方案已确认，不可修改"}
-        )
+        raise HTTPException(status_code=422, detail={"code": 42201, "msg": "方案已确认，不可修改"})
 
     items_prod_map: dict[UUID, Product] = {}
     update_fields = set(proposal_data.model_fields_set) - {"items"}
@@ -297,12 +280,8 @@ async def update_proposal(
     if "items" in proposal_data.model_fields_set:
         new_items = proposal_data.items
         if new_items is None or not new_items:
-            raise HTTPException(
-                status_code=422, detail={"code": 42201, "msg": "方案明细不可为空"}
-            )
-        products = await _validate_proposal_items(
-            [i.product_id for i in new_items], db
-        )
+            raise HTTPException(status_code=422, detail={"code": 42201, "msg": "方案明细不可为空"})
+        products = await _validate_proposal_items([i.product_id for i in new_items], db)
         old_items = await db.execute(
             select(ProposalItem).where(ProposalItem.proposal_id == proposal.id)
         )
@@ -321,9 +300,7 @@ async def update_proposal(
             db.add(item)
             created.append((item, prod))
 
-        total_face = _round(
-            sum(prod.face_price * it.quantity for it, prod in created)
-        )
+        total_face = _round(sum(prod.face_price * it.quantity for it, prod in created))
         proposal.total_face_value = total_face
         items_prod_map = {p.id: p for _, p in created}
 
@@ -404,15 +381,15 @@ async def revert_confirmation(
         prod_map: dict[UUID, Product] = {}
         if product_ids:
             prod_result = await db.execute(
-                select(Product).where(
-                    Product.id.in_(product_ids), Product.is_deleted.is_(False)
-                )
+                select(Product).where(Product.id.in_(product_ids), Product.is_deleted.is_(False))
             )
             prod_map = {p.id: p for p in prod_result.scalars().all()}
         cover_urls = await _cover_urls(product_ids, request, db)
         enriched = []
         for it in proposal.items:
-            enriched.append(_enrich_item(it, prod_map.get(it.product_id), cover_urls.get(it.product_id)))
+            enriched.append(
+                _enrich_item(it, prod_map.get(it.product_id), cover_urls.get(it.product_id))
+            )
         return _wrap_proposal(proposal, enriched)
 
     if proposal.status != "confirmed":
@@ -448,15 +425,15 @@ async def revert_confirmation(
     prod_map: dict[UUID, Product] = {}
     if product_ids:
         prod_result = await db.execute(
-            select(Product).where(
-                Product.id.in_(product_ids), Product.is_deleted.is_(False)
-            )
+            select(Product).where(Product.id.in_(product_ids), Product.is_deleted.is_(False))
         )
         prod_map = {p.id: p for p in prod_result.scalars().all()}
     cover_urls = await _cover_urls(product_ids, request, db)
     enriched = []
     for it in proposal.items:
-        enriched.append(_enrich_item(it, prod_map.get(it.product_id), cover_urls.get(it.product_id)))
+        enriched.append(
+            _enrich_item(it, prod_map.get(it.product_id), cover_urls.get(it.product_id))
+        )
     return _wrap_proposal(proposal, enriched)
 
 

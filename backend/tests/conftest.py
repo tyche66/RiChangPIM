@@ -91,7 +91,7 @@ def _evaluate_db(url: str):
 
 
 @pytest.fixture
-async def _engine(_test_db_url):
+async def _engine(_test_db_url, integration_setup_db):
     """Per-test async engine, created INSIDE the test's own anyio loop.
 
     anyio runs each test (and its async fixtures) in a *fresh* event loop.
@@ -198,7 +198,7 @@ def _drop_schema(url: str) -> None:
 
 
 @pytest.fixture
-async def client(_engine, _sessionmaker, integration_setup_db):
+async def client(_engine, _sessionmaker):
     """ASGI test client wired to a per-test DB override.
 
     Lazily imports ``app.main`` so pure unit tests never import the app, and

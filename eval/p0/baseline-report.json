@@ -1,0 +1,435 @@
+{
+  "timestamp": "2026-07-26T04:35:39Z",
+  "base_url": "http://localhost:888",
+  "adapter": "openai",
+  "samples": [
+    {
+      "endpoint": "chat",
+      "query": "找一张圣奥品牌的会议桌",
+      "runs": [
+        {
+          "latency_ms": 3436,
+          "http_status": 200,
+          "answer_length": 478,
+          "sources_count": 0,
+          "is_200": true,
+          "error_code": 0
+        }
+      ]
+    },
+    {
+      "endpoint": "chat",
+      "query": "有材质是E1级板材的办公桌吗",
+      "runs": [
+        {
+          "latency_ms": 3311,
+          "http_status": 200,
+          "answer_length": 433,
+          "sources_count": 0,
+          "is_200": true,
+          "error_code": 0
+        }
+      ]
+    },
+    {
+      "endpoint": "chat",
+      "query": "推荐适合10人会议室的桌子",
+      "runs": [
+        {
+          "latency_ms": 7470,
+          "http_status": 200,
+          "answer_length": 1900,
+          "sources_count": 0,
+          "is_200": true,
+          "error_code": 0
+        }
+      ]
+    },
+    {
+      "endpoint": "chat",
+      "query": "圣奥有没有带线盒的办公桌",
+      "runs": [
+        {
+          "latency_ms": 19828,
+          "http_status": 200,
+          "answer_length": 362,
+          "sources_count": 0,
+          "is_200": true,
+          "error_code": 0
+        }
+      ]
+    },
+    {
+      "endpoint": "chat",
+      "query": "找一张白色烤漆的会议桌",
+      "runs": [
+        {
+          "latency_ms": 3566,
+          "http_status": 200,
+          "answer_length": 907,
+          "sources_count": 0,
+          "is_200": true,
+          "error_code": 0
+        }
+      ]
+    },
+    {
+      "endpoint": "chat",
+      "query": "有没有适合开放式办公区的桌子",
+      "runs": [
+        {
+          "latency_ms": 7454,
+          "http_status": 200,
+          "answer_length": 1293,
+          "sources_count": 0,
+          "is_200": true,
+          "error_code": 0
+        }
+      ]
+    },
+    {
+      "endpoint": "chat",
+      "query": "圣奥的洽谈桌有哪些尺寸",
+      "runs": [
+        {
+          "latency_ms": 4181,
+          "http_status": 200,
+          "answer_length": 781,
+          "sources_count": 0,
+          "is_200": true,
+          "error_code": 0
+        }
+      ]
+    },
+    {
+      "endpoint": "chat",
+      "query": "找一张带储物功能的办公桌",
+      "runs": [
+        {
+          "latency_ms": 4214,
+          "http_status": 200,
+          "answer_length": 947,
+          "sources_count": 0,
+          "is_200": true,
+          "error_code": 0
+        }
+      ]
+    },
+    {
+      "endpoint": "chat",
+      "query": "适合高管办公室的会议桌推荐",
+      "runs": [
+        {
+          "latency_ms": 7468,
+          "http_status": 200,
+          "answer_length": 1966,
+          "sources_count": 0,
+          "is_200": true,
+          "error_code": 0
+        }
+      ]
+    },
+    {
+      "endpoint": "chat",
+      "query": "圣奥背柜和办公桌搭配建议",
+      "runs": [
+        {
+          "latency_ms": 7989,
+          "http_status": 200,
+          "answer_length": 1864,
+          "sources_count": 0,
+          "is_200": true,
+          "error_code": 0
+        }
+      ]
+    },
+    {
+      "endpoint": "rag/search",
+      "query": "圣奥办公桌的安装说明",
+      "runs": [
+        {
+          "latency_ms": 360,
+          "http_status": 502,
+          "answer_length": 0,
+          "sources_count": 0,
+          "is_200": false,
+          "error_code": 50201
+        }
+      ]
+    },
+    {
+      "endpoint": "rag/search",
+      "query": "会议桌的承重是多少",
+      "runs": [
+        {
+          "latency_ms": 1480,
+          "http_status": 502,
+          "answer_length": 0,
+          "sources_count": 0,
+          "is_200": false,
+          "error_code": 50201
+        }
+      ]
+    },
+    {
+      "endpoint": "rag/search",
+      "query": "办公桌E1级板材的环保标准",
+      "runs": [
+        {
+          "latency_ms": 357,
+          "http_status": 502,
+          "answer_length": 0,
+          "sources_count": 0,
+          "is_200": false,
+          "error_code": 50201
+        }
+      ]
+    },
+    {
+      "endpoint": "rag/search",
+      "query": "圣奥产品的质保政策",
+      "runs": [
+        {
+          "latency_ms": 356,
+          "http_status": 502,
+          "answer_length": 0,
+          "sources_count": 0,
+          "is_200": false,
+          "error_code": 50201
+        }
+      ]
+    },
+    {
+      "endpoint": "rag/search",
+      "query": "办公桌线盒怎么安装",
+      "runs": [
+        {
+          "latency_ms": 3,
+          "http_status": 429,
+          "answer_length": 0,
+          "sources_count": 0,
+          "is_200": false,
+          "error_code": 42901
+        }
+      ]
+    },
+    {
+      "endpoint": "rag/search",
+      "query": "会议桌钢化玻璃如何清洁",
+      "runs": [
+        {
+          "latency_ms": 2,
+          "http_status": 429,
+          "answer_length": 0,
+          "sources_count": 0,
+          "is_200": false,
+          "error_code": 42901
+        }
+      ]
+    },
+    {
+      "endpoint": "rag/search",
+      "query": "洽谈桌的包装尺寸",
+      "runs": [
+        {
+          "latency_ms": 3,
+          "http_status": 429,
+          "answer_length": 0,
+          "sources_count": 0,
+          "is_200": false,
+          "error_code": 42901
+        }
+      ]
+    },
+    {
+      "endpoint": "rag/search",
+      "query": "办公桌脚垫如何调节",
+      "runs": [
+        {
+          "latency_ms": 2,
+          "http_status": 429,
+          "answer_length": 0,
+          "sources_count": 0,
+          "is_200": false,
+          "error_code": 42901
+        }
+      ]
+    },
+    {
+      "endpoint": "rag/search",
+      "query": "圣奥背柜的层板承重",
+      "runs": [
+        {
+          "latency_ms": 2,
+          "http_status": 429,
+          "answer_length": 0,
+          "sources_count": 0,
+          "is_200": false,
+          "error_code": 42901
+        }
+      ]
+    },
+    {
+      "endpoint": "rag/search",
+      "query": "产品说明书在哪里下载",
+      "runs": [
+        {
+          "latency_ms": 3,
+          "http_status": 429,
+          "answer_length": 0,
+          "sources_count": 0,
+          "is_200": false,
+          "error_code": 42901
+        }
+      ]
+    },
+    {
+      "endpoint": "recommend",
+      "query": "推荐适合小型会议室的桌子",
+      "runs": [
+        {
+          "latency_ms": 6,
+          "http_status": 429,
+          "answer_length": 0,
+          "sources_count": 0,
+          "is_200": false,
+          "error_code": 42901
+        }
+      ]
+    },
+    {
+      "endpoint": "recommend",
+      "query": "找一张5000元以内的办公桌",
+      "runs": [
+        {
+          "latency_ms": 3,
+          "http_status": 429,
+          "answer_length": 0,
+          "sources_count": 0,
+          "is_200": false,
+          "error_code": 42901
+        }
+      ]
+    },
+    {
+      "endpoint": "recommend",
+      "query": "推荐带线盒功能的会议桌",
+      "runs": [
+        {
+          "latency_ms": 3,
+          "http_status": 429,
+          "answer_length": 0,
+          "sources_count": 0,
+          "is_200": false,
+          "error_code": 42901
+        }
+      ]
+    },
+    {
+      "endpoint": "recommend",
+      "query": "适合创业公司的办公桌组合",
+      "runs": [
+        {
+          "latency_ms": 6,
+          "http_status": 429,
+          "answer_length": 0,
+          "sources_count": 0,
+          "is_200": false,
+          "error_code": 42901
+        }
+      ]
+    },
+    {
+      "endpoint": "recommend",
+      "query": "推荐白色系的洽谈桌",
+      "runs": [
+        {
+          "latency_ms": 3,
+          "http_status": 429,
+          "answer_length": 0,
+          "sources_count": 0,
+          "is_200": false,
+          "error_code": 42901
+        }
+      ]
+    },
+    {
+      "endpoint": "recommend",
+      "query": "找一张1.2米的单人办公桌",
+      "runs": [
+        {
+          "latency_ms": 4,
+          "http_status": 429,
+          "answer_length": 0,
+          "sources_count": 0,
+          "is_200": false,
+          "error_code": 42901
+        }
+      ]
+    },
+    {
+      "endpoint": "recommend",
+      "query": "推荐高管办公室用的桌子",
+      "runs": [
+        {
+          "latency_ms": 4,
+          "http_status": 429,
+          "answer_length": 0,
+          "sources_count": 0,
+          "is_200": false,
+          "error_code": 42901
+        }
+      ]
+    },
+    {
+      "endpoint": "recommend",
+      "query": "适合开放式办公区的桌椅组合",
+      "runs": [
+        {
+          "latency_ms": 3,
+          "http_status": 429,
+          "answer_length": 0,
+          "sources_count": 0,
+          "is_200": false,
+          "error_code": 42901
+        }
+      ]
+    },
+    {
+      "endpoint": "recommend",
+      "query": "推荐带储物功能的办公桌",
+      "runs": [
+        {
+          "latency_ms": 3,
+          "http_status": 429,
+          "answer_length": 0,
+          "sources_count": 0,
+          "is_200": false,
+          "error_code": 42901
+        }
+      ]
+    },
+    {
+      "endpoint": "recommend",
+      "query": "找一张适合培训室的长桌",
+      "runs": [
+        {
+          "latency_ms": 3,
+          "http_status": 429,
+          "answer_length": 0,
+          "sources_count": 0,
+          "is_200": false,
+          "error_code": 42901
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "p50_latency_ms": 6.0,
+    "p95_latency_ms": 7989,
+    "p99_latency_ms": 19828,
+    "error_rate": 0.6667,
+    "total_samples": 30,
+    "total_runs": 30
+  }
+}

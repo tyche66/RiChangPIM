@@ -19,6 +19,8 @@ htmlcov/
 *.swo
 .env
 .env.local
+AI.env
+embedding.env
 backend/.env
 docker/volumes/
 docker/nginx/certs/
@@ -34,3 +36,5 @@ backend/err.txt
 *.log
 .DS_Store
 Thumbs.db
+*:Zone.Identifier
+*Zone.Identifier

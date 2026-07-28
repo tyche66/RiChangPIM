@@ -40,7 +40,7 @@ def build_adapter(
             api_key=api_key,
             api_url=api_url or "https://api.openai.com/v1",
             chat_model=chat_model or "gpt-4o-mini",
-            embedding_model=embedding_model or "text-embedding-3-small",
+            embedding_model=embedding_model or "nvidia/nemotron-3-embed-1b:free",
             timeout=timeout,
         )
         return OpenAIAdapter(cfg)
@@ -63,6 +63,11 @@ def get_ai_adapter() -> AIServiceAdapter:
         return _cached_adapter
 
     from app.core.config import settings
+
+    if settings.AI_ADAPTER == "openai":
+        from app.adapters.openai import register_vector_dim
+
+        register_vector_dim(settings.AI_EMBEDDING_DIM)
 
     _cached_adapter = build_adapter(
         adapter_type=settings.AI_ADAPTER,

@@ -21,7 +21,7 @@ set -uo pipefail
 #   the authoritative interpretation of "未进入 Git" in docs/v1.2-plan.md §6.5
 #   — local-only files such as .env (which is in .gitignore) are NOT scanned.
 # - If not a git repo (sandbox/manual check), scan everything except the
-#   recognized local / build / cache directories and .env / *.local files.
+#   recognized local / build / cache directories and local credential files.
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
@@ -42,7 +42,7 @@ TARGETS_FILE="/tmp/ai-pim-secret-scan-targets-$$.txt"
 if [ -d "$ROOT/.git" ] && command -v git >/dev/null 2>&1; then
   git ls-files > "$TARGETS_FILE"
 else
-  # No git: list everything except .env / .env.local / *.local and the
+  # No git: list everything except local credential files and the
   # excluded directories above. Also honor a minimal set of git-ignored dev
   # paths (docker/nginx/certs — local self-signed TLS) to behave consistently
   # with the git-tracked scan mode.
@@ -59,6 +59,8 @@ else
     -not -path './docker/nginx/certs/*' \
     -not -name '.env' \
     -not -name '.env.local' \
+    -not -name 'AI.env' \
+    -not -name 'embedding.env' \
     -not -name '*.local' \
     | sed 's#^\./##' > "$TARGETS_FILE"
 fi
@@ -98,6 +100,9 @@ scan_pattern "JWT-ish bearer" 'eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0
 
 # OpenAI-style keys (sk-...). Any match is a real leak (docs/v1.2-plan.md §6.5).
 scan_pattern "OpenAI-style key" 'sk-[A-Za-z0-9]{20,}'
+
+# OpenRouter keys.
+scan_pattern "OpenRouter key" 'sk-or-v1-[A-Za-z0-9]{20,}'
 
 # Azure / generic AI API keys (long concrete literal assignments).
 scan_pattern "Azure/concrete AI key" 'AI_API_KEY=[A-Za-z0-9_=\-]{30,}'

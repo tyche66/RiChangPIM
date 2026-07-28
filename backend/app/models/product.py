@@ -16,7 +16,7 @@ from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import text
 
-from app.core.database import Vector
+from app.core.database import HalfVector
 from app.models.base import CommonBase
 
 
@@ -85,12 +85,10 @@ class Product(CommonBase):
     colors = Column(Text)
     data_source = Column(String(512))
     completeness_status = Column(String(20), nullable=False, default="complete")
-    vector = Column(Vector(1536), nullable=True)
+    vector = Column(HalfVector(2048), nullable=True)
 
     __table_args__ = (
-        CheckConstraint(
-            "status IN ('active', 'inactive', 'draft')", name="check_product_status"
-        ),
+        CheckConstraint("status IN ('active', 'inactive', 'draft')", name="check_product_status"),
         CheckConstraint(
             "stock_status IN ('in_stock', 'out_of_stock', 'preorder', 'unknown')",
             name="check_product_stock_status",
@@ -121,8 +119,7 @@ class Product(CommonBase):
         back_populates="product",
         cascade="all, delete-orphan",
         primaryjoin=(
-            "and_(Product.id == ProductImage.product_id, "
-            "ProductImage.is_deleted.is_(False))"
+            "and_(Product.id == ProductImage.product_id, ProductImage.is_deleted.is_(False))"
         ),
         order_by="ProductImage.sort",
     )
@@ -133,7 +130,9 @@ class Product(CommonBase):
         cascade="all, delete-orphan",
         primaryjoin="ProductManualChunk.product_id==Product.id",
     )
-    scene_images = relationship("SceneImage", secondary="product_scene_image", back_populates="products")
+    scene_images = relationship(
+        "SceneImage", secondary="product_scene_image", back_populates="products"
+    )
 
     @property
     def cover_image(self):
@@ -189,11 +188,27 @@ class ProductImage(CommonBase):
 product_scene_image = Table(
     "product_scene_image",
     CommonBase.metadata,
-    Column("product_id", PGUUID(as_uuid=True), ForeignKey("product.id", ondelete="CASCADE"), primary_key=True),
-    Column("scene_image_id", PGUUID(as_uuid=True), ForeignKey("scene_image.id", ondelete="CASCADE"), primary_key=True),
+    Column(
+        "product_id",
+        PGUUID(as_uuid=True),
+        ForeignKey("product.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column(
+        "scene_image_id",
+        PGUUID(as_uuid=True),
+        ForeignKey("scene_image.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
     Column("sort", Integer, default=0),
     Column("create_time", DateTime(timezone=True), server_default=func.now(), nullable=False),
-    Column("update_time", DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False),
+    Column(
+        "update_time",
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    ),
     Column("deleted_at", DateTime(timezone=True), nullable=True),
     Column("is_deleted", Boolean, default=False, nullable=False),
 )
@@ -215,7 +230,9 @@ class SceneImage(CommonBase):
     sort = Column(Integer, default=0)
 
     attachment = relationship("Attachment")
-    products = relationship("Product", secondary="product_scene_image", back_populates="scene_images")
+    products = relationship(
+        "Product", secondary="product_scene_image", back_populates="scene_images"
+    )
 
 
 class ProductManual(CommonBase):

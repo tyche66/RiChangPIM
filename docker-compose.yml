@@ -1,13 +1,12 @@
 services:
   nginx:
-    image: nginx:alpine
+    build:
+      context: .
+      dockerfile: docker/nginx/Dockerfile
     ports:
-      - "80:80"
-      - "443:443"
+      - "888:80"
     volumes:
-      - ./docker/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - ./docker/nginx/certs:/etc/nginx/certs:ro
-      - ./frontend/dist:/usr/share/nginx/html
     depends_on:
       backend:
         condition: service_healthy
@@ -44,13 +43,20 @@ services:
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
       - JWT_ALGORITHM=HS256
       - ACCESS_TOKEN_EXPIRE_MINUTES=120
-      - AI_ADAPTER=${AI_ADAPTER:-none}
-      - AI_API_URL=${AI_API_URL:-}
+      - AI_ADAPTER=openai
+      - AI_API_URL=https://apihub.agnes-ai.com/v1
       - AI_API_KEY=${AI_API_KEY:-}
-      - AI_CHAT_MODEL=${AI_CHAT_MODEL:-gpt-4o-mini}
-      - AI_EMBEDDING_MODEL=${AI_EMBEDDING_MODEL:-text-embedding-3-small}
-      - AI_EMBEDDING_DIM=${AI_EMBEDDING_DIM:-1536}
+      - AI_API_KEY_FILE=${AI_API_KEY_FILE:-}
+      - AI_CHAT_MODEL=agnes-2.0-flash
+      - AI_EMBEDDING_MODEL=${AI_EMBEDDING_MODEL:-nvidia/nemotron-3-embed-1b:free}
+      - AI_EMBEDDING_VERSION=${AI_EMBEDDING_VERSION:-}
+      - AI_EMBEDDING_DIM=${AI_EMBEDDING_DIM:-2048}
+      - AI_EMBEDDING_CACHE_ENABLED=${AI_EMBEDDING_CACHE_ENABLED:-false}
+      - AI_EMBEDDING_CACHE_TTL_SECONDS=${AI_EMBEDDING_CACHE_TTL_SECONDS:-3600}
+      - AI_EMBEDDING_CACHE_MAX_ITEMS=${AI_EMBEDDING_CACHE_MAX_ITEMS:-10000}
       - AI_TIMEOUT=${AI_TIMEOUT:-30}
+      - AI_TOOL_PLANNING_TIMEOUT=${AI_TOOL_PLANNING_TIMEOUT:-8}
+      - KNOWLEDGE_GATEWAY_ENABLED=${KNOWLEDGE_GATEWAY_ENABLED:-1}
       - AI_RATE_LIMIT=${AI_RATE_LIMIT:-10}
       - AI_RATE_LIMIT_WINDOW=${AI_RATE_LIMIT_WINDOW:-60}
       - OCR_ADAPTER=${OCR_ADAPTER:-none}

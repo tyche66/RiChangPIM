@@ -13,6 +13,8 @@ from app.core.config import settings
 from app.models.user import User, Role, Permission, RolePermission
 from app.models.product import Product, Category, Brand, Supplier, Tag, ProductTag, Attachment, ProductImage, ProductManual
 from app.models.doc_chunk import ProductManualChunk
+from app.models.knowledge import KnowledgeChunk, KnowledgeDocument, KnowledgeIndexJob
+from app.models.ai_action import PendingAction
 from app.models.sales import Proposal, ProposalItem, Quotation, QuotationItem
 from app.models.audit import Share, ShareToken, ShareLog, Visitor, OperationLog, AIConversation
 

@@ -17,17 +17,25 @@ class LegacyRagRetriever:
         self.adapter = adapter
         self.db = db
 
-    async def retrieve(self, query: str, *, product_id: str | None, pool: PermissionPool, trace_id: str) -> list[dict]:
+    async def retrieve(
+        self,
+        query: str,
+        *,
+        product_id: str | None,
+        pool: PermissionPool,
+        current_user: dict,
+        trace_id: str,
+    ) -> tuple[list[dict], list[dict]]:
         if isinstance(self.adapter, NoneAdapter):
-            return []
+            return [], []
         if any(term in query for term in DYNAMIC_TERMS):
-            return []
+            return [], []
         pid = UUID(product_id) if product_id else None
         searcher = RagSearcher(self.adapter, self.db)
         try:
             rows = await searcher.search(query, product_id=pid)
         except Exception:
-            return []
+            return [], []
         sources: list[dict] = []
         for row in rows:
             quote = row.get("chunk_text") or ""
@@ -45,4 +53,4 @@ class LegacyRagRetriever:
                     access_policy="role_projected",
                 ).model_dump(mode="json")
             )
-        return sources
+        return sources, []

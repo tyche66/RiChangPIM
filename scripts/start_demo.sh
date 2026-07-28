@@ -9,8 +9,8 @@ BACKEND_URL="${PIM_DEMO_BACKEND:-http://127.0.0.1:8000}"
 
 cd "$ROOT"
 
-if [ ! -d "$ROOT/frontend/dist" ]; then
-  echo "ERROR: frontend/dist not found. Run 'cd frontend && npm run build' first." >&2
+if [ ! -d "$ROOT/frontend/dist" ] || [ ! -d "$ROOT/portal/dist" ]; then
+  echo "ERROR: frontend/dist or portal/dist not found. Build both frontends first." >&2
   exit 1
 fi
 
@@ -25,7 +25,8 @@ if [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" >/dev/null 2>&1; then
 else
   echo "==> starting demo server on http://${HOST}:${PORT}"
   nohup env \
-    PIM_DEMO_ROOT="$ROOT/frontend/dist" \
+    PIM_DEMO_PORTAL_ROOT="$ROOT/portal/dist" \
+    PIM_DEMO_ADMIN_ROOT="$ROOT/frontend/dist" \
     PIM_DEMO_PORT="$PORT" \
     PIM_DEMO_HOST="$HOST" \
     PIM_DEMO_BACKEND="$BACKEND_URL" \

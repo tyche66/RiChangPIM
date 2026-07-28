@@ -12,3 +12,5 @@ class QueryEntities(BaseModel):
     status_terms: list[str] = Field(default_factory=list)
     price_min: float | None = None
     price_max: float | None = None
+    price_sort: str | None = None
+    specification_sort: str | None = None

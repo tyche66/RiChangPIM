@@ -17,7 +17,9 @@ from app.api.v1 import (
     categories,
     health,
     knowledge,
+    knowledge_sources,
     observability,
+    pending_actions,
     products,
     proposals,
     roles,
@@ -42,6 +44,7 @@ async def _check_db() -> bool:
     """Lightweight DB reachability probe."""
     try:
         from app.core.database import engine
+
         async with engine.connect() as conn:
             await conn.execute(__import__("sqlalchemy").text("SELECT 1"))
         return True
@@ -53,6 +56,7 @@ async def _check_redis() -> bool:
     """Lightweight Redis reachability probe."""
     try:
         import redis.asyncio as redis
+
         client = redis.from_url(
             settings.REDIS_URL,
             socket_connect_timeout=1.0,
@@ -69,6 +73,7 @@ async def _check_minio() -> bool:
     """Probe the configured bucket without exposing connection details."""
     try:
         from app.core.minio_client import get_minio_client
+
         client = get_minio_client()
         await asyncio.wait_for(asyncio.to_thread(client.list_buckets), timeout=2.0)
         return True
@@ -130,7 +135,7 @@ def _volume_status() -> dict[str, dict[str, int | bool]]:
     Returns empty dict if env not configured (pure unit environments).
     """
     threshold_env = os.environ.get("VOLUME_CAPACITY_WARN_BYTES")
-    threshold = int(threshold_env) if threshold_env and threshold_env.isdigit() else 5 * 1024 ** 3
+    threshold = int(threshold_env) if threshold_env and threshold_env.isdigit() else 5 * 1024**3
     out: dict[str, dict[str, int | bool]] = {}
     targets = {
         "backups": os.environ.get("BACKUP_DIR", "backups"),
@@ -198,6 +203,8 @@ app.include_router(shares.router, prefix="/api/v1/shares", tags=["shares"])
 app.include_router(share_token.router, prefix="/api/v1", tags=["shares"])
 app.include_router(ai.router, prefix="/api/v1/ai", tags=["ai"])
 app.include_router(knowledge.router, prefix="/api/v1/knowledge", tags=["knowledge"])
+app.include_router(knowledge_sources.router, prefix="/api/v1/knowledge", tags=["knowledge"])
+app.include_router(pending_actions.router, prefix="/api/v1/ai/actions", tags=["ai"])
 app.include_router(audit.router, prefix="/api/v1/audit", tags=["audit"])
 app.include_router(quotations_router, prefix="/api/v1/quotations", tags=["quotations"])
 app.include_router(files_router, prefix="/api/v1/files", tags=["files"])
@@ -218,6 +225,7 @@ async def root():
 # ---------------------------------------------------------------------------
 # Kubernetes-style health probes
 # ---------------------------------------------------------------------------
+
 
 @app.get("/health/live", tags=["health"])
 async def health_live():

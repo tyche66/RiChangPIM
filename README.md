@@ -30,7 +30,7 @@ RiChangPIM 是当前这套 AI-PIM 项目的工作快照，面向产品信息管�
 | 对象存储 | MinIO |
 | 文档转换 | Gotenberg 8 |
 | OCR 服务 | `docker/ocr/` 容器内独立服务 |
-| 当前迁移 head | `0012_product_scene_image_partial_unique` |
+| 当前迁移 head | `0014_knowledge_tables` |
 | 主要种子入口 | `backend/app/scripts/seed_data.py` + `backend/alembic/versions/0004_seed_data.py` |
 | 产品试点数据文件 | `backend/data/sunon_pilot_products.json` |
 
@@ -89,7 +89,7 @@ RiChangPIM 是当前这套 AI-PIM 项目的工作快照，面向产品信息管�
 
 ### 1. 开发环境
 
-本地开发建议使用 `docker-compose.dev.yml` 启动基础依赖，再分别启动后端和前端。
+本地开发建议使用 `docker-compose.dev.yml` 启动基础依赖，再分别启动后端、Portal 和 Admin。
 
 ```bash
 # 1) 启动依赖服务
@@ -102,7 +102,12 @@ source venv/bin/activate
 pip install -r requirements.txt
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
-# 3) 启动前端
+# 3) 启动 Portal
+cd portal
+npm install
+npm run dev
+
+# 4) 启动 Admin
 cd frontend
 npm install
 npm run dev
@@ -133,11 +138,12 @@ Set-ExecutionPolicy -Scope Process Bypass
 tailscale funnel 3001
 ```
 
-公网入口会落到前端，同源 `/api` 会由演示服务器转发到后端，因此产品图片、文件上传、分享页等功能都可以走完整链路。
+公网入口会落到 Portal，`/admin/` 会落到现有管理后台，同源 `/api` 会由演示服务器转发到后端，因此 Portal、管理后台、产品图片、文件上传、分享页等功能都可以走完整链路。
 
 开发环境默认端口：
 
-- 前端：Vite 默认端口，通常为 `5173`
+- Portal：Vite 默认端口 `5174`
+- Admin：Vite 默认端口 `5173`
 - 后端：`http://localhost:8000`
 - API 文档：`http://localhost:8000/docs`
 
@@ -148,16 +154,22 @@ tailscale funnel 3001
 cp .env.example .env
 # 编辑 .env，确保 ADMIN_PASSWORD、JWT_SECRET、POSTGRES_PASSWORD、MINIO_ROOT_* 都已设置
 
-# 2) 构建前端
+# 2) 构建 Portal
+cd portal
+npm install
+npm run build
+cd ..
+
+# 3) 构建 Admin
 cd frontend
 npm install
 npm run build
 cd ..
 
-# 3) 生成本地 TLS 证书（仅本地验收可用，自签名证书需手动信任）
+# 4) 生成本地 TLS 证书（仅本地验收可用，自签名证书需手动信任）
 ./scripts/generate_dev_tls.sh
 
-# 4) 启动全套服务
+# 5) 启动全套服务
 docker compose up -d
 ```
 
@@ -359,15 +371,43 @@ python -m app.scripts.import_sunon_products data/sunon_pilot_products.json
 
 ```bash
 cd backend
-pytest
+PYTHONPATH=. pytest
 ```
+
+无可达 PostgreSQL 测试库时，纯单元测试会继续运行，依赖 DB 的集成测试按设计跳过，不应出现失败。
+
+### 测试数据库
+
+本地可复现测试库基线：PostgreSQL 16 + pgvector。
+
+```bash
+# 启动依赖；postgres 首次初始化时会自动创建 ai_pim_test
+docker compose -f docker-compose.dev.yml up -d postgres redis minio
+
+# 后端测试显式指向安全测试库
+cd backend
+TEST_DATABASE_URL=postgresql+asyncpg://pim:${POSTGRES_PASSWORD:-pim_password}@localhost:5432/ai_pim_test \
+PYTHONPATH=. pytest
+```
+
+若测试库名不含 `test`，必须额外设置 `AI_PIM_TEST_DB_APPROVED=1`，否则测试夹具会拒绝执行任何建表、清库或迁移动作。
 
 ### 前端测试
 
 ```bash
 cd frontend
 npm run test
+npm run build
 ```
+
+### P2 评测与 Portal 门禁
+
+- Portal 构建：`cd portal && npm install && npm run build`
+- Portal E2E：`scripts/p2/portal_e2e.sh`
+- Knowledge Gateway 回归：`scripts/p1/knowledge_gateway_eval.py`
+- P2 RAG / 安全评测：`scripts/p2/rag_eval.py`、`scripts/p2/security_eval.py`
+
+上面几项是 P2 门禁入口；其中 `portal/` 与 `scripts/p2/*` 需要在对应功能落地后执行，不以当前 README 文字替代实现。
 
 ### 端到端与检查
 

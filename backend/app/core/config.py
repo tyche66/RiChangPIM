@@ -50,15 +50,28 @@ class Settings(BaseSettings):
     AI_ADAPTER: str | None = None
     AI_API_URL: str | None = None
     AI_API_KEY: str | None = None
+    AI_API_KEY_FILE: str | None = None
 
     AI_CHAT_MODEL: str = "gpt-4o-mini"
-    AI_EMBEDDING_MODEL: str = "text-embedding-3-small"
-    AI_EMBEDDING_DIM: int = 1536
+    AI_EMBEDDING_MODEL: str = "nvidia/nemotron-3-embed-1b:free"
+    AI_EMBEDDING_VERSION: str | None = None
+    AI_EMBEDDING_CACHE_ENABLED: bool = False
+    AI_EMBEDDING_CACHE_TTL_SECONDS: int = 3600
+    AI_EMBEDDING_CACHE_MAX_ITEMS: int = 10000
+    AI_EMBEDDING_DIM: int = 2048
     AI_TIMEOUT: float = 30.0
+    AI_TOOL_PLANNING_TIMEOUT: float = 8.0
+    KNOWLEDGE_GATEWAY_ENABLED: bool = True
+    AI_PENDING_ACTIONS_ENABLED: bool = True
+    AI_PROCUREMENT_ENABLED: bool = True
     AI_RAG_TOP_K: int = 8
     AI_RAG_MIN_SCORE: float = 0.65
     AI_RAG_CHUNK_SIZE: int = 600
     AI_RAG_CHUNK_OVERLAP: int = 80
+    KNOWLEDGE_JOB_POLL_INTERVAL_SECONDS: float = 2.0
+    KNOWLEDGE_JOB_BATCH_SIZE: int = 10
+    KNOWLEDGE_JOB_MAX_ATTEMPTS: int = 3
+    KNOWLEDGE_JOB_RETRY_DELAY_SECONDS: int = 60
     AI_QUOTA_CHECK_ENABLED: bool = False
     AI_QUOTA_CHECKER_BACKEND: str = "noop"
     AI_LIMIT_TPS: int | None = None
@@ -74,6 +87,10 @@ class Settings(BaseSettings):
     AI_PRICING_BACKEND: str | None = None
 
     SHARE_IMAGE_URL_EXPIRE_HOURS: int = 24
+
+    def model_post_init(self, __context) -> None:
+        if self.AI_API_KEY_FILE:
+            self.AI_API_KEY = Path(self.AI_API_KEY_FILE).read_text(encoding="utf-8").strip()
 
 
 settings = Settings()

@@ -6,7 +6,8 @@ import { fileURLToPath } from 'node:url'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-const rootDir = path.resolve(process.env.PIM_DEMO_ROOT || path.join(__dirname, '..', 'frontend', 'dist'))
+const portalRootDir = path.resolve(process.env.PIM_DEMO_PORTAL_ROOT || path.join(__dirname, '..', 'portal', 'dist'))
+const adminRootDir = path.resolve(process.env.PIM_DEMO_ADMIN_ROOT || path.join(__dirname, '..', 'frontend', 'dist'))
 const listenHost = process.env.PIM_DEMO_HOST || '0.0.0.0'
 const listenPort = Number(process.env.PIM_DEMO_PORT || 5173)
 const backendTarget = new URL(process.env.PIM_DEMO_BACKEND || 'http://127.0.0.1:8000')
@@ -37,11 +38,11 @@ function send(res, status, headers, body) {
   res.end(body)
 }
 
-function safeResolve(urlPath) {
+function safeResolve(urlPath, baseDir) {
   const decoded = decodeURIComponent(urlPath.split('?')[0] || '/')
   const relative = decoded.replace(/^\/+/, '')
-  const resolved = path.resolve(rootDir, relative)
-  if (!resolved.startsWith(rootDir)) return null
+  const resolved = path.resolve(baseDir, relative)
+  if (!resolved.startsWith(baseDir)) return null
   return resolved
 }
 
@@ -79,9 +80,9 @@ function proxyToBackend(req, res) {
   req.pipe(proxyReq)
 }
 
-function serveStatic(req, res) {
+function serveStatic(req, res, baseDir, fallback = 'index.html') {
   const requestPath = (req.url || '/').split('?')[0] || '/'
-  const resolvedPath = safeResolve(requestPath)
+  const resolvedPath = safeResolve(requestPath, baseDir)
   if (!resolvedPath) {
     return send(res, 400, { 'content-type': 'text/plain; charset=utf-8' }, 'Bad request')
   }
@@ -92,7 +93,7 @@ function serveStatic(req, res) {
   }
 
   if (!existsSync(filePath)) {
-    filePath = path.join(rootDir, 'index.html')
+    filePath = path.join(baseDir, fallback)
   }
 
   if (!existsSync(filePath)) {
@@ -113,15 +114,24 @@ const server = http.createServer((req, res) => {
     return proxyToBackend(req, res)
   }
 
-  if (urlPath === '/favicon.ico') {
-    return serveStatic({ ...req, url: '/RiChangPIM.png' }, res)
+  if (urlPath.startsWith('/admin/')) {
+    return serveStatic({ ...req, url: urlPath.replace(/^\/admin/, '') || '/' }, res, adminRootDir)
   }
 
-  return serveStatic(req, res)
+  if (urlPath.startsWith('/share/')) {
+    return serveStatic({ ...req, url: '/' }, res, adminRootDir)
+  }
+
+  if (urlPath === '/favicon.ico') {
+    return serveStatic({ ...req, url: '/RiChangPIM.png' }, res, adminRootDir)
+  }
+
+  return serveStatic(req, res, portalRootDir)
 })
 
 server.listen(listenPort, listenHost, () => {
   console.log(`PIM demo server listening on http://${listenHost}:${listenPort}`)
-  console.log(`Serving ${rootDir}`)
+  console.log(`Serving portal ${portalRootDir}`)
+  console.log(`Serving admin ${adminRootDir}`)
   console.log(`Proxying API to ${backendTarget.origin}`)
 })

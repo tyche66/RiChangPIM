@@ -23,7 +23,11 @@ from typing import Any
 import httpx
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-ENV_PATH = PROJECT_ROOT / "backend" / ".env.example"
+ENV_PATHS = (
+    PROJECT_ROOT / "backend" / ".env.example",
+    PROJECT_ROOT / ".env",
+    PROJECT_ROOT / "backend" / ".env",
+)
 
 CHAT_SAMPLES = [
     "找一张圣奥品牌的会议桌",
@@ -73,20 +77,22 @@ SAMPLES = {
 
 def _load_env_defaults() -> dict[str, str]:
     defaults: dict[str, str] = {}
-    if ENV_PATH.exists():
-        for line in ENV_PATH.read_text(encoding="utf-8").splitlines():
+    for env_path in ENV_PATHS:
+        if not env_path.exists():
+            continue
+        for line in env_path.read_text(encoding="utf-8").splitlines():
             line = line.strip()
             if not line or line.startswith("#") or "=" not in line:
                 continue
             key, _, value = line.partition("=")
-            defaults[key.strip()] = value.strip()
+            defaults[key.strip()] = value.strip().strip('"').strip("'")
     return defaults
 
 
 async def _login(client: httpx.AsyncClient, base_url: str, username: str, password: str) -> str:
     resp = await client.post(
         f"{base_url}/api/v1/auth/login",
-        data={"username": username, "password": password},
+        json={"username": username, "password": password},
     )
     resp.raise_for_status()
     data = resp.json()
@@ -270,16 +276,25 @@ async def _main() -> int:
         try:
             token = await _login(client, base_url, username, password)
         except Exception as exc:
+            report = {
+                "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                "base_url": base_url,
+                "adapter": ai_adapter,
+                "samples": [],
+                "summary": {"status": "environment_error", "reason": str(exc)},
+            }
+            report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
             print(f"登录失败: {exc}", file=sys.stderr)
             return 1
 
         all_samples: list[dict[str, Any]] = []
         exit_code = 0
 
+        runs = max(1, int(os.environ.get("EVAL_RUNS", "3")))
         for endpoint, queries in SAMPLES.items():
             measurer = MEASURERS[endpoint]
             for query in queries:
-                sample = await measurer(client, base_url, token, query, runs=3)
+                sample = await measurer(client, base_url, token, query, runs=runs)
                 all_samples.append(sample)
 
         summary = _compute_summary(all_samples)

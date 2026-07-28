@@ -1,4 +1,5 @@
 from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import relationship
 
@@ -16,11 +17,16 @@ class Proposal(CommonBase):
     ai_polished = Column(Boolean, default=False)
     total_face_value = Column(Float, default=0)
 
-    creator = relationship("User")
-    items = relationship("ProposalItem", back_populates="proposal", cascade="all, delete-orphan")
     ai_polish_content = Column(Text, nullable=True)
     ai_polish_at = Column(DateTime(timezone=True), nullable=True)
     ai_polish_model = Column(String(64), nullable=True)
+    ai_generation_version = Column(String(32), nullable=True)
+    ai_source_ids = Column(JSONB, nullable=True)
+    ai_confirmed_by = Column(PGUUID(as_uuid=True), ForeignKey("user.id"), nullable=True)
+
+    creator = relationship("User", foreign_keys=[creator_id])
+    ai_confirmer = relationship("User", foreign_keys=[ai_confirmed_by])
+    items = relationship("ProposalItem", back_populates="proposal", cascade="all, delete-orphan")
 
 
 class ProposalItem(CommonBase):

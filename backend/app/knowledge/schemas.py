@@ -87,11 +87,16 @@ class Source(BaseModel):
     source_type: Literal["document", "product", "database_fact"]
     title: str
     product_id: str | None = None
+    document_id: str | None = None
+    chunk_id: str | None = None
     page: int | None = None
     section: str | None = None
     quote: str | None = None
     observed_at: datetime | None = None
     access_policy: str = "filtered"
+    score: float | None = None
+    channel: str | None = None
+    open_url: str | None = None
 
 
 class Fact(BaseModel):

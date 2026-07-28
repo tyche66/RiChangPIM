@@ -28,6 +28,7 @@ PERMISSIONS = [
 ]
 
 ROLE_PERMISSIONS = {
+    "admin": [perm[0] for perm in PERMISSIONS],
     "purchaser": ["ai:access", "ai:product", "ai:knowledge", "ai:quality", "ai:procurement"],
     "sales": ["ai:access", "ai:product", "ai:knowledge"],
     "viewer": ["ai:access", "ai:knowledge"],

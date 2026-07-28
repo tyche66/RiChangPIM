@@ -100,6 +100,7 @@ PERMISSIONS = [
     ("ai:knowledge", "AI 知识问答", "ai", "knowledge", "read"),
     ("ai:quality", "AI 质量查询", "ai", "quality", "read"),
     ("ai:procurement", "AI 采购查询", "ai", "procurement", "read"),
+    ("ai:pending_action", "AI 待确认动作", "ai", "pending_action", "write"),
     ("knowledge:manage", "知识索引管理", "knowledge", "manage", "write"),
     ("knowledge:debug", "知识调试", "knowledge", "debug", "read"),
 ]
@@ -166,6 +167,7 @@ ROLE_PERMISSIONS = {
         "ai:access",
         "ai:product",
         "ai:knowledge",
+        "ai:pending_action",
         "scene_image:view",
         "scene_image:create",
         "scene_image:edit",

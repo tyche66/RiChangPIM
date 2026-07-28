@@ -56,6 +56,9 @@ class ProposalResponse(ProposalBase):
     ai_polish_content: str | None = None
     ai_polish_at: datetime | None = None
     ai_polish_model: str | None = None
+    ai_generation_version: str | None = None
+    ai_source_ids: list[str] | None = None
+    ai_confirmed_by: UUID | None = None
     total_face_value: float
     create_time: datetime
     items: list[ProposalItemResponse] = Field(default_factory=list)
