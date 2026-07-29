@@ -3,7 +3,9 @@ param(
   [int]$FrontendListenPort = 3001,
   [int]$FrontendTargetPort = 5173,
   [int]$BackendListenPort = 8000,
-  [int]$BackendTargetPort = 8000
+  [int]$BackendTargetPort = 8000,
+  [int]$AiListenPort = 888,
+  [int]$AiTargetPort = 888
 )
 
 $ErrorActionPreference = 'Stop'
@@ -32,13 +34,16 @@ function Ensure-FirewallRule {
 
 Ensure-PortProxy -ListenPort $FrontendListenPort -TargetPort $FrontendTargetPort
 Ensure-PortProxy -ListenPort $BackendListenPort -TargetPort $BackendTargetPort
+Ensure-PortProxy -ListenPort $AiListenPort -TargetPort $AiTargetPort
 Ensure-FirewallRule -Port $FrontendListenPort -Name 'AI-PIM Demo Frontend 3001'
 Ensure-FirewallRule -Port $BackendListenPort -Name 'AI-PIM Demo Backend 8000'
+Ensure-FirewallRule -Port $AiListenPort -Name 'AI-PIM Demo AI 888'
 
 Write-Host '==> portproxy configured:'
 & netsh interface portproxy show all
 
 Write-Host ''
 Write-Host '==> Funnel commands:'
-Write-Host "tailscale funnel $FrontendListenPort"
+Write-Host "tailscale funnel $FrontendListenPort   # recommended public AI Portal / demo entry"
 Write-Host "tailscale funnel $BackendListenPort"
+Write-Host "tailscale funnel $AiListenPort         # optional direct Docker nginx entry"

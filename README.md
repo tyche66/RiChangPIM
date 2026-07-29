@@ -25,11 +25,15 @@ RiChangPIM 是当前这套 AI-PIM 项目的工作快照，面向产品信息管�
 | 仓库根目录 | `RiChangPIM/` |
 | 后端 | `backend/`，FastAPI + SQLAlchemy + Alembic |
 | 前端 | `frontend/`，Vue 3 + Vite + Element Plus + Pinia |
+| AI 门户 | `portal/`，独立 AI 对话门户 |
 | 数据库 | PostgreSQL 16 + pgvector |
 | 缓存 | Redis 7 |
 | 对象存储 | MinIO |
 | 文档转换 | Gotenberg 8 |
 | OCR 服务 | `docker/ocr/` 容器内独立服务 |
+| AI 默认状态 | `AI_ADAPTER=openai`，`AI_CHAT_MODEL=agnes-2.5-flash` |
+| Knowledge Gateway | 默认启用（`KNOWLEDGE_GATEWAY_ENABLED=1`）|
+| 当前版本 | v1.8.0 |
 | 当前迁移 head | `0014_knowledge_tables` |
 | 主要种子入口 | `backend/app/scripts/seed_data.py` + `backend/alembic/versions/0004_seed_data.py` |
 | 产品试点数据文件 | `backend/data/sunon_pilot_products.json` |
@@ -138,7 +142,21 @@ Set-ExecutionPolicy -Scope Process Bypass
 tailscale funnel 3001
 ```
 
-公网入口会落到 Portal，`/admin/` 会落到现有管理后台，同源 `/api` 会由演示服务器转发到后端，因此 Portal、管理后台、产品图片、文件上传、分享页等功能都可以走完整链路。
+推荐把 `3001` 作为唯一公网入口使用。这个入口实际就是 AI Portal 演示入口：
+
+- `https://<你的 Funnel 域名>/`：AI Portal 首页
+- `https://<你的 Funnel 域名>/chat`：AI 对话页
+- `https://<你的 Funnel 域名>/admin/`：现有管理后台
+
+同源 `/api` 会由演示服务器转发到后端，因此 AI 查询、Portal、管理后台、产品图片、文件上传、分享页等功能都可以走完整链路。
+
+如果你还需要把 Docker Nginx 的 `888` 入口单独暴露出来做排障或对照验证，`windows_demo_ports.ps1` 现在也会补上 `888 -> 888` 的 Windows 端口转发。此时可以单独执行：
+
+```powershell
+tailscale funnel 888
+```
+
+但会议演示时仍然优先建议使用 `3001` 这条统一入口，避免把 AI 页面、管理后台和 API 分散到多条公网地址上。
 
 开发环境默认端口：
 

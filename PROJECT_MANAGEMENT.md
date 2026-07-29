@@ -27,7 +27,7 @@
 - 13 条铭达试点产品 + 待核价占位 + OCR 解析状态 + 字段级 RBAC + 备份脚本与恢复演练
 - AI/OCR 默认 fail-closed (AI_ADAPTER=none / OCR_ADAPTER=none)
 
-### V1.2 - 内部试点运营加固（当前阶段，唯一基线 = docs/v1.2-plan.md）
+### V1.2 - 内部试点运营加固 ✅ GO
 
 - CI 与发布门禁升级（完整后端 pytest / 前端 tsc / ESLint / Vitest / build / Compose / migration upgrade / pip-audit / npm audit）
 - 运维可观测性（零依赖 /metrics、扩展 /health/ready、/ops/status、5xx rolling 计数、日志脱敏）
@@ -37,6 +37,25 @@
 - 性能规模与并发基线（seed_scale.py 1x/10x/100x；报价 confirm 真正幂等）
 - 文档与版本治理（v1.2-plan + RELEASE_GATE + TODO/PROJECT_MANAGEMENT/BUILD_LOG 更新至 V1.1 GO）
 - 明确不做：多租户、ERP/CRM、完整审批引擎、向量 RAG 生产启用、Kubernetes 等
+
+### V1.8.0 - AI 能力生产就绪 ✅ GO
+
+**目标**: 将 AI 从验证级升级为可演示生产能力，统一演示入口。
+
+**交付内容**:
+- Knowledge Gateway 正式上线（`POST /api/v1/knowledge/query` + SSE 流式协议）
+- RuleBasedPlanner 支持中文实体提取（铭达、办公桌等）+ 价格排序意图识别
+- 只读产品搜索/比较/质量查询工具 + 供应商比较工具
+- 混合检索（pgvector + 关键词）
+- 角色级字段投射（销售/viewer 隐藏成本价等敏感字段）
+- OpenAI-compatible 适配器默认启用（AI_ADAPTER=openai）
+- 模型默认 `agnes-2.5-flash`，OpenRouter embedding 2048 维
+- DigestConversationStore + 配额检查
+- AI Portal 演示服务器（`portal/dist` 入口 + `/chat` 对话页 + `/admin/` 反向代理）
+- 演示脚本增强：健康检查端点、端口冲突检测、死进程清理、Windows 888 端口转发
+- docker-compose.yml AI 配置全环境变量化
+
+**当前结论**: GO。后端 healthy，AI 状态 ok，Knowledge Gateway 全链路可用，Portal 演示页面可达。
 
 ### V2 - 企业集成
 
@@ -194,3 +213,4 @@ docker compose up -d backend
 | 2026-07-16 | RC 最终验收复跑；Docker 可用且 backend 镜像构建通过，但 Compose 因 host 5432 端口冲突失败，维持 NO-GO | RC 最终验收 Agent |
 | 2026-07-16 | RC 端口冲突解除后全量复跑；Compose 六服务健康，backend migrate/init_admin/seed_data/uvicorn 顺序通过，frontend/API/login/core/share/PDF/RBAC 全量通过，backend 111 passed / frontend 36 passed，判定 GO。MVP-RC 关闭，进入 V1-AI Pilot。 | 主控 Agent |
 | 2026-07-22 | 修复带图片产品详情 500 和前端错误状态；新增版本接口、版本页面及统一构建元数据；修复 Compose 凭据漂移导致的登录 500 和 Alembic 长 revision 兼容。详见 `docs/v1.2-verification.md`。 | 主控 Agent |
+| 2026-07-29 | V1.8.0 发布：Knowledge Gateway + AI Portal 正式上线；docker-compose AI 配置全环境变量化；Portal 演示服务器支持同源 /api 转发与 /admin/ 反向代理；演示脚本增强。 | 主控 Agent |

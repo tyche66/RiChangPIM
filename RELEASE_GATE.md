@@ -1,9 +1,8 @@
-# RELEASE GATE — AI-PIM V1.2
+# RELEASE GATE — AI-PIM V1.8.0
 
-> 唯一基线：`docs/v1.2-plan.md`
-> 版本号：`v1.2.0`
-> 适用分支：`release/v1.2.0`（从 `main` 切出）
-> 适用阶段：M2 之后所有候选发布，以及最终 RC GO 判定
+> 版本号：`v1.8.0`
+> 适用分支：`main`（V1.8.0 直接基于 main 发布）
+> 适用阶段：Knowledge Gateway + AI Portal 生产就绪发布
 
 本文件定义 V1.2 的发布门禁。任一门禁失败即为 NO-GO，不接受“测试通过但运维未验收”的条件式发布。门禁验证脚本见 `scripts/release_gate.sh`。
 

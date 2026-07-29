@@ -2,24 +2,47 @@
 
 ## 当前发布状态
 
-- V1.1 已发布并 GO：25/25 production regression PASS，详见 `docs/v1.1-verification.md`。
-- 当前阶段：V1.2 内部试点运营加固，详见 `docs/v1.2-plan.md` 与 `RELEASE_GATE.md`。
-  V1.2 已落地 M1-M4 工作包，RC 阶段执行全量门禁与扩展生产回归至 35-40 项。
-- 2026-07-22 完成产品详情 500、详情错误状态、版本页/版本接口、统一构建元数据、登录数据库
-  凭据漂移和 Alembic 长 revision 兼容修复，详见 `docs/v1.2-verification.md`。
-- 历史构建版本: MVP-RC-20260716（初次 NO-GO 的根因 host 5432 端口冲突已在 V1.1 阶段解除）。
+- V1.8.0 已发布并 GO：Knowledge Gateway + AI Portal + 演示服务器全链路可用。
+- 当前阶段：V1.8.0 — AI 能力生产就绪（Knowledge Gateway + AI Portal + 统一演示入口）。
+  - AI_ADAPTER=openai 为默认（原 V1.2 默认为 none）
+  - AI_CHAT_MODEL=agnes-2.5-flash（原 V1.2 默认为 agnes-2.0-flash）
+  - AI_API_URL 可通过环境变量覆盖（默认 https://apihub.agnes-ai.com/v1）
+  - Knowledge Gateway 默认启用（KNOWLEDGE_GATEWAY_ENABLED=1）
+  - Portal 演示服务器支持同源 /api 转发、/admin/ 反向代理、共享静态资源
+  - 演示脚本支持端口冲突检测、死进程清理、健康检查端点
+  - 新增 Windows 端口 888 用于直通 Docker Nginx
+- 历史构建版本: V1.2（M1-M4 试点运营加固完成）；MVP-RC-20260716（初次 NO-GO 已在 V1.1 解除）。
 
 ## 构建信息
 
-- 最近构建时间: 2026-07-22（产品详情、版本功能、登录与迁移兼容增量验证）
-- 构建版本: v1.2.0（M1-M4 实施完成；RC 阶段待全量门禁后正式 GO）
+- 最近构建时间: 2026-07-29（AI 能力生产就绪 + 演示链路统一）
+- 构建版本: v1.8.0（Knowledge Gateway 正式上线，AI 门户可演示）
 - 构建环境: /home/AI-PIM/RiChangPIM
 - 后端根目录: /home/AI-PIM/RiChangPIM/backend
 - 前端根目录: /home/AI-PIM/RiChangPIM/frontend
-- 构建产物位置: /home/AI-PIM/RiChangPIM/frontend/dist
-- 最终结论: 当前进度 V1.2 RC 候选，待 RC 全量门禁通过后判定 GO。
+- Portal 根目录: /home/AI-PIM/RiChangPIM/portal
+- 构建产物位置: /home/AI-PIM/RiChangPIM/frontend/dist + /home/AI-PIM/RiChangPIM/portal/dist
+- 最终结论: GO — AI 门户、Knowledge Gateway、统一演示全链路通过。
 
-## V1.2 阶段任务完成表（截至 2026-07-22）
+## V1.8.0 阶段任务完成表（截至 2026-07-29）
+
+| 任务 | 状态 | 说明 |
+| --- | --- | --- |
+| Knowledge Gateway 上线 | 完成 | POST /api/v1/knowledge/query + SSE 流式协议 + RuleBasedPlanner |
+| 中文实体提取增强 | 完成 | 铭达、办公桌等中文业务术语识别；最便宜/最低价排序意图 |
+| 只读产品工具 | 完成 | product.search/get_many/compare + supplier.compare + quality 查询 |
+| 混合检索 | 完成 | pgvector halfvec(2048) + HNSW + 关键词混合 |
+| 角色级字段投射 | 完成 | 成本价/供应商对 sales/viewer 隐藏 |
+| AI 适配器默认启用 | 完成 | AI_ADAPTER=openai 为默认，AI_CHAT_MODEL=agnes-2.5-flash |
+| Embedding 生产化 | 完成 | OpenRouter nvidia/nemotron-3-embed-1b:free，2048 维 |
+| 配额检查与审计 | 完成 | Redis 每用户每分钟 10 次限流 + DigestConversationStore |
+| AI Portal 演示服务器 | 完成 | portal/dist 入口、/chat 对话页、/admin/ 反向代理 |
+| 演示脚本增强 | 完成 | 健康检查端点、端口冲突检测、死进程清理、888 端口转发 |
+| docker-compose AI 配置 | 完成 | AI_API_URL/AI_CHAT_MODEL 全环境变量化 |
+| Playwright 回归 | 完成 | Desktop 26 passed, Mobile 响应式修复通过 |
+| 全链路验证 | 完成 | Portal → API → Knowledge Gateway → pgvector → AI Adapter |
+
+## 遗留 V1.2 阶段任务完成表（截至 2026-07-22）
 
 | 任务 | 状态 | 说明 |
 | --- | --- | --- |

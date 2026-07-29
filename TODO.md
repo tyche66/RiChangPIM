@@ -2,11 +2,13 @@
 
 ## 当前状态
 
-- V1.1 已发布并 GO（详见 docs/v1.1-verification.md，25/25 production regression PASS）。
-- 当前阶段: V1.2 内部试点运营加固（详见 docs/v1.2-plan.md）。
-- V1.2 唯一基线: docs/v1.2-plan.md；本文件仅作为任务跟踪辅助，与 plan 冲突时以 plan 为准。
+- V1.8.0 已发布并 GO：Knowledge Gateway + AI Portal + 统一演示入口全链路可用。
+  - AI_ADAPTER=openai 默认，AI_CHAT_MODEL=agnes-2.5-flash
+  - Knowledge Gateway 默认启用（KNOWLEDGE_GATEWAY_ENABLED=1）
+  - Portal 演示服务器支持同源 /api 转发、/admin/ 反向代理
+  - 演示脚本支持端口冲突检测、死进程清理、健康检查端点
+- 当前阶段: V1.8.0 — AI 能力生产就绪（Knowledge Gateway + AI Portal）。
 - 发布门禁: RELEASE_GATE.md。
-- V1-AI Pilot 历史判定已并入 V1.1 GO 状态（见 docs/v1.1-verification.md）。
 
 ## V1.2 内部试点运营加固
 
