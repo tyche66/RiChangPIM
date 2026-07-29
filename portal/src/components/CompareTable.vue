@@ -3,7 +3,7 @@ defineProps<{ products: Array<Record<string, unknown>> }>()
 </script>
 
 <template>
-  <div v-if="products.length > 1" class="compare-panel">
+  <div v-if="products.length > 1" class="answer-panel compare-panel">
     <div class="panel-heading">
       <p class="eyebrow">Side by side</p>
       <h3>比较</h3>

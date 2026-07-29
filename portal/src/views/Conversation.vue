@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
-
 import {
   confirmPendingAction,
   getSource,
@@ -40,10 +39,7 @@ const hasResults = computed(
 
 async function submit(message: string) {
   const token = await auth.ensureToken()
-  if (!token) {
-    error.value = '请先登录'
-    return
-  }
+  if (!token) { error.value = '请先登录'; return }
   error.value = ''
   answer.value = ''
   products.value = []
@@ -52,10 +48,7 @@ async function submit(message: string) {
   events.value = []
   busy.value = true
   controller.value = new AbortController()
-  const body = {
-    message,
-    capabilities: { stream: true, supports_actions: true },
-  }
+  const body = { message, capabilities: { stream: true, supports_actions: true } }
   try {
     await streamKnowledgeQuery(body, token, controller.value.signal, (event) => {
       events.value.push(event)
@@ -75,22 +68,13 @@ async function submit(message: string) {
         meta.value = {
           trace_id: String(event.data.trace_id || ''),
           session_id: String(event.data.session_id || ''),
-          answer: '',
-          facts: [],
-          sources: [],
-          products: [],
-          pending_actions: [],
-          confidence: 'medium',
-          insufficient_sources: false,
-          usage: {},
+          answer: '', facts: [], sources: [], products: [], pending_actions: [],
+          confidence: 'medium', insufficient_sources: false, usage: {},
         }
       }
     })
     if (!answer.value) {
-      const response = await runKnowledgeQuery(
-        { message, capabilities: { stream: false, supports_actions: true } },
-        token,
-      )
+      const response = await runKnowledgeQuery({ message, capabilities: { stream: false, supports_actions: true } }, token)
       meta.value = response
       answer.value = response.answer
       products.value = response.products
@@ -105,10 +89,7 @@ async function submit(message: string) {
   }
 }
 
-function stop() {
-  controller.value?.abort()
-  busy.value = false
-}
+function stop() { controller.value?.abort(); busy.value = false }
 
 function reset() {
   answer.value = ''
@@ -123,7 +104,6 @@ function reset() {
 function productDetailUrl(product: Record<string, unknown>) {
   const productId = String(product.id || '')
   if (!productId) return '/admin/login'
-
   const detailPath = `/products/${encodeURIComponent(productId)}`
   const canViewProduct = auth.roleCode === 'admin' || auth.permissions.includes('product:view')
   if (canViewProduct) return `/admin${detailPath}`
@@ -133,13 +113,10 @@ function productDetailUrl(product: Record<string, unknown>) {
 async function confirmAction(action: PendingAction) {
   const token = await auth.ensureToken()
   if (!token) return
-  busy.value = true
-  error.value = ''
+  busy.value = true; error.value = ''
   try {
     const confirmed = await confirmPendingAction(action, token)
-    pendingActions.value = pendingActions.value.map((item) =>
-      item.id === confirmed.id ? confirmed : item,
-    )
+    pendingActions.value = pendingActions.value.map((item) => item.id === confirmed.id ? confirmed : item)
   } catch (exc) {
     error.value = exc instanceof Error ? exc.message : '确认失败'
   } finally {
@@ -161,109 +138,91 @@ async function openSource(sourceId: string) {
 
 onMounted(() => {
   const initial = route.query.q
-  if (typeof initial === 'string' && initial) {
-    void submit(initial)
-  }
+  if (typeof initial === 'string' && initial) { void submit(initial) }
 })
 </script>
 
 <template>
   <main class="chat-shell">
+    <!-- Minimal sticky header -->
     <header class="site-header">
       <a class="brand-mark" href="/" aria-label="RiChangPIM Portal">
         <img :src="logoUrl" alt="RiChangPIM" />
         <span>Portal</span>
       </a>
-      <nav class="site-nav" aria-label="Primary">
-        <span>AI Search</span>
-        <span>Products</span>
-        <span>Sources</span>
-      </nav>
-      <div class="toolbar-inline">
-        <button type="button" class="button button--secondary" @click="reset">清空</button>
-      </div>
+      <button type="button" class="button button--secondary" @click="reset">清空</button>
     </header>
 
-    <section class="chat-intro page-shell">
-      <div class="chat-intro__copy">
-        <p class="eyebrow">AI Product Search</p>
+    <!-- Centered intro + input (reference chatbot style) -->
+    <section class="chat-intro">
+      <div>
         <h1>把产品、资料和质量记录放到同一个查询入口。</h1>
-        <p>输入型号、场景、材质、预算或对比需求，AI 会返回回答、候选产品、引用来源和需要确认的动作。</p>
+        <p>输入型号、场景、材质、预算或对比需求，AI 会返回答案、候选产品、引用来源和需要确认的动作。</p>
       </div>
-      <ChatInput :busy="busy" @submit="submit" @stop="stop" />
+      <div class="chat-input-wrap">
+        <!-- Pre-set prompt tags (left-aligned strip inside container) -->
+        <div class="tag-strip" aria-label="快捷产品类型">
+          <button v-for="p in ['办公桌','会议桌','安装资料','价格库存']" :key="p" type="button" class="chip" @click="submit(p)">
+            {{ p }}
+          </button>
+        </div>
+        <ChatInput :busy="busy" @submit="submit" @stop="stop" />
+      </div>
     </section>
 
-    <section class="workspace-grid page-shell">
-      <section class="workspace-main">
-        <div class="answer-panel panel--answer" :class="{ 'answer-panel--empty': !hasResults && !busy }">
-          <div class="panel__header">
-            <div>
-              <p class="eyebrow">Assistant summary</p>
-              <h2>回答</h2>
-            </div>
-            <span v-if="traceId" class="trace-pill">{{ traceId }}</span>
+    <!-- Results: single centered column, same width as input -->
+    <section v-if="hasResults || busy" class="workspace">
+      <!-- Answer -->
+      <article class="answer-panel" :class="{ 'answer-panel--empty': !hasResults && !busy }">
+        <div class="panel__header">
+          <div>
+            <p class="eyebrow">Assistant summary</p>
+            <h2>回答</h2>
           </div>
-          <p v-if="busy && !answer" class="muted-text">正在匹配产品与知识来源...</p>
-          <p v-else>{{ answer || '等待查询' }}</p>
-          <p v-if="error" class="error-text">{{ error }}</p>
+          <span v-if="traceId" class="trace-pill">{{ traceId }}</span>
         </div>
+        <p v-if="busy && !answer" class="muted-text">正在匹配产品与知识来源…</p>
+        <p v-else>{{ answer || '等待查询' }}</p>
+        <p v-if="error" class="error-text">{{ error }}</p>
+      </article>
 
-        <CompareTable :products="products" />
+      <!-- Compare -->
+      <CompareTable :products="products" />
 
-        <section v-if="products.length" class="card-list product-grid" aria-label="产品结果">
-          <ProductCard
-            v-for="product in products"
-            :key="String(product.id || product.product_no)"
-            :product="product"
-            :detail-url="productDetailUrl(product)"
-          />
-        </section>
-
-        <section v-if="pendingActions.length" class="card-list action-list" aria-label="待确认操作">
-          <PendingActionCard
-            v-for="action in pendingActions"
-            :key="action.id"
-            :action="action"
-            :busy="busy"
-            @confirm="confirmAction"
-          />
-        </section>
-
-        <section v-if="sources.length" class="card-list source-grid" aria-label="引用来源">
-          <SourceCard v-for="source in sources" :key="source.source_id" :source="source" @open="openSource" />
-        </section>
+      <!-- Products -->
+      <section v-if="products.length" class="card-list product-grid" aria-label="产品结果">
+        <ProductCard
+          v-for="item in products"
+          :key="String(item.id || item.product_no)"
+          :product="item"
+          :detail-url="productDetailUrl(item)"
+        />
       </section>
 
-      <aside class="workspace-side">
-        <section class="side-panel">
-          <p class="eyebrow">Query state</p>
-          <dl class="status-list">
-            <div>
-              <dt>状态</dt>
-              <dd>{{ busy ? '查询中' : '就绪' }}</dd>
-            </div>
-            <div>
-              <dt>产品</dt>
-              <dd>{{ products.length }}</dd>
-            </div>
-            <div>
-              <dt>来源</dt>
-              <dd>{{ sources.length }}</dd>
-            </div>
-            <div>
-              <dt>动作</dt>
-              <dd>{{ pendingActions.length }}</dd>
-            </div>
-          </dl>
-        </section>
-        <section class="side-panel">
-          <div class="panel__header">
-            <p class="eyebrow">Stream events</p>
-            <span>{{ events.length }}</span>
-          </div>
-          <EventStream :events="events" />
-        </section>
-      </aside>
+      <!-- Pending actions -->
+      <section v-if="pendingActions.length" class="card-list" aria-label="待确认操作">
+        <PendingActionCard
+          v-for="action in pendingActions"
+          :key="action.id"
+          :action="action"
+          :busy="busy"
+          @confirm="confirmAction"
+        />
+      </section>
+
+      <!-- Sources -->
+      <section v-if="sources.length" class="card-list source-grid" aria-label="引用来源">
+        <SourceCard v-for="source in sources" :key="source.source_id" :source="source" @open="openSource" />
+      </section>
+
+      <!-- Stream events (collapsible / compact) -->
+      <section v-if="events.length" class="side-panel" aria-label="流式事件">
+        <div class="panel__header">
+          <p class="eyebrow">Stream events</p>
+          <span>{{ events.length }}</span>
+        </div>
+        <EventStream :events="events" />
+      </section>
     </section>
   </main>
 </template>

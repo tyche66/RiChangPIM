@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-
 import ScopePanel from '@/components/ScopePanel.vue'
 import { useAuthStore } from '@/stores/auth'
 
@@ -38,19 +37,19 @@ async function quickStart(prompt: string) {
       </div>
       <ScopePanel :prompts="prompts" @pick="quickStart" />
     </section>
-    <section class="home-grid">
-      <div class="panel">
-        <h2>登录</h2>
 
+    <section class="home-grid">
+      <div class="login-panel">
+        <h2>登录</h2>
         <label>
           <span>账号</span>
-          <input v-model="username" type="text" />
+          <input v-model="username" type="text" placeholder="admin" />
         </label>
         <label>
           <span>密码</span>
-          <input v-model="password" type="password" @keydown.enter="login" />
+          <input v-model="password" type="password" placeholder="请输入密码" @keydown.enter="login" />
         </label>
-        <button type="button" class="button" @click="login">进入 Portal</button>
+        <button type="button" class="button button--primary" @click="login">进入 Portal</button>
         <p v-if="error" class="error-text">{{ error }}</p>
       </div>
     </section>
