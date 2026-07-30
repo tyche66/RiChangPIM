@@ -132,6 +132,22 @@ export async function streamKnowledgeQuery(
   }
 }
 
+/**
+ * 首屏推荐产品。需要 `product:view` 权限，门户 viewer 拿不到时会 403；
+ * 调用方要把失败当成「没有推荐」处理，退化成占位卡，不允许编造数据。
+ */
+export async function listProducts(
+  token: string,
+  size = 6,
+): Promise<Array<Record<string, unknown>>> {
+  const payload = await apiFetch<{ code: number; data: { list?: Array<Record<string, unknown>> } }>(
+    `/api/v1/products?page=1&size=${encodeURIComponent(size)}`,
+    { method: 'GET' },
+    token,
+  )
+  return payload.data?.list || []
+}
+
 export async function getSource(sourceId: string, token: string): Promise<KnowledgeSource> {
   const payload = await apiFetch<{ code: number; data: KnowledgeSource }>(
     `/api/v1/knowledge/sources/${encodeURIComponent(sourceId)}`,

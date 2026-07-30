@@ -38,11 +38,15 @@
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
-  --radius-composer: 22px;
+  --radius-composer: 999px;
+  /* 首屏卡堆用更大的圆角和更重的投影，与参考页（reeoo.com）一致 */
+  --radius-deck: 24px;
 
   /* 层级 */
   --shadow-hover: 0 8px 24px rgb(0 0 0 / 6%);
   --shadow-pop: 0 18px 48px rgb(0 0 0 / 12%);
+  --shadow-deck: 0 18px 40px rgb(0 0 0 / 14%);
+  --shadow-deck-hover: 0 30px 64px rgb(0 0 0 / 20%);
 
   /* 栅格 */
   --page-max: 1200px;
@@ -63,6 +67,12 @@ body {
   letter-spacing: 0;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /**
+   * 首屏卡堆会有卡片被推到 1200px 内容列之外，通栏白底也用了 100vw。
+   * 用 clip 而不是 hidden：clip 不会生成滚动容器，顶栏的 position: sticky
+   * 才能继续贴在视口上。
+   */
+  overflow-x: clip;
 }
 h1, h2, h3, h4 { line-height: 1.25; font-weight: 700; letter-spacing: 0; }
 button, input, textarea, select { font: inherit; color: inherit; }
@@ -168,73 +178,124 @@ table { border-collapse: collapse; }
   gap: 40px;
 }
 
-/* ===== 首屏说明 + 输入区 ===== */
+/* ===== 首屏：标题 + 胶囊输入 + 卡堆 + 能力条 =====
+ * 构图对齐 reeoo.com 首屏。整段压在一条通栏白底上，与下方 --bg 的暖灰
+ * 拉开层次；白底用 100vw 展开，靠 body 的 overflow-x: clip 兜住横向溢出。
+ */
+.chat-hero {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 28px;
+  padding-bottom: 36px;
+}
+.chat-hero::before {
+  content: "";
+  position: absolute;
+  inset: -32px calc(50% - 50vw) 0;
+  z-index: -1;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.chat-hero--compact { gap: 22px; }
+
 .chat-intro {
   padding-top: 24px;
   text-align: center;
 }
 .chat-intro h1 {
-  font-size: clamp(28px, 4vw, 42px);
-  line-height: 1.2;
-  max-width: 18em;
+  font-size: clamp(30px, 4.4vw, 48px);
+  font-weight: 800;
+  line-height: 1.14;
+  letter-spacing: -0.015em;
+  /* 21 个汉字的标题在 48px 下会顶满 1200px 内容列，收窄后交给 balance
+     断成两行长度接近的行，避免最后一行只剩「口。」两个字。 */
+  max-width: 17em;
   margin-inline: auto;
+  text-wrap: balance;
+  transition: font-size .3s ease;
+}
+/* 出结果后标题让位给回答，缩到一行的常规尺寸（reeoo 只有首屏一种状态，这里要兼顾阅读） */
+.chat-hero--compact .chat-intro { padding-top: 8px; }
+.chat-hero--compact .chat-intro h1 {
+  font-size: clamp(21px, 2.8vw, 30px);
+  max-width: none;
 }
 .chat-intro p {
-  margin: 14px auto 0;
+  margin: 16px auto 0;
   max-width: 34em;
   color: var(--ink-muted);
 }
 .composer-wrap {
-  max-width: var(--composer-max);
-  margin: 32px auto 0;
+  width: min(100%, var(--composer-max));
+  margin-inline: auto;
+}
+.hero-status {
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--ink-subtle);
+  margin-top: -12px;
 }
 
-.composer {
+/* 胶囊搜索框：左放大镜 / 中输入 / 右黑色圆形箭头，类型胶囊落到胶囊下面一行 */
+.composer-form {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 14px 14px 12px;
+  gap: 14px;
+}
+.composer {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) 40px;
+  align-items: center;
+  gap: 12px;
+  min-height: 58px;
+  padding: 8px 9px 8px 20px;
   background: var(--surface);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-composer);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 4%);
   transition: border-color .18s ease, box-shadow .18s ease;
 }
 .composer:focus-within {
   border-color: var(--ink);
   box-shadow: var(--shadow-hover);
 }
+.composer__icon {
+  display: inline-flex;
+  color: var(--ink-subtle);
+  transition: color .18s ease;
+}
+.composer__icon svg { width: 20px; height: 20px; display: block; }
+.composer:focus-within .composer__icon { color: var(--ink-muted); }
 .composer__field {
   width: 100%;
-  min-height: 66px;
-  max-height: 220px;
+  min-height: 26px;
+  max-height: 132px;
   resize: none;
   border: none;
   outline: none;
   background: transparent;
-  padding: 4px 4px 0;
-  line-height: 1.6;
+  padding: 0;
+  line-height: 1.7;
 }
 .composer__field::placeholder { color: var(--ink-subtle); }
 
 .composer__toolbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   gap: 12px;
   flex-wrap: wrap;
+  padding-inline: 4px;
 }
 .composer__chips {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   flex-wrap: wrap;
   min-width: 0;
-}
-.composer__actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-left: auto;
 }
 .composer__hint {
   font-size: 12px;
@@ -487,6 +548,158 @@ button.citation:hover { background: var(--ink); border-color: var(--ink); color:
 .source-list { gap: 10px; }
 /* 待确认动作不用 .card-list，避免和产品/来源两个列表混在同一组选择器里 */
 .stack { display: grid; gap: 16px; }
+
+/* ===== 首屏卡堆（reeoo 的扇形发牌） =====
+ * 卡位偏移写在组件的行内自定义属性里（--deck-x/-y/-rot/-enter-x/-z/-delay），
+ * transform 留在样式表：这样窄屏的媒体查询才能用 transform: none 把扇形拍平，
+ * 行内 transform 是压不掉的。
+ */
+.hero-deck--fan {
+  --deck-card-width: 248px;
+  position: relative;
+  display: block;
+  width: 100%;
+  /* 卡片本体约 330px 高，加上卡位 ±33px 的错落刚好收在这个高度里，
+     再高就会在卡堆和下面的能力条之间留出一段空白。 */
+  height: clamp(320px, 27vw, 380px);
+  gap: 0;
+  isolation: isolate;
+}
+.hero-deck--fan .hero-deck__slot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: var(--deck-card-width);
+  z-index: var(--deck-z, 1);
+  transform:
+    translate(calc(-50% + var(--deck-x, 0px)), calc(-50% + var(--deck-y, 0px)))
+    rotate(var(--deck-rot, 0deg));
+}
+/* hover 的卡片要压在同一环的另一张之上，否则放大后被邻居切掉一角 */
+.hero-deck--fan .hero-deck__slot:hover { z-index: 10; }
+.hero-deck--fan .product-card {
+  border-radius: var(--radius-deck);
+  box-shadow: var(--shadow-deck);
+  animation: deck-card-deal .56s cubic-bezier(.18, .84, .2, 1) backwards;
+  animation-delay: var(--deck-delay, 0ms);
+  transition: transform .26s cubic-bezier(.18, .84, .2, 1), box-shadow .26s ease;
+}
+/* 参考页 hover 只做「抬升 + 放大 + 加深投影」，旋转角留在外层卡位上不回正 */
+.hero-deck--fan .product-card:hover {
+  transform: translateY(-18px) scale(1.06);
+  box-shadow: var(--shadow-deck-hover);
+  border-color: var(--border);
+}
+@keyframes deck-card-deal {
+  from { opacity: 0; transform: translate(var(--deck-enter-x, 0px), 72px) scale(.78); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes deck-card-rise {
+  from { opacity: 0; transform: translateY(26px); }
+  to { opacity: 1; transform: none; }
+}
+/* 卡片数超过卡位数时退回常规栅格，宁可不扇形也不能丢数据 */
+.hero-deck--grid { padding-block: 4px; }
+.hero-deck--grid .product-card { border-radius: var(--radius-md); }
+/* 推荐/结果切换：旧卡淡出、新卡按 --deck-delay 重新发一次牌。
+   故意不定义 .deck-move，避免 TransitionGroup 的 FLIP 位移和扇形 transform 打架。 */
+.deck-enter-from,
+.deck-leave-to { opacity: 0; }
+.deck-leave-active { transition: opacity .18s ease; }
+/* 取不到推荐产品时的空白占位卡：只有卡形，不放任何编造出来的内容 */
+.product-card--empty {
+  display: block;
+  min-height: 296px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+/* ===== 能力入口条（对应参考页卡片下方那条分格统计条，但不放任何数字） ===== */
+.capability-bar {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.capability {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) 16px;
+  align-items: center;
+  gap: 12px;
+  padding: 16px clamp(12px, 2vw, 20px);
+  text-align: left;
+  opacity: .82;
+  transition: background-color .18s ease, opacity .18s ease;
+}
+.capability + .capability { border-left: 1px solid var(--border); }
+.capability:hover { background: var(--surface-soft); opacity: 1; }
+.capability__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: var(--surface-soft);
+  color: var(--ink);
+  transition: background-color .18s ease;
+}
+.capability:hover .capability__icon { background: var(--surface-strong); }
+.capability__icon svg { width: 17px; height: 17px; display: block; }
+.capability__body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.capability__body strong { font-size: 13.5px; font-weight: 600; line-height: 1.4; }
+.capability__body span {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--ink-muted);
+  overflow-wrap: anywhere;
+}
+.capability__arrow {
+  display: inline-flex;
+  color: var(--ink-subtle);
+  opacity: .38;
+  transition: opacity .18s ease, transform .18s ease;
+}
+.capability:hover .capability__arrow { opacity: .9; transform: translateX(2px); }
+.capability__arrow svg { width: 14px; height: 14px; display: block; }
+
+/* ===== 向下看回答的提示（查询后不自动滚动，滚不滚由用户决定） ===== */
+.scroll-cue {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-inline: auto;
+  padding: 4px 10px;
+  color: var(--ink-muted);
+  font-size: 13px;
+  transition: color .18s ease;
+}
+.scroll-cue:hover { color: var(--ink); }
+.scroll-cue svg {
+  width: 16px;
+  height: 16px;
+  display: block;
+  animation: cue-nudge 1.8s ease-in-out infinite;
+}
+@keyframes cue-nudge {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(4px); }
+}
+
+/* ===== 滚动揭示（配合 utils/reveal.ts 的 v-reveal） ===== */
+.reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity .5s ease, transform .5s cubic-bezier(.18, .84, .2, 1);
+}
+.reveal.is-revealed { opacity: 1; transform: none; }
 
 /* ===== 产品卡片 ===== */
 .product-card {
@@ -873,29 +1086,70 @@ button.citation:hover { background: var(--ink); border-color: var(--ink); color:
 @media (max-width: 1024px) {
   :root { --page-gutter: 20px; }
   .product-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  /**
+   * 扇形在窄屏里要么把卡片压到看不清字，要么竖着堆成 1800px 把回答埋掉。
+   * 这里改成可横向滑动的卡片带：卡位回到文档流，行内的 --deck-* 自定义属性
+   * 全部失效，只留 --deck-delay 控制入场节奏。
+   */
+  .hero-deck--fan {
+    display: flex;
+    height: auto;
+    gap: 14px;
+    padding: 4px var(--page-gutter) 14px;
+    margin-inline: calc(var(--page-gutter) * -1);
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+  }
+  .hero-deck--fan::-webkit-scrollbar { display: none; }
+  .hero-deck--fan .hero-deck__slot {
+    position: static;
+    transform: none;
+    flex: 0 0 min(74vw, 264px);
+    scroll-snap-align: center;
+  }
+  .hero-deck--fan .product-card {
+    animation-name: deck-card-rise;
+    border-radius: var(--radius-md);
+  }
+  .hero-deck--fan .product-card:hover { transform: translateY(-2px); }
+  .product-card--empty { min-height: 240px; }
+  .capability-bar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .capability:nth-child(2n + 1) { border-left: none; }
+  .capability:nth-child(n + 3) { border-top: 1px solid var(--border); }
 }
 
 /* ===== 响应式：手机 ===== */
 @media (max-width: 640px) {
-  :root { --page-gutter: 16px; --radius-composer: 18px; }
+  :root { --page-gutter: 16px; --radius-composer: 999px; }
   body { font-size: 14.5px; }
   .site-header__inner { min-height: 56px; }
   .brand-mark__sub { display: none; }
   .chat-shell { padding: 20px 0 72px; gap: 28px; }
+  .chat-hero { gap: 20px; padding-bottom: 28px; }
+  .chat-hero::before { inset: -20px calc(50% - 50vw) 0; }
   .chat-intro { padding-top: 8px; }
-  .composer-wrap { margin-top: 24px; }
-  .composer__field { min-height: 54px; }
-  /* 手机上把类型胶囊压成可横向滑动的一行，发送键才能留在同一行。 */
-  .composer__toolbar { flex-wrap: nowrap; }
+  .chat-intro h1 { max-width: none; }
+  .composer { min-height: 52px; padding: 7px 7px 7px 16px; grid-template-columns: 18px minmax(0, 1fr) 36px; }
+  .composer__icon svg { width: 18px; height: 18px; }
+  .composer__field { min-height: 24px; max-height: 108px; }
+  .composer .icon-button { width: 36px; height: 36px; }
+  /* 手机上把类型胶囊压成可横向滑动的一行 */
+  .composer__toolbar { flex-wrap: nowrap; justify-content: flex-start; }
   .composer__chips {
     flex: 1 1 0;
     flex-wrap: nowrap;
+    justify-content: flex-start;
     overflow-x: auto;
     scrollbar-width: none;
     padding-bottom: 2px;
   }
   .composer__chips::-webkit-scrollbar { display: none; }
   .composer__hint { display: none; }
+  .hero-status { margin-top: -8px; }
+  .capability { grid-template-columns: 28px minmax(0, 1fr); gap: 10px; padding: 12px 12px; }
+  .capability__icon { width: 28px; height: 28px; border-radius: 9px; }
+  .capability__arrow { display: none; }
   .panel { padding: 18px 16px; }
   .product-grid { grid-template-columns: 1fr; }
   .product-card__media { aspect-ratio: 16 / 10; }
@@ -916,4 +1170,14 @@ button.citation:hover { background: var(--ink); border-color: var(--ink); color:
   }
   .product-card:hover { transform: none; }
   .product-card:hover .product-card__image { transform: none; }
+  /* 上面把时长压到 0 就够了，但卡堆和滚动揭示的起始状态是 opacity: 0，
+     必须显式回到可见态，不能让内容停在透明上。 */
+  .hero-deck--fan .product-card {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+  .hero-deck--fan .product-card:hover { transform: none; box-shadow: var(--shadow-deck); }
+  .scroll-cue svg { animation: none; }
+  .reveal { opacity: 1; transform: none; }
 }

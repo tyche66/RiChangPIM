@@ -38,3 +38,5 @@ backend/err.txt
 Thumbs.db
 *:Zone.Identifier
 *Zone.Identifier
+.opencode/
+MANIFEST.txt

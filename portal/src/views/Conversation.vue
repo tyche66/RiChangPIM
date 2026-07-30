@@ -2,17 +2,25 @@
 /**
  * 查询工作台。
  *
+ * 版式参考 reeoo.com 首屏：巨号标题 + 胶囊输入 + 扇形铺开的卡片堆 +
+ * 一条能力入口，回答、动作、比较表、来源、技术详情全部放在首屏下方，
+ * 向下滚动逐段淡入。
+ *
  * 展示原则：
  * 1. 用户先看答案、产品和来源；追踪 ID、SSE 原始事件、token 用量这些
  *    对使用者没有意义的内容统一折进「技术详情」，默认收起。
  * 2. 后端枚举、字段名和占位值一律经 utils/format 翻译，不直接渲染。
  * 3. 正文里的 [chunk:uuid] 由 utils/citations 折成脚注角标，引用关系不丢。
+ * 4. 卡片堆默认放推荐产品，AI 返回产品后整堆替换；取不到推荐（门户
+ *    viewer 没有 product:view）就退化成空白占位卡，**不编造数据**。
+ * 5. 查询后不自动滚动，改用卡片下方的「向下查看回答」提示，滚动由用户决定。
  */
 import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   confirmPendingAction,
   getSource,
+  listProducts,
   runKnowledgeQuery,
   streamKnowledgeQuery,
   type KnowledgeResponse,
@@ -22,17 +30,19 @@ import {
 } from '@/api'
 import AnswerBody from '@/components/AnswerBody.vue'
 import AppHeader from '@/components/AppHeader.vue'
+import CapabilityBar from '@/components/CapabilityBar.vue'
 import ChatInput from '@/components/ChatInput.vue'
 import CollapseSection from '@/components/CollapseSection.vue'
 import CompareTable from '@/components/CompareTable.vue'
 import EventStream from '@/components/EventStream.vue'
+import HeroDeck from '@/components/HeroDeck.vue'
 import PendingActionCard from '@/components/PendingActionCard.vue'
-import ProductCard from '@/components/ProductCard.vue'
 import SourceCard from '@/components/SourceCard.vue'
 import SourceDialog from '@/components/SourceDialog.vue'
 import { useAuthStore } from '@/stores/auth'
 import { buildAnswer, citationIndexBySource } from '@/utils/citations'
 import { confidenceLabel, formatDuration, phaseLabel, shortId } from '@/utils/format'
+import { vReveal } from '@/utils/reveal'
 
 const RESULT_STATUS_LABELS: Record<string, string> = {
   completed: '已完成',
@@ -40,6 +50,8 @@ const RESULT_STATUS_LABELS: Record<string, string> = {
   cancelled: '已取消',
   failed: '失败',
 }
+/** 首屏推荐卡数量。扇形卡位是 9 个，5 张刚好铺满可视宽度不被裁掉。 */
+const RECOMMEND_SIZE = 5
 
 const auth = useAuthStore()
 const route = useRoute()
@@ -52,6 +64,7 @@ const answer = ref('')
 const lastQuery = ref('')
 const phaseText = ref('')
 const products = ref<Array<Record<string, unknown>>>([])
+const recommended = ref<Array<Record<string, unknown>>>([])
 const sources = ref<KnowledgeSource[]>([])
 const pendingActions = ref<PendingAction[]>([])
 const events = ref<StreamEvent[]>([])
@@ -66,6 +79,7 @@ const activeSource = ref<KnowledgeSource | null>(null)
 const copied = ref(false)
 const controller = ref<AbortController | null>(null)
 const resultsEl = ref<HTMLElement | null>(null)
+const composer = ref<InstanceType<typeof ChatInput> | null>(null)
 
 const rendered = computed(() => buildAnswer(answer.value, sources.value, busy.value))
 const segments = computed(() => rendered.value.segments)
@@ -82,6 +96,30 @@ const hasResults = computed(() =>
   ),
 )
 const started = computed(() => busy.value || hasResults.value || Boolean(lastQuery.value))
+/** 门户 viewer 只有 ai:* 权限，取产品列表会 403，所以先判断再请求。 */
+const canViewProducts = computed(
+  () => auth.roleCode === 'admin' || auth.permissions.includes('product:view'),
+)
+
+const deckMode = computed<'result' | 'recommend' | 'placeholder'>(() => {
+  if (products.value.length) return 'result'
+  if (recommended.value.length) return 'recommend'
+  return 'placeholder'
+})
+const deckProducts = computed(() =>
+  deckMode.value === 'recommend' ? recommended.value : products.value,
+)
+const deckLabel = computed(() => (deckMode.value === 'result' ? '产品结果' : '推荐产品'))
+/** 卡片堆的说明文字必须让人分清「AI 返回」「推荐」「没有数据」三种情况。 */
+const deckCaption = computed(() => {
+  if (deckMode.value === 'result') return `查询返回 ${products.value.length} 个产品`
+  if (deckMode.value === 'recommend') {
+    return `推荐产品 ${recommended.value.length} 个 · 查询后替换为 AI 返回的结果`
+  }
+  if (busy.value) return '正在检索产品'
+  if (!canViewProducts.value) return '当前账号没有产品浏览权限，查询后这里显示 AI 返回的产品'
+  return '暂时没有可展示的产品，查询后这里显示 AI 返回的结果'
+})
 
 const usageText = computed(() => {
   const total = usage.value.total_tokens ?? usage.value.total
@@ -178,6 +216,7 @@ function handleEvent(event: StreamEvent) {
   }
 }
 
+/** 只有用户点「向下查看回答」时才滚动，查询本身不抢走视口。 */
 async function scrollToResults() {
   await nextTick()
   const el = resultsEl.value
@@ -197,7 +236,6 @@ async function submit(message: string) {
   busy.value = true
   const startedAt = Date.now()
   controller.value = new AbortController()
-  void scrollToResults()
   try {
     let streamFailure: unknown = null
     try {
@@ -267,8 +305,7 @@ function productDetailUrl(product: Record<string, unknown>) {
   const productId = String(product.id || '')
   if (!productId) return '/admin/login'
   const detailPath = `/products/${encodeURIComponent(productId)}`
-  const canViewProduct = auth.roleCode === 'admin' || auth.permissions.includes('product:view')
-  if (canViewProduct) return `/admin${detailPath}`
+  if (canViewProducts.value) return `/admin${detailPath}`
   return `/admin/login?redirect=${encodeURIComponent(detailPath)}`
 }
 
@@ -287,6 +324,26 @@ async function confirmAction(action: PendingAction) {
   }
 }
 
+/** 能力入口只把关键词填进输入框，最后一步仍由用户按发送。 */
+function prefill(text: string) {
+  composer.value?.prefill(text)
+}
+
+/**
+ * 首屏推荐产品。403 或后端不可用时保持空数组，让卡位退化成空白占位卡，
+ * 绝不用假数据填充。
+ */
+async function loadRecommended() {
+  if (!canViewProducts.value) return
+  const token = await auth.ensureToken()
+  if (!token) return
+  try {
+    recommended.value = await listProducts(token, RECOMMEND_SIZE)
+  } catch {
+    recommended.value = []
+  }
+}
+
 function signOut() {
   auth.clear()
   void router.push('/')
@@ -295,6 +352,7 @@ function signOut() {
 onMounted(() => {
   const initial = route.query.q
   if (typeof initial === 'string' && initial) void submit(initial)
+  void loadRecommended()
 })
 </script>
 
@@ -305,21 +363,50 @@ onMounted(() => {
   </AppHeader>
 
   <main class="chat-shell">
-    <section v-if="!started" class="chat-intro">
-      <h1>把产品、资料和质量记录放到同一个查询入口。</h1>
-      <p>输入型号、场景、材质、预算或对比需求，AI 会返回答案、候选产品、引用来源和需要确认的动作。</p>
+    <section class="chat-hero" :class="{ 'chat-hero--compact': started }">
+      <div class="chat-intro">
+        <h1>把产品、资料和质量记录放到同一个查询入口。</h1>
+        <p v-if="!started">
+          输入型号、场景、材质、预算或对比需求，AI 会返回答案、候选产品、引用来源和需要确认的动作。
+        </p>
+      </div>
+
+      <div class="composer-wrap">
+        <ChatInput ref="composer" :busy="busy" @submit="submit" @stop="stop" />
+      </div>
+
+      <HeroDeck
+        :products="deckProducts"
+        :detail-url="productDetailUrl"
+        :variant="deckMode"
+        :label="deckLabel"
+        :placeholder-count="RECOMMEND_SIZE"
+      />
+      <p class="hero-status">{{ deckCaption }}</p>
+
+      <CapabilityBar @pick="prefill" />
+
+      <button v-if="started" type="button" class="scroll-cue" @click="scrollToResults">
+        <span>向下查看回答</span>
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path
+            d="M12 5v14m-7-7l7 7l7-7"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>
+      </button>
     </section>
 
-    <div class="composer-wrap">
-      <ChatInput :busy="busy" @submit="submit" @stop="stop" />
-    </div>
     <section v-if="started" ref="resultsEl" class="workspace" aria-label="查询结果">
       <p v-if="lastQuery" class="query-echo">
         <span>本次查询</span>
         <strong>{{ lastQuery }}</strong>
       </p>
 
-      <article class="panel panel--answer">
+      <article v-reveal class="panel panel--answer">
         <div class="panel__header">
           <div class="panel__title">
             <h2>回答</h2>
@@ -352,7 +439,7 @@ onMounted(() => {
         <p v-if="notice" class="notice">{{ notice }}</p>
         <p v-if="error" class="notice notice--error">{{ error }}</p>
       </article>
-      <section v-if="pendingActions.length" class="stack" aria-label="待确认动作">
+      <section v-if="pendingActions.length" v-reveal class="stack" aria-label="待确认动作">
         <PendingActionCard
           v-for="action in pendingActions"
           :key="action.id"
@@ -362,29 +449,15 @@ onMounted(() => {
         />
       </section>
 
+      <!-- 比较表的根节点自带 v-if，套 v-reveal 会落到注释节点上，所以这里不做滚动淡入 -->
       <CompareTable :products="products" class="workspace__wide" />
-
-      <template v-if="products.length">
-        <div class="section-head workspace__wide">
-          <h2>候选产品</h2>
-          <span class="section-head__count">{{ products.length }} 个</span>
-        </div>
-        <section class="card-list product-grid workspace__wide" aria-label="产品结果">
-          <ProductCard
-            v-for="item in products"
-            :key="String(item.id || item.product_no)"
-            :product="item"
-            :detail-url="productDetailUrl(item)"
-          />
-        </section>
-      </template>
 
       <template v-if="sources.length">
         <div class="section-head">
           <h2>引用来源</h2>
           <span class="section-head__count">{{ sources.length }} 条</span>
         </div>
-        <section class="card-list source-list" aria-label="引用来源">
+        <section v-reveal class="card-list source-list" aria-label="引用来源">
           <SourceCard
             v-for="source in sources"
             :key="source.source_id"
