@@ -11,6 +11,7 @@
 - [升级发布 runbook](#升级发布-runbook)
 - [健康检查](#健康检查)
 - [备份](#备份)
+  - [全量迁移包（整机搬迁 / 灾难恢复）](#全量迁移包整机搬迁--灾难恢复)
 - [恢复](#恢复)
 - [TLS 与公网入口](#tls-与公网入口)
 - [发布门禁](#发布门禁)
@@ -185,9 +186,9 @@ bash scripts/build_frontends.sh          # 输出里有 APP_VERSION / BUILD_ID /
 
 # 3) 把同一套版本值导出给 backend（否则 compose 默认值会让后端自报 dev，见下）
 export APP_VERSION=1.9.0                 # = frontend/package.json 的 version
-export BUILD_ID=local-20260731T101832Z   # 抄第 2 步输出，必须和前端产物里的一致
-export GIT_COMMIT=dbce35e-dirty
-export BUILD_TIME=2026-07-31T10:18:32Z
+export BUILD_ID=local-20260731T134109Z   # 抄第 2 步输出，必须和前端产物里的一致
+export GIT_COMMIT=9cd132c
+export BUILD_TIME=2026-07-31T13:41:09Z
 export APP_ENV=production
 
 # 4) 重建镜像并只替换需要的服务
@@ -211,7 +212,7 @@ curl -s --noproxy '*' http://127.0.0.1:888/api/v1/health   # version 必须是�
 后台「版本」页按 `build_id` 比对（`frontend/src/config/version.ts` 的 `compareBuilds`）
 就会显示「前后端版本不一致」。2026-07-31 返工时踩过一次：漏导出重建了 backend，
 `/api/v1/health` 变成 `"version":"dev"`；补一条 `docker compose up -d --no-deps backend`
-（带上面这些 export）就恢复成 `1.8.5` / `local-20260731T101832Z`，**不需要重建镜像**
+（带当时那一套 export）就恢复成当时的 `1.8.5` / `local-20260731T101832Z`，**不需要重建镜像**
 （env 覆盖镜像里的 ENV；而 `backend/Dockerfile` 的 ARG 在第 3~7 行，改 ARG 会让 apt/pip 层全部失效）。
 回滚：`docker compose build` 会留下上一版镜像（`docker images | grep richangpim`），
 `docker tag` 回去再 `up -d --no-deps <service>`；所以升级后先别清理镜像。
@@ -243,6 +244,13 @@ docker compose config --quiet
 ```
 
 ## 备份
+
+### 全量迁移包（整机搬迁 / 灾难恢复）
+
+发版时打的那种一体包（源码 + git bundle + 库 + 卷 + env，约 240 MB）见
+**[MIGRATION_BUNDLE.md](MIGRATION_BUNDLE.md)**：怎么打、怎么恢复、怎么校验、保密要求都在那里。
+包放在仓库外的 `/home/AI-PIM/`，当前最新一份是 `RiChangPIM_v1.9.0_20260731_215300.tar.gz`。
+本节下面讲的是日常备份。
 
 ### ⚠️ 先读这条：`db_backup.sh` / `backup.sh` 在本机连不到生产库
 
@@ -527,6 +535,7 @@ cd /home/AI-PIM/RiChangPIM/backend && /tmp/pimtestenv/bin/python -m pytest tests
 - `docker/nginx/conf.d/default.conf`：生产路由（`/` 与 `/share/{token}` 门户、`/admin/` 后台产物、`/api/` 反代）
 - `scripts/start_demo.sh` / `scripts/stop_demo.sh`：演示服务器（后台入口），按 `PIM_DEMO_PORT` 起停
 - `scripts/windows_demo_ports.ps1`：Windows 侧 portproxy + 防火墙（`-FrontendTargetPort` 要和演示端口一致）
+- `MIGRATION_BUNDLE.md`：**全量备份迁移包**（怎么打 / 怎么恢复 / 怎么校验 / 保密要求）
 - `scripts/backup.sh`：统一备份封装
 - `scripts/db_backup.sh`：PostgreSQL 备份
 - `scripts/minio_backup.sh`：MinIO 备份

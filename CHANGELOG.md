@@ -82,6 +82,22 @@ MINOR 位进到 9 而不是发 v1.8.6：本轮换掉的是表格排版体系、�
   1 条是 `MediaPicker.vue` 的 `vue/no-dupe-keys`）。本轮新增的 `backend/app/services/thumbnails.py`
   ruff 干净。
 
+### 发布与上线（2026-07-31 实测）
+
+- 提交 `9cd132c`、annotated tag `v1.9.0`，均已推到 `origin/main`（`github.com/tyche66/RiChangPIM`）。
+- 生产栈按「升级发布 runbook」重建：`scripts/build_frontends.sh` 出产物后 `docker compose build backend nginx`
+  + `up -d --no-deps`。`/api/v1/version` 实测
+  `1.9.0 / local-20260731T134109Z / 9cd132c / 2026-07-31T13:41:09Z / production`，与 dist 里的
+  `/admin/assets/index-EbCCaYhV.js` 同一套值，「版本」页不再报前后端不一致。
+- 四个入口：`:888/` 200、`:888/admin` 301→`/admin/`、`:888/admin/` 200（后台 JS 200 `application/javascript`）、
+  `:888/share/abc` 200、`:888/api/v1/health` 200；演示服务器 `:5173/admin/` 与 `:5173/chat` 200。
+  `alembic current` = `0017_operation_log_username (head)`。
+- 回滚镜像留了 `richangpim-nginx:pre-v190` / `richangpim-backend:pre-v190`，暂不清理。
+- 全量备份迁移包：`/home/AI-PIM/RiChangPIM_v1.9.0_20260731_215300.tar.gz`（240,369,356 B，
+  sha256 `cb4f9fc1…99ca6`），结构对齐 v1.8.0 参考包，`sha256sum -c` 20/20 通过，
+  换目录解包复验过源码锚点与 bundle 内的 `v1.9.0` tag。打法与恢复步骤见新增的 `MIGRATION_BUNDLE.md`。
+  打包全程未停、未重启任何服务；库走 `docker exec … pg_dump -Fc`。
+
 ### 过程记录（下面两段发生时还没改版本号，随本版一并发布）
 
 - **2026-07-31 生产部署**
