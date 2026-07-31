@@ -124,6 +124,9 @@ async def _write_operation_log(
 
     使用独立 session 而非复用业务 db：避免业务事务已 commit/rollback 影响审计，
     也避免审计写入失败回滚掉业务结果。
+
+    同时把操作人用户名定格进 ``username``：日志列表要显示的是「谁做的」，
+    只存 user_id 的话前端只能摊一串 UUID；而改名/删号之后再 join 也拿不回当时的名字。
     """
     try:
         from app.core.database import AsyncSessionLocal
@@ -132,6 +135,7 @@ async def _write_operation_log(
         async with AsyncSessionLocal() as session:
             log = OperationLog(
                 user_id=user_id,
+                username=await _resolve_username(session, user_id),
                 module=module,
                 action=action,
                 target_id=target_id,
@@ -152,6 +156,22 @@ async def _write_operation_log(
             exc,
             exc_info=True,
         )
+
+
+async def _resolve_username(session: Any, user_id: str | None) -> str | None:
+    """查操作人用户名。查不到（匿名请求、用户已物理删除）返回 None，不编造占位值。"""
+    if not user_id:
+        return None
+    try:
+        from sqlalchemy import select
+
+        from app.models.user import User
+
+        result = await session.execute(select(User.username).where(User.id == user_id))
+        return result.scalar_one_or_none()
+    except Exception:  # noqa: BLE001 - 取不到名字不影响审计落库
+        logger.warning("audit username lookup failed user_id=%s", user_id, exc_info=True)
+        return None
 
 
 async def _request_body_value(request: Request) -> str | None:
@@ -247,6 +267,11 @@ def audit_action(
                 raise
 
             elapsed_ms = int((time.perf_counter() - start) * 1000)
+            # 登录类端点执行前还没有 Authorization 头，请求进来时取不到 user_id；
+            # 业务成功后 endpoint 会把 request.state.user_id 写好，这里补一次，
+            # 否则登录成功的审计记录永远是匿名的。
+            if user_id is None and request is not None:
+                user_id = _user_id_from_request(request)
             response_code = 200
             if isinstance(result, dict):
                 code = result.get("code")

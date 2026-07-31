@@ -60,28 +60,35 @@ describe('Logs.vue', () => {
       data: {
         list: [
           {
-            operate_time: '2026-07-20T08:00:00',
+            // 后端 operate_time 是 timestamptz，序列化成 UTC 瞬时（带 Z）。
+            operate_time: '2026-07-20T08:00:00Z',
             action: 'login',
             module: 'auth',
             user_id: 'admin-uuid',
+            username: '张三',
             target_id: null,
             response_code: 200,
             ip: '127.0.0.1',
           },
           {
-            operate_time: '2026-07-20T09:00:00',
+            // 跨日：UTC 16:30 是北京时间次日 00:30，24 小时制下必须是 00 而不是 24。
+            operate_time: '2026-07-20T16:30:00Z',
             action: 'login_failed',
             module: 'auth',
             user_id: null,
+            username: null,
             target_id: null,
             response_code: 401,
             ip: '203.0.113.7',
           },
           {
+            // 万一某天后端回了不带时区标记的值，也按 UTC 解析（列本身是 timestamptz），
+            // 不能跟着跑测试的机器时区飘。
             operate_time: '2026-07-20T10:00:00',
             action: 'product_create',
             module: 'products',
             user_id: 'admin-uuid',
+            username: null,
             target_id: 'p-1',
             response_code: 500,
             ip: '127.0.0.1',
@@ -99,17 +106,33 @@ describe('Logs.vue', () => {
     // Header
     expect(wrapper.text()).toContain('操作审计')
 
-    // Table content rows
-    expect(wrapper.text()).toContain('login')
-    expect(wrapper.text()).toContain('product_create')
+    // 动作/模块按中文名渲染，后端枚举不直接摊给用户看。
+    expect(wrapper.text()).toContain('登录')
+    expect(wrapper.text()).toContain('新建产品')
+    expect(wrapper.text()).not.toContain('product_create')
+
+    // 操作用户列：记到了用户名就显示用户名；只剩 user_id 时退化成短编号；
+    // 两者都没有的匿名请求明确标注，不猜一个名字填上去。
+    expect(wrapper.text()).toContain('张三')
+    expect(wrapper.text()).toContain('admin-uu…')
+    expect(wrapper.text()).toContain('匿名请求')
 
     // Response code badge presence (data values)
     expect(wrapper.text()).toContain('200')
     expect(wrapper.text()).toContain('401')
     expect(wrapper.text()).toContain('500')
 
-    // Time is shown with a space instead of 'T' separator (localized display).
-    expect(wrapper.text()).toContain('2026-07-20 08:00:00')
+    // 时间列固定按北京时间（UTC+8）24 小时制展示，列头也要说清口径。
+    // 这里断的是「UTC 瞬时 → +8 小时」的换算，不是「把 T 换成空格」——
+    // 后者曾经把 UTC 当本地时间贴出来，比北京时间慢 8 小时。
+    expect(wrapper.text()).toContain('时间（北京时间）')
+    expect(wrapper.text()).toContain('2026-07-20 16:00:00')
+    expect(wrapper.text()).not.toContain('2026-07-20 08:00:00')
+    // 跨日 + 零点：00:30，不能出现 24:30。
+    expect(wrapper.text()).toContain('2026-07-21 00:30:00')
+    expect(wrapper.text()).not.toContain('24:30:00')
+    // 不带时区标记的值按 UTC 解析（10:00Z → 18:00 北京），不跟随本机时区。
+    expect(wrapper.text()).toContain('2026-07-20 18:00:00')
   })
 
   it('renders an empty state when there are no audit records', async () => {

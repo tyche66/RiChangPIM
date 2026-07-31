@@ -70,14 +70,17 @@
           stripe
           class="proposal-table"
         >
+          <!-- 排版层级用 class-name（不是 class）：class 会落到 hidden-columns 的隐藏占位 div 上，规则不生效 -->
           <el-table-column
             prop="proposal_no"
             label="方案编号"
+            class-name="cell-code"
             width="160"
           />
           <el-table-column
             prop="proposal_name"
             label="方案名称"
+            class-name="cell-strong"
             min-width="180"
             show-overflow-tooltip
           />
@@ -105,6 +108,7 @@
           <el-table-column
             prop="create_time"
             label="创建时间"
+            class-name="cell-meta"
             width="170"
           >
             <template #default="{ row }">
@@ -610,8 +614,6 @@ onMounted(fetchProposals)
 /* ===== Glass Card ===== */
 .glass-card {
   background: var(--glass-bg);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-soft);
@@ -800,28 +802,14 @@ onMounted(fetchProposals)
   overflow: hidden;
 }
 
-.proposal-table :deep(.el-table__header-wrapper) {
-  background: var(--brand-lighter);
-}
-
-.proposal-table :deep(.el-table__header th) {
-  background: var(--brand-lighter);
-  color: var(--text-primary);
-  font-weight: 600;
-  font-size: 13px;
-  padding: 14px 0;
-}
-
-.proposal-table :deep(.el-table__row td) {
-  padding: 12px 0;
-}
-
-.proposal-table :deep(.el-table__row:hover td) {
-  background: var(--brand-lighter);
-}
-
+/*
+ * 表头底色 / 字号 / 字重 / 单元格 padding / hover 底色都交给 design-system.css 的
+ * 全局表格规则（12px + 字距的弱化表头、极细横线、11px 行距），这里原先的
+ * .el-table__header th / .el-table__row td 覆盖跟它打架，会把层级压回「一个字重」。
+ */
 .mono-text {
-  font-family: monospace;
+  /* 走 --pim-font-mono（鸿蒙优先），裸 monospace 在 Windows 上会掉成 Courier New */
+  font-family: var(--pim-font-mono);
   color: var(--text-secondary);
   font-size: 12px;
 }

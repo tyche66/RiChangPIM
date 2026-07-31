@@ -1,10 +1,13 @@
 import { test, expect } from '@playwright/test'
-import { ADMIN_TOKEN } from './helpers'
+import { ADMIN_TOKEN, installApiFallback } from './helpers'
 
 const MOCK_REFRESH_TOKEN = 'mock-refresh-token'
 const USER_PERMS = ['product:view', 'ai:use', 'proposal:view', 'proposal:edit', 'share:view']
 
 test.beforeEach(async ({ page }) => {
+  // 兜底必须最先注册（route 是后注册者优先），否则会盖掉下面各用例自己的 mock。
+  await installApiFallback(page)
+
   await page.addInitScript(
     (arg: { token: string; refreshToken: string }) => {
       localStorage.setItem('token', arg.token)

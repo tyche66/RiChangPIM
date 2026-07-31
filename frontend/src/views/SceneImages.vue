@@ -249,6 +249,7 @@
         @row-dblclick="handleEdit"
         @selection-change="handleSelectionChange"
       >
+        <!-- 排版层级用 class-name（不是 class）：class 会落到 hidden-columns 的隐藏占位 div 上，规则不生效 -->
         <el-table-column
           type="selection"
           width="40"
@@ -280,12 +281,14 @@
           prop="name"
           label="名称"
           min-width="180"
+          class-name="cell-strong"
         />
         <el-table-column
           prop="sort"
           label="排序"
           width="80"
           align="center"
+          class-name="cell-num cell-soft"
         />
         <el-table-column
           label="绑定产品"
@@ -305,6 +308,7 @@
         <el-table-column
           label="更新时间"
           width="160"
+          class-name="cell-meta"
         >
           <template #default="{ row }">
             {{ formatDate(row.update_time) }}
@@ -925,6 +929,7 @@ import type { SceneImage } from '@/api'
 import { formatDate } from '@/api/media'
 import MediaPicker from '@/components/MediaPicker.vue'
 import type { MediaItem } from '@/api/media'
+import { usePreference } from '@/composables/usePreference'
 import { useAuthStore } from '@/stores/auth'
 import { hasPermission } from '@/types/permissions'
 
@@ -945,7 +950,8 @@ const keyword = ref('')
 const productKeyword = ref('')
 const statusFilter = ref('')
 const sortOrder = ref('newest')
-const viewMode = ref<'grid' | 'list'>('grid')
+// 视图模式是用户习惯，记在浏览器里，下次进来沿用上次的选择。
+const viewMode = usePreference<'grid' | 'list'>('sceneImages.viewMode', 'grid', ['grid', 'list'] as const)
 
 // Multi-select
 const selectedIds = ref<string[]>([])
@@ -1709,7 +1715,8 @@ onMounted(fetchData)
 .product-no {
   font-size: 11px;
   color: var(--el-text-color-secondary);
-  font-family: monospace;
+  /* 走 --pim-font-mono（鸿蒙优先），裸 monospace 在 Windows 上会掉成 Courier New */
+  font-family: var(--pim-font-mono);
   flex-shrink: 0;
   width: 90px;
 }

@@ -1,183 +1,128 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { mount, flushPromises } from '@vue/test-utils'
-import { ElCard, ElButton, ElInput, ElTag, ElEmpty, ElAlert, ElSkeleton } from 'element-plus'
-import { createMemoryHistory, createRouter } from 'vue-router'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { mount, type VueWrapper } from '@vue/test-utils'
+import { ElButton } from 'element-plus'
 import { setActivePinia, createPinia } from 'pinia'
 
-vi.mock('@/api', () => ({
-  aiApi: {
-    chat: vi.fn(),
-    recommend: vi.fn(),
-  },
-}))
-
-import { aiApi } from '@/api'
 import AISelect from '@/views/AISelect.vue'
+import { useAuthStore } from '@/stores/auth'
 
-const mockChat = aiApi.chat as any
-const mockRecommend = aiApi.recommend as any
+const PORTAL_ORIGIN = 'http://portal.test'
 
-const factory = async () => {
-  const router = createRouter({
-    history: createMemoryHistory(),
-    routes: [{ path: '/', component: { template: '<div />' } }],
-  })
-  router.push('/')
-  await router.isReady()
+let wrapper: VueWrapper | null = null
 
-  const wrapper = mount(AISelect, {
+const factory = () => {
+  const pinia = createPinia()
+  setActivePinia(pinia)
+  const auth = useAuthStore()
+  auth.accessToken = 'access-token-1'
+  auth.refreshToken = 'refresh-token-1'
+
+  wrapper = mount(AISelect, {
+    attachTo: document.body,
     global: {
-      plugins: [createPinia(), router],
-      stubs: {
-        ElCard,
-        ElButton,
-        ElInput,
-        ElTag,
-        ElEmpty,
-        ElAlert,
-        ElSkeleton,
-      },
+      plugins: [pinia],
+      stubs: { ElButton },
     },
   })
-  await flushPromises()
   return wrapper
 }
 
-describe('AISelect.vue', () => {
+describe('AISelect.vue（嵌入 AI 前台 /chat）', () => {
   beforeEach(() => {
-    setActivePinia(createPinia())
-    vi.clearAllMocks()
+    vi.stubEnv('VITE_PORTAL_ORIGIN', PORTAL_ORIGIN)
   })
 
-  it('shows initial AI greeting message', async () => {
-    const wrapper = await factory()
-    expect(wrapper.text()).toContain('AI 选品助手')
+  afterEach(() => {
+    wrapper?.unmount()
+    wrapper = null
+    vi.unstubAllEnvs()
+    document.body.innerHTML = ''
   })
 
-  it('adds user message and AI response to chat on send', async () => {
-    mockChat.mockResolvedValue({
-      data: { answer: '这是 AI 的回复', sources: [] },
-    })
-
-    const wrapper = await factory()
-    const input = wrapper.findComponent(ElInput)
-    await input.setValue('推荐护肤品')
-    await wrapper.findComponent(ElButton).trigger('click')
-    await flushPromises()
-
-    expect(mockChat).toHaveBeenCalledWith(expect.objectContaining({ message: '推荐护肤品' }))
-    expect(wrapper.text()).toContain('推荐护肤品')
-    expect(wrapper.text()).toContain('这是 AI 的回复')
+  it('renders an iframe pointing at the portal /chat in embed mode', () => {
+    const iframe = factory().find('iframe')
+    expect(iframe.exists()).toBe(true)
+    expect(iframe.attributes('src')).toBe(`${PORTAL_ORIGIN}/chat?embed=1`)
   })
 
-  it('shows AI unavailable message when chat throws', async () => {
-    mockChat.mockRejectedValue(new Error('network'))
+  it('hands the session to the iframe when it announces it is ready', async () => {
+    const view = factory()
+    const frame = view.find('iframe').element as HTMLIFrameElement
+    const post = vi.fn()
+    Object.defineProperty(frame, 'contentWindow', { value: { postMessage: post }, configurable: true })
 
-    const wrapper = await factory()
-    const input = wrapper.findComponent(ElInput)
-    await input.setValue('hello')
-    await wrapper.findComponent(ElButton).trigger('click')
-    await flushPromises()
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        data: { type: 'pim-embed-ready' },
+        origin: PORTAL_ORIGIN,
+        source: frame.contentWindow,
+      }),
+    )
 
-    expect(wrapper.text()).toContain('AI 服务暂时不可用')
+    expect(post).toHaveBeenCalledTimes(1)
+    expect(post).toHaveBeenCalledWith(
+      { type: 'pim-embed-session', token: 'access-token-1', refreshToken: 'refresh-token-1' },
+      PORTAL_ORIGIN,
+    )
   })
 
-  it('displays recommend results with rationale and no degraded banner on success', async () => {
-    mockRecommend.mockResolvedValue({
-      data: {
-        filters_applied: { category_id: 'cat-1', max_face_price: 100 },
-        products: [
-          {
-            id: 'p1',
-            product_no: 'P001',
-            product_name: '保湿乳液',
-            face_price: 89,
-            stock_status: 'in_stock',
-            description: '适合油性皮肤',
-            _verified: true,
-            _verified_by: 'ai-model-v2',
-          },
-        ],
-        rationale: '基于预算和肤质筛选',
-        total: 1,
-        sources: [],
-      },
-    })
+  it('never posts the session to a wildcard target origin', async () => {
+    const view = factory()
+    const frame = view.find('iframe').element as HTMLIFrameElement
+    const post = vi.fn()
+    Object.defineProperty(frame, 'contentWindow', { value: { postMessage: post }, configurable: true })
 
-    const wrapper = await factory()
-    const textarea = wrapper.findAllComponents(ElInput)[1]
-    await textarea.setValue('需要保湿乳液')
-    const buttons = wrapper.findAllComponents(ElButton)
-    await buttons[1].trigger('click')
-    await flushPromises()
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        data: { type: 'pim-embed-ready' },
+        origin: PORTAL_ORIGIN,
+        source: frame.contentWindow,
+      }),
+    )
 
-    expect(wrapper.text()).toContain('保湿乳液')
-    expect(wrapper.text()).toContain('基于预算和肤质筛选')
-    expect(wrapper.text()).toContain('筛选条件')
-    expect(wrapper.text()).toContain('category_id: cat-1')
-    expect(wrapper.text()).toContain('已验证')
-    expect(wrapper.text()).toContain('by ai-model-v2')
-    // No degraded banner
-    expect(wrapper.text()).not.toContain('降级')
+    expect(post.mock.calls[0][1]).not.toBe('*')
   })
 
-  it('shows degraded banner when AI parse fails', async () => {
-    mockRecommend.mockResolvedValue({
-      data: {
-        status: 'parse_failed',
-        filters_applied: {},
-        products: [],
-        rationale: 'AI 解析失败',
-        total: 0,
-        sources: [],
-      },
-    })
+  it('ignores ready messages from a foreign origin', () => {
+    const view = factory()
+    const frame = view.find('iframe').element as HTMLIFrameElement
+    const post = vi.fn()
+    Object.defineProperty(frame, 'contentWindow', { value: { postMessage: post }, configurable: true })
 
-    const wrapper = await factory()
-    const textarea = wrapper.findAllComponents(ElInput)[1]
-    await textarea.setValue('vague')
-    const buttons = wrapper.findAllComponents(ElButton)
-    await buttons[1].trigger('click')
-    await flushPromises()
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        data: { type: 'pim-embed-ready' },
+        origin: 'http://evil.example',
+        source: frame.contentWindow,
+      }),
+    )
 
-    expect(wrapper.text()).toContain('AI 解析失败，请修正需求后重试')
+    expect(post).not.toHaveBeenCalled()
   })
 
-  it('never reads p.reason from recommend response', async () => {
-    mockRecommend.mockResolvedValue({
-      data: {
-        filters_applied: {},
-        products: [{ product_name: 'X' }],
-        rationale: 'rationale text',
-        total: 1,
-        sources: [],
-      },
-    })
+  it('ignores messages that do not come from the embedded frame', () => {
+    const view = factory()
+    const frame = view.find('iframe').element as HTMLIFrameElement
+    const post = vi.fn()
+    Object.defineProperty(frame, 'contentWindow', { value: { postMessage: post }, configurable: true })
 
-    const wrapper = await factory()
-    const textarea = wrapper.findAllComponents(ElInput)[1]
-    await textarea.setValue('test')
-    const buttons = wrapper.findAllComponents(ElButton)
-    await buttons[1].trigger('click')
-    await flushPromises()
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        data: { type: 'pim-embed-ready' },
+        origin: PORTAL_ORIGIN,
+        source: window,
+      }),
+    )
 
-    // The product should render without any "reason" field
-    expect(wrapper.text()).toContain('X')
-    expect(wrapper.text()).toContain('rationale text')
-    expect(wrapper.text()).not.toContain('reason')
+    expect(post).not.toHaveBeenCalled()
   })
 
-  it('shows error message when recommend API fails', async () => {
-    mockRecommend.mockRejectedValue(new Error('fail'))
-
-    const wrapper = await factory()
-    const textarea = wrapper.findAllComponents(ElInput)[1]
-    await textarea.setValue('test')
-    const buttons = wrapper.findAllComponents(ElButton)
-    await buttons[1].trigger('click')
-    await flushPromises()
-
-    // ElMessage.error is called; we verify no crash and no results
-    expect(wrapper.findAll('.result-item').length).toBe(0)
+  it('busts the iframe cache when the user reloads the workspace', async () => {
+    const view = factory()
+    const before = view.find('iframe').attributes('src')
+    await view.findAllComponents(ElButton)[0].trigger('click')
+    const after = view.find('iframe').attributes('src')
+    expect(after).not.toBe(before)
+    expect(after).toContain('embed=1')
   })
 })

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { ADMIN_TOKEN, createMockToken } from './helpers'
+import { ADMIN_TOKEN, createMockToken, installApiFallback } from './helpers'
 
 // V1.2 §5.5 / RELEASE_GATE §3 — audit E2E:
 //   - admin can reach /logs and see the audit table
@@ -60,11 +60,18 @@ function mockLoginByRole(page: any, role: 'admin' | 'sales' | 'viewer') {
 }
 
 test.describe('Audit page RBAC and content', () => {
+  test.beforeEach(async ({ page }) => {
+    // 兜底必须最先注册（route 是后注册者优先），否则会盖掉各用例自己的 mock。
+    await installApiFallback(page)
+  })
+
   test('admin can open the audit page and the response body must omit request_body', async ({ page }) => {
     await mockLoginByRole(page, 'admin')
 
     let apiPayload: any = null
-    await page.route('**/api/v1/audit/operation-logs', (route: any) => {
+    // 结尾必须带 `*`：真实请求是 /audit/operation-logs?page=1&size=20（Logs.vue 固定传
+    // page/size），不带通配的 pattern 匹配不到查询串，mock 会静默失效并把请求放去真后端。
+    await page.route('**/api/v1/audit/operation-logs*', (route: any) => {
       apiPayload = {
         list: [{
           operate_time: '2026-07-20T08:00:00',
@@ -83,10 +90,12 @@ test.describe('Audit page RBAC and content', () => {
       }
       route.fulfill({ status: 200, json: { code: 200, data: apiPayload } })
     })
-    await page.route('**/api/v1/stats/shares', (route: any) => route.fulfill({
+    await page.route('**/api/v1/stats/shares*', (route: any) => route.fulfill({
       status: 200, json: { data: { total_shares: 0, total_access: 0, active_shares: 0, top_accessed: [] } },
     }))
-    await page.route('**/api/v1/stats/hot-products', (route: any) => route.fulfill({
+    // 真实路径是 /stats/products/hot（见 src/api/index.ts statsApi.hotProducts），
+    // 原来写的 /stats/hot-products 后端根本没有，这个 mock 从来没生效过。
+    await page.route('**/api/v1/stats/products/hot*', (route: any) => route.fulfill({
       status: 200, json: { data: { items: [] } },
     }))
 
@@ -100,7 +109,11 @@ test.describe('Audit page RBAC and content', () => {
     await expect(page).toHaveURL(/\/logs/)
 
     // Audit content visible.
-    await expect(page.getByText('login').first()).toBeVisible({ timeout: 10_000 })
+    // T11 给 Logs.vue 加了枚举本地化（ACTION_NAMES['login'] === '登录'），表格里再也不会
+    // 出现原始枚举 'login'，旧断言必然落空。改断言「未被本地化的 IP + 渲染后的动作中文名」：
+    // 一样能证明这条审计记录真的渲染进了表格，又不会被文案本地化绊倒。
+    await expect(page.getByRole('cell', { name: '127.0.0.1' })).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByRole('cell', { name: '登录', exact: true }).first()).toBeVisible()
 
     // request_body redaction invariant — never in DOM.
     await expect(page.locator('body')).not.toContainText('SHOULD_NOT_APPEAR')
@@ -110,7 +123,8 @@ test.describe('Audit page RBAC and content', () => {
   test('sales role (no audit:view) cannot reach the audit page', async ({ page }) => {
     await mockLoginByRole(page, 'sales')
 
-    await page.route('**/api/v1/products', (route: any) => {
+    // 同上：产品列表真实请求带 ?page=1&size=20，pattern 必须容许查询串。
+    await page.route('**/api/v1/products*', (route: any) => {
       route.fulfill({ status: 200, json: { data: { list: [], total: 0, page: 1, size: 20 } } })
     })
 
@@ -127,7 +141,8 @@ test.describe('Audit page RBAC and content', () => {
   test('viewer role (no audit:view) cannot reach the audit page', async ({ page }) => {
     await mockLoginByRole(page, 'viewer')
 
-    await page.route('**/api/v1/products', (route: any) => {
+    // 同上：产品列表真实请求带 ?page=1&size=20，pattern 必须容许查询串。
+    await page.route('**/api/v1/products*', (route: any) => {
       route.fulfill({ status: 200, json: { data: { list: [], total: 0, page: 1, size: 20 } } })
     })
 

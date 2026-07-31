@@ -154,21 +154,27 @@ onMounted(checkVersion)
 </script>
 
 <style scoped>
+/*
+ * 颜色和字体一律走 design-system.css 的设计变量：品牌蓝 --pim-primary / --pim-brand-lift，
+ * 铜色副色 --pim-accent* （版本页是全站唯一用铜色的地方），文字层级 --pim-text-strong /
+ * --pim-text-soft，描线 --pim-line。等宽字体走 --pim-font-mono（鸿蒙优先），
+ * 原先的 ui-monospace 链在 Windows 上会掉成 Courier New，跟正文字体对不上。
+ */
 .version-page { display: grid; gap: 20px; max-width: 1180px; margin: 0 auto; }
-.version-hero { display: flex; align-items: end; justify-content: space-between; padding: 30px 34px; border-radius: 28px; color: white; background: linear-gradient(125deg, #1e325a 0%, #294c7d 60%, #b56d3d 140%); box-shadow: 0 24px 60px rgba(30, 50, 90, .18); }
+.version-hero { display: flex; align-items: end; justify-content: space-between; padding: 30px 34px; border-radius: 28px; color: white; background: linear-gradient(125deg, var(--pim-primary) 0%, var(--pim-brand-lift) 60%, var(--pim-accent-mid) 140%); box-shadow: 0 24px 60px rgba(var(--pim-brand), .18); }
 .eyebrow { font-size: 11px; letter-spacing: .18em; opacity: .65; }
 h2 { margin: 8px 0; font-size: 34px; } p { margin: 0; opacity: .78; }
-.check-button { border: 0; background: #e68b51; }
-.status-card, .build-card { border: 1px solid rgba(30, 50, 90, .1); border-radius: 24px; }
+.check-button { border: 0; background: var(--pim-accent); }
+.status-card, .build-card { border: 1px solid rgba(var(--pim-brand), .1); border-radius: 24px; }
 .status-line { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
-.status-line > div { display: grid; gap: 5px; }.status-line strong { font-size: 22px; }.status-line small { color: #7a8496; }
-.status-kicker { color: #9b613e; font-size: 11px; font-weight: 700; letter-spacing: .14em; }
+.status-line > div { display: grid; gap: 5px; }.status-line strong { font-size: 22px; }.status-line small { color: var(--pim-text-soft); }
+.status-kicker { color: var(--pim-accent-deep); font-size: 11px; font-weight: 700; letter-spacing: .14em; }
 .build-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
 .build-card :deep(.el-card__header) { display: flex; align-items: baseline; gap: 12px; border: 0; }
-.build-card :deep(.el-card__header) span { font-size: 11px; letter-spacing: .16em; color: #9b613e; }
-.build-card :deep(.el-card__header) strong { font-size: 20px; color: #1e325a; }
-dl { margin: 0; } dl div { display: grid; grid-template-columns: 110px 1fr; gap: 12px; padding: 14px 0; border-top: 1px solid #edf0f5; }
-dt { color: #7a8496; } dd { margin: 0; color: #25334d; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; overflow-wrap: anywhere; }
-.frontend { border-top: 4px solid #e68b51; }.backend { border-top: 4px solid #294c7d; }.checked-at { text-align: right; color: #7a8496; font-size: 13px; }
+.build-card :deep(.el-card__header) span { font-size: 11px; letter-spacing: .16em; color: var(--pim-accent-deep); }
+.build-card :deep(.el-card__header) strong { font-size: 20px; color: var(--pim-primary); }
+dl { margin: 0; } dl div { display: grid; grid-template-columns: 110px 1fr; gap: 12px; padding: 14px 0; border-top: 1px solid var(--pim-line); }
+dt { color: var(--pim-text-soft); } dd { margin: 0; color: var(--pim-text-strong); font-family: var(--pim-font-mono); overflow-wrap: anywhere; }
+.frontend { border-top: 4px solid var(--pim-accent); }.backend { border-top: 4px solid var(--pim-brand-lift); }.checked-at { text-align: right; color: var(--pim-text-soft); font-size: 13px; }
 @media (max-width: 720px) { .version-hero { align-items: stretch; flex-direction: column; gap: 22px; padding: 24px; } .build-grid { grid-template-columns: 1fr; } .status-line { align-items: flex-start; flex-direction: column; } dl div { grid-template-columns: 90px 1fr; } }
 </style>

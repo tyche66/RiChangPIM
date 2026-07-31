@@ -33,8 +33,12 @@ RiChangPIM 是当前这套 AI-PIM 项目的工作快照，面向产品信息管�
 | OCR 服务 | `docker/ocr/` 容器内独立服务 |
 | AI 默认状态 | `AI_ADAPTER=openai`，`AI_CHAT_MODEL=agnes-2.5-flash` |
 | Knowledge Gateway | 默认启用（`KNOWLEDGE_GATEWAY_ENABLED=1`）|
-| 当前版本 | v1.8.0 |
-| 当前迁移 head | `0014_knowledge_tables` |
+| 当前版本 | v1.9.0（版本号声明位置见 [CHANGELOG.md](CHANGELOG.md)） |
+| 当前迁移 head | `0017_operation_log_username` |
+| 生产入口 | `http://127.0.0.1:888/`（Docker nginx `888:80`；门户 / 分享页 `/share/{token}` / `/admin/` / `/api/v1/*`） |
+| 管理后台入口 | `http://127.0.0.1:888/admin/`（生产 nginx）或 `http://127.0.0.1:5173/admin/`（演示服务器，公网隧道走它） |
+| 环境体检 | `bash scripts/where-am-i.sh`（**每次开工第一条命令**） |
+| 实机运维口径 | [README-OPS.md](README-OPS.md)、`/home/AI-PIM/从启动到穿透.md` |
 | 主要种子入口 | `backend/app/scripts/seed_data.py` + `backend/alembic/versions/0004_seed_data.py` |
 | 产品试点数据文件 | `backend/data/sunon_pilot_products.json` |
 
@@ -56,7 +60,7 @@ RiChangPIM 是当前这套 AI-PIM 项目的工作快照，面向产品信息管�
 - `docker-compose.dev.yml`：开发依赖编排
 - `.env.example`：根级环境变量示例
 - `.env`：当前本地开发环境变量
-- `scripts/`：备份、恢复、健康检查、TLS 生成、发布门禁等脚本
+- `scripts/`：环境体检（`where-am-i.sh`）、前端构建（`build_frontends.sh`）、演示服务器、备份、恢复、健康检查、TLS 生成、发布门禁等脚本
 - `docs/`：需求、架构、数据库、接口、部署、测试等文档
 - `backups/`：数据库备份与恢复演练文件
 - `docker/`：Nginx、Postgres 初始化、OCR 容器等基础设施配置
@@ -117,19 +121,30 @@ npm install
 npm run dev
 ```
 
-### 演示模式（Tailscale 公网）
+### 演示模式（Tailscale Funnel）
 
-如果需要把完整 PIM 演示到公网，推荐使用仓库内置的演示服务器：
+如果需要把完整 PIM 演示到公网，用仓库内置的演示服务器。**端口固定 5173，不要换**
+（`windows_demo_ports.ps1` 的默认值就是它，Funnel 的 `3001` 也已经指向它）：
 
 ```bash
-# WSL / Linux 侧启动演示服务器
-./scripts/start_demo.sh
-
-# 停止演示服务器
-./scripts/stop_demo.sh
+export PATH="$HOME/.nvm/versions/node/v24.18.0/bin:$PATH"
+PIM_DEMO_PORT=5173 PIM_DEMO_BACKEND=http://127.0.0.1:888 bash scripts/start_demo.sh
 ```
 
-Windows 管理员 PowerShell 侧执行端口转发：
+```bash
+PIM_DEMO_PORT=5173 bash scripts/stop_demo.sh
+```
+
+`PIM_DEMO_BACKEND` **必须**指向生产 nginx `:888`。默认值 `:8000` 在这台机器上是死的
+（Windows 系统进程占着 8000），照默认起来页面能开但**登录一直转圈不返回**。起完确认一眼：
+
+```bash
+curl -s --noproxy '*' http://127.0.0.1:5173/__demo/health
+```
+
+`backendTarget` 必须是 `http://127.0.0.1:888`。
+
+Windows 管理员 PowerShell 侧执行端口转发（默认 `-FrontendTargetPort 5173`，正常不用带参数）：
 
 ```powershell
 Set-ExecutionPolicy -Scope Process Bypass
@@ -161,34 +176,46 @@ tailscale funnel 888
 开发环境默认端口：
 
 - Portal：Vite 默认端口 `5174`
-- Admin：Vite 默认端口 `5173`
+- Admin：Vite 默认端口 `5173`（**注意和演示服务器同端口，两者不能同时起**）
 - 后端：`http://localhost:8000`
 - API 文档：`http://localhost:8000/docs`
 
+> ⚠️ 起本地后端前先确认 `DATABASE_URL` 指向哪里。**绝不要指到 `localhost:5432/ai_pim`**——
+> 生产库在容器里、没有发布端口，只能从 compose 网络内以主机名 `postgres` 访问。
+> 2026-07-31 因为本机原生 PostgreSQL 里有一个同名空库，出过一次「所有密码都错」的事故。
+> 先跑 `bash scripts/where-am-i.sh`。
+
 ### 2. 生产 / 容器化环境
+
+> 本机（Windows 11 + Docker Desktop + WSL 发行版 `RiChangPIM`）的实机口径见
+> [README-OPS.md](README-OPS.md) 的「这台机器的实机真相」与 `/home/AI-PIM/从启动到穿透.md`。
+> 下面是通用流程。
 
 ```bash
 # 1) 配置环境变量
 cp .env.example .env
 # 编辑 .env，确保 ADMIN_PASSWORD、JWT_SECRET、POSTGRES_PASSWORD、MINIO_ROOT_* 都已设置
 
-# 2) 构建 Portal
-cd portal
-npm install
-npm run build
-cd ..
+# 2) 构建两个前端（不要直接 npm run build）
+export PATH="$HOME/.nvm/versions/node/v24.18.0/bin:$PATH"
+bash scripts/build_frontends.sh
 
-# 3) 构建 Admin
-cd frontend
-npm install
-npm run build
-cd ..
-
-# 4) 生成本地 TLS 证书（仅本地验收可用，自签名证书需手动信任）
+# 3) 生成本地 TLS 证书（仅本地验收可用，自签名证书需手动信任）
 ./scripts/generate_dev_tls.sh
 
-# 5) 启动全套服务
+# 4) 启动全套服务
 docker compose up -d
+```
+
+`scripts/build_frontends.sh` 比裸 `npm run build` 多做两件事，都不能省：注入真实版本元数据
+（`VITE_APP_VERSION` / `BUILD_ID` / `GIT_COMMIT` / `BUILD_TIME`，否则「版本」页显示 `dev` 之类的假值），
+以及把 `frontend/dist/assets` 合并进 `portal/dist/assets`（后台按 `base '/'` 构建，
+少了这步生产上后台的 JS/CSS 全 404）。
+
+**改了前端必须重建 nginx 镜像**：`frontend/dist` / `portal/dist` 是 `COPY` 进镜像的，不是 bind mount。
+
+```bash
+docker compose build nginx && docker compose up -d --no-deps nginx
 ```
 
 生产 Compose 会在 backend 容器启动后自动执行：
@@ -196,6 +223,9 @@ docker compose up -d
 `等待 PostgreSQL 就绪 -> alembic upgrade head -> 初始化管理员 -> 种子数据 -> 启动 uvicorn`
 
 也就是说，正常部署不需要手工跑 `alembic upgrade head` 或 `python -m app.scripts.seed_data`。
+
+注意「初始化管理员」会**用 `.env` 的 `ADMIN_PASSWORD` 重算 hash 覆盖数据库里的 admin 口令**，
+每次 backend 容器启动都做。在界面上改的 admin 密码会在下次重启后被 `.env` 的值盖回去。
 
 ## 配置说明
 
@@ -255,6 +285,12 @@ docker compose up -d
 - 场景图
 - 说明书 / 资料附件
 - 报价单相关文件
+- `derived/thumb/w{width}/{原始 key}.webp`：列表缩略图的读穿缓存（派生对象，可随时删，会自动重建）
+
+列表封面不发原图，走 `GET /api/v1/files/{id}/content?w=<短边宽度>`：宽度白名单
+`96 / 192 / 240 / 480 / 960`，白名单外返回 422（不静默退回原图）。
+服务端实现在 `backend/app/services/thumbnails.py`，前端档位在 `frontend/src/views/Products.vue`
+（表格 192 / 卡片 480），两边必须对齐。原图路径（不带 `w`）保持不变。
 
 ### 迁移与种子
 
@@ -393,6 +429,12 @@ PYTHONPATH=. pytest
 ```
 
 无可达 PostgreSQL 测试库时，纯单元测试会继续运行，依赖 DB 的集成测试按设计跳过，不应出现失败。
+
+`tests/unit` 有一条硬约定（`backend/tests/unit/conftest.py`）：只许 import 不牵连 `app.main` /
+`app.core.database` 的叶子模块。撞上了要去改应用的 import 链，不要把整个 app 拖进单元层。
+
+这台实机的宿主 python 是 3.14，缺 `pgvector` / `pytest-asyncio` / `pillow` 且 PEP 668 不让往系统装，
+`pytest` 会直接 collect 失败——临时 venv 的配方见 `README-OPS.md` 排障「在宿主机跑 `backend/tests`」。
 
 ### 测试数据库
 

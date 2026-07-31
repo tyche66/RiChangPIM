@@ -1,7 +1,15 @@
 import { test, expect } from '@playwright/test'
+import { installApiFallback } from './helpers'
 
 test.describe('Public Share Page Access', () => {
   const shareToken = 'share-abc123'
+
+  // 公开分享页本身不带 JWT，不会被 401 拦截器踹去 /login；但只要页面多发一个 /api/v1/**
+  // 请求（例如后续加埋点或访问统计），没兜底就会打到真后端，测试结果又变成「看本机有没有
+  // 起后端」。兜底必须最先注册，各用例自己的 /share/<token> mock 才能盖住它。
+  test.beforeEach(async ({ page }) => {
+    await installApiFallback(page)
+  })
 
   test('accesses share page without JWT token', async ({ page }) => {
     await page.addInitScript(() => {

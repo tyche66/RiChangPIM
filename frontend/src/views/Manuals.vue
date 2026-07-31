@@ -103,15 +103,18 @@
               class="manuals-table"
               empty-text="暂无说明书"
             >
+              <!-- 排版层级用 class-name（不是 class）：class 会落到 hidden-columns 的隐藏占位 div 上，规则不生效 -->
               <el-table-column
                 prop="doc_type"
                 label="类型"
                 width="90"
+                class-name="cell-soft"
               />
               <el-table-column
                 prop="product_id"
                 label="产品"
                 min-width="180"
+                class-name="cell-code"
                 show-overflow-tooltip
               />
               <el-table-column
@@ -145,14 +148,16 @@
               <el-table-column
                 label="解析器"
                 min-width="120"
+                class-name="cell-code"
               >
                 <template #default="scope">
-                  <span class="mono-text">{{ scope.row.parser_name || '-' }} {{ scope.row.parser_version || '' }}</span>
+                  {{ scope.row.parser_name || '-' }} {{ scope.row.parser_version || '' }}
                 </template>
               </el-table-column>
               <el-table-column
                 label="失败原因"
                 min-width="180"
+                class-name="cell-meta"
                 show-overflow-tooltip
               >
                 <template #default="scope">
@@ -474,7 +479,6 @@ onMounted(loadManuals)
   border-radius: var(--radius-lg);
   color: #fff;
   background: linear-gradient(135deg, rgba(30, 50, 90, 0.92), rgba(15, 118, 110, 0.9));
-  backdrop-filter: blur(10px);
   box-shadow: 0 8px 32px rgba(30, 50, 90, 0.2);
 }
 
@@ -505,8 +509,6 @@ onMounted(loadManuals)
 /* ===== Glass Card ===== */
 .glass-card {
   background: var(--glass-bg);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-soft);
@@ -640,11 +642,13 @@ onMounted(loadManuals)
   background: var(--brand-lighter);
 }
 
+/*
+ * 表头的字号 / 字重 / 颜色交给 design-system.css 的全局表格规则（12px + 字距的弱化表头），
+ * 这里原先的 color / font-weight / font-size 覆盖跟它打架，会把层级压回「一个字重」。
+ * 只留页面自己的东西：表头底色和 hover 底色。
+ */
 .manuals-table :deep(.el-table__header th) {
   background: var(--brand-lighter);
-  color: var(--text-primary);
-  font-weight: 600;
-  font-size: 13px;
 }
 
 .manuals-table :deep(.el-table__row:hover td) {
@@ -652,7 +656,8 @@ onMounted(loadManuals)
 }
 
 .mono-text {
-  font-family: monospace;
+  /* 走 --pim-font-mono（鸿蒙优先），裸 monospace 在 Windows 上会掉成 Courier New */
+  font-family: var(--pim-font-mono);
   color: var(--text-secondary);
   font-size: 12px;
 }

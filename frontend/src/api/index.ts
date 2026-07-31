@@ -28,6 +28,21 @@ type PendingRequest = {
 }
 const pendingQueue: PendingRequest[] = []
 
+// 后台是以 base '/admin/' 构建的（scripts/build_frontends.sh 里 VITE_BASE_PATH=/admin/），
+// 硬编码 '/login' 的整页跳转会落到 nginx 的 location /（门户 SPA），门户没有 /login
+// 路由 → 用户看到白屏。这里统一拼上 import.meta.env.BASE_URL（dev 下就是 '/'）。
+function loginUrl(): string {
+  const base = (import.meta.env.BASE_URL || '/').replace(/\/+$/, '')
+  return `${base}/login`
+}
+
+// 会话失效时的整页跳转。已经在登录页时不再重复赋值，避免刷新循环。
+function redirectToLogin() {
+  const target = loginUrl()
+  if (window.location.pathname === target) return
+  window.location.href = target
+}
+
 function processQueue(error: unknown, token?: string) {
   while (pendingQueue.length) {
     const req = pendingQueue.shift()!
@@ -70,7 +85,7 @@ api.interceptors.response.use(
     if (originalRequest._retry) {
       localStorage.removeItem('token')
       localStorage.removeItem('refresh_token')
-      window.location.href = '/login'
+      redirectToLogin()
       return Promise.reject(error)
     }
 
@@ -86,7 +101,7 @@ api.interceptors.response.use(
       const rt = localStorage.getItem('refresh_token')
       if (!rt) {
         localStorage.removeItem('token')
-        window.location.href = '/login'
+        redirectToLogin()
         return Promise.reject(error)
       }
 
@@ -103,7 +118,7 @@ api.interceptors.response.use(
             processQueue(error, undefined)
             localStorage.removeItem('token')
             localStorage.removeItem('refresh_token')
-            window.location.href = '/login'
+            redirectToLogin()
             return false
           })
           .finally(() => {
@@ -122,13 +137,20 @@ api.interceptors.response.use(
       }
     }
 
-    if (error.response?.status === 403 && !originalRequest.suppressErrorMessage) {
+    if (error.response?.status === 403) {
       const detail: any = (error.response as any).data
-      ElMessage.error(detail?.detail?.msg || detail?.message || '无权限访问该资源')
+      console.error('[API Error]', 403, detail)
+      if (!originalRequest.suppressErrorMessage) {
+        ElMessage.error(detail?.detail?.msg || detail?.message || '无权限访问该资源')
+      }
     }
 
-    // Surface backend error messages for non-401/403 cases.
-    if (error.response?.status && error.response.status !== 401) {
+    /*
+     * Surface backend error messages for non-401/403 cases.
+     * 403 必须排除掉：后端的 403 都带 detail.msg，上面那段已经弹过一次，再走一遍
+     * 通用分支就是同一个原因弹两条一模一样的 toast（分享页的密码门最明显）。
+     */
+    if (error.response?.status && error.response.status !== 401 && error.response.status !== 403) {
       const raw = (error.response as any).data
       console.error('[API Error]', error.response.status, raw)
       // FastAPI custom HTTPException: { detail: { code, msg } }
@@ -325,8 +347,9 @@ export const quotationApi = {
 export const shareApi = {
   create: (data: ShareCreateRequest) => api.post('/shares', data) as Promise<ApiEnvelope<ShareResult>>,
   list: () => api.get('/shares') as Promise<{ data: { list: { id: string; share_type: 'proposal' | 'quotation'; target_id: string; creator_id: string; status: 'active' | 'disabled' | 'expired'; create_time: string | null }[] } }>,
+  // 分享页自己渲染密码门 / 失效提示，拦截器再弹 toast 只会和页面上的 alert 说同一句话
   get: (token: string, password?: string) =>
-    api.get(`/share/${token}`, { skipAuth: true, params: password ? { password } : {} }),
+    api.get(`/share/${token}`, { skipAuth: true, suppressErrorMessage: true, params: password ? { password } : {} }),
   revoke: (id: string) => api.delete(`/shares/${id}`),
 }
 

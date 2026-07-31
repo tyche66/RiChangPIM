@@ -20,22 +20,27 @@
           border
           stripe
         >
+          <!-- 排版层级用 class-name（不是 class）：class 会落到 hidden-columns 的隐藏占位 div 上，规则不生效 -->
           <el-table-column
             prop="role_name"
             label="角色名称"
+            class-name="cell-strong"
           />
           <el-table-column
             prop="role_code"
             label="角色编码"
+            class-name="cell-code"
           />
           <el-table-column
             prop="description"
             label="描述"
+            class-name="cell-soft"
             show-overflow-tooltip
           />
           <el-table-column
             prop="create_time"
             label="创建时间"
+            class-name="cell-meta"
             width="170"
           >
             <template #default="{ row }">
@@ -393,8 +398,6 @@ onMounted(fetchRoles)
 
 .roles-page :deep(.el-card) {
   background: rgba(255, 255, 255, 0.68);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
   border-radius: 28px;
   border: 1px solid rgba(255, 255, 255, 0.6);
   box-shadow: 0 4px 32px rgba(30, 50, 90, 0.06);

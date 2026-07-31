@@ -273,6 +273,7 @@
         @row-dblclick="openPreview"
         @selection-change="handleSelectionChange"
       >
+        <!-- 排版层级用 class-name（不是 class）：class 会落到 hidden-columns 的隐藏占位 div 上，规则不生效 -->
         <el-table-column
           type="selection"
           width="42"
@@ -304,6 +305,7 @@
         <el-table-column
           label="文件名"
           min-width="200"
+          class-name="cell-strong"
         >
           <template #default="{ row }">
             <span
@@ -329,6 +331,7 @@
         <el-table-column
           label="大小"
           width="100"
+          class-name="cell-num cell-soft"
         >
           <template #default="{ row }">
             {{ formatSize(row.size) }}
@@ -337,6 +340,7 @@
         <el-table-column
           label="上传时间"
           width="120"
+          class-name="cell-meta"
         >
           <template #default="{ row }">
             {{ formatDate(row.uploadedAt) }}
@@ -470,7 +474,7 @@
               {{ detailItem.uploadedAt }}
             </el-descriptions-item>
             <el-descriptions-item label="文件 ID">
-              {{ detailItem.id }}
+              <span class="cell-code">{{ detailItem.id }}</span>
             </el-descriptions-item>
           </el-descriptions>
         </div>
@@ -728,6 +732,7 @@ import type { UploadFile } from 'element-plus'
 import MediaUploader from '@/components/MediaUploader.vue'
 import { mediaApi, formatSize, formatDate } from '@/api/media'
 import type { MediaItem } from '@/api/media'
+import { usePreference } from '@/composables/usePreference'
 import { useAuthStore } from '@/stores/auth'
 
 interface ExtendedMediaItem extends MediaItem {
@@ -778,7 +783,8 @@ const searchQuery = ref('')
 const typeFilter = ref('')
 const refFilter = ref('')
 const sortBy = ref('newest')
-const viewMode = ref<'grid' | 'list'>('grid')
+// 视图模式是用户习惯，记在浏览器里，下次进来沿用上次的选择。
+const viewMode = usePreference<'grid' | 'list'>('mediaLibrary.viewMode', 'grid', ['grid', 'list'] as const)
 
 const detailVisible = ref(false)
 const detailItem = ref<ExtendedMediaItem | null>(null)
@@ -1402,7 +1408,8 @@ async function handleBatchDelete() {
 .ref-product-no {
   font-size: 11px;
   color: var(--el-text-color-secondary);
-  font-family: monospace;
+  /* 走 --pim-font-mono（鸿蒙优先），裸 monospace 在 Windows 上会掉成 Courier New */
+  font-family: var(--pim-font-mono);
   margin: 0;
 }
 

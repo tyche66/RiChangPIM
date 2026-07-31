@@ -31,13 +31,16 @@ jobs:
       - name: Generate build metadata
         id: meta
         run: |
-          # Version from package.json (frontend) or git tag
+          # Version: exact tag > describe > 版本锚点 frontend/package.json。
+          # 最后这一档原来写死 "1.0.3"，锚点已经走到 1.8.5，写死值只会在 CI 里造出一个
+          # 不存在的版本号（规范 §1.1：派生值不许手写）。改成读锚点本身；读不到就留空，
+          # 空值会让后端回落到 settings.VERSION，也仍然是真话。
           if git describe --tags --exact-match 2>/dev/null; then
             APP_VERSION=$(git describe --tags --exact-match)
           elif git describe --tags --always 2>/dev/null; then
             APP_VERSION=$(git describe --tags --always)
           else
-            APP_VERSION="1.0.3"
+            APP_VERSION=$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' frontend/package.json | head -1)
           fi
 
           # Build ID: use GitHub run ID for CI builds

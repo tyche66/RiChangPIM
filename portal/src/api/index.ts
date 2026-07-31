@@ -168,3 +168,86 @@ export async function confirmPendingAction(action: PendingAction, token: string)
   )
   return payload.data
 }
+
+/* ===== 公开分享（/share/:token）===== */
+
+export type ShareSceneImage = {
+  id?: string
+  name?: string | null
+  image_url?: string | null
+  sort?: number | null
+}
+
+export type ShareProductItem = {
+  product_id?: string
+  product_no?: string | null
+  product_name?: string | null
+  face_price?: number | null
+  quantity?: number
+  line_total?: number | null
+  unit_price?: number | null
+  tax_rate?: number | null
+  subtotal?: number | null
+  cover_image_url?: string | null
+  scene_images?: ShareSceneImage[]
+}
+
+export type ShareProposalContent = {
+  proposal_no?: string | null
+  proposal_name?: string | null
+  customer_name?: string | null
+  status?: string | null
+  total_face_value?: number | null
+  items?: ShareProductItem[]
+}
+
+export type ShareQuotationContent = {
+  quotation_no?: string | null
+  status?: string | null
+  total_amount?: number | null
+  items?: ShareProductItem[]
+}
+
+export type ShareEnvelopeData = {
+  share_type: 'proposal' | 'quotation'
+  target_id: string
+  access_count: number
+  content: ShareProposalContent | ShareQuotationContent | null
+}
+
+/**
+ * 分享访问失败时后端返回 `detail: {code, msg}`（见 backend/app/api/v1/share_token.py）：
+ *   40304 需要/错误的访问密码、40301 已失效、40302 已过期、
+ *   40303 访问次数用完、40401 分享不存在。
+ * 页面要按 code 区分「输密码」和「彻底失效」两种形态，所以这里把 code 一起抛出来，
+ * 不能像 apiFetch 那样只留一句 message。
+ */
+export class ShareAccessError extends Error {
+  readonly code: number
+  constructor(code: number, message: string) {
+    super(message)
+    this.name = 'ShareAccessError'
+    this.code = code
+  }
+}
+
+/** 公开分享内容。故意不带 Authorization：这是唯一豁免后台鉴权的接口。 */
+export async function getShareContent(
+  token: string,
+  password?: string,
+): Promise<ShareEnvelopeData> {
+  const query = password ? `?password=${encodeURIComponent(password)}` : ''
+  const response = await fetch(`/api/v1/share/${encodeURIComponent(token)}${query}`, {
+    method: 'GET',
+    headers: { Accept: 'application/json' },
+  })
+  const payload = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    const detail = (payload as { detail?: { code?: number; msg?: string } })?.detail
+    throw new ShareAccessError(detail?.code ?? response.status, detail?.msg || '分享链接无效或已过期')
+  }
+  const data = (payload as { data?: ShareEnvelopeData })?.data
+  if (!data) throw new ShareAccessError(0, '分享内容为空')
+  return data
+}
+

@@ -2,8 +2,8 @@
 
 ## 当前发布状态
 
-- V1.8.0 已发布并 GO：Knowledge Gateway + AI Portal + 演示服务器全链路可用。
-- 当前阶段：V1.8.0 — AI 能力生产就绪（Knowledge Gateway + AI Portal + 统一演示入口）。
+- 当前版本：v1.9.0（annotated tag `v1.9.0`，2026-07-31，后台界面与产品列表体验成套改版；发布在 `main` 上）。
+- 当前阶段：V1.9.x — 后台界面与交互打磨；AI 能力生产就绪的基线自 V1.8.0 起不变（Knowledge Gateway + AI Portal + 统一演示入口）。
   - AI_ADAPTER=openai 为默认（原 V1.2 默认为 none）
   - AI_CHAT_MODEL=agnes-2.5-flash（原 V1.2 默认为 agnes-2.0-flash）
   - AI_API_URL 可通过环境变量覆盖（默认 https://apihub.agnes-ai.com/v1）
@@ -11,12 +11,13 @@
   - Portal 演示服务器支持同源 /api 转发、/admin/ 反向代理、共享静态资源
   - 演示脚本支持端口冲突检测、死进程清理、健康检查端点
   - 新增 Windows 端口 888 用于直通 Docker Nginx
-- 历史构建版本: V1.2（M1-M4 试点运营加固完成）；MVP-RC-20260716（初次 NO-GO 已在 V1.1 解除）。
+- 历史构建版本: V1.8.0（Knowledge Gateway + AI Portal 首次生产就绪，2026-07-29 GO）；V1.2（M1-M4 试点运营加固完成）；MVP-RC-20260716（初次 NO-GO 已在 V1.1 解除）。
 
 ## 构建信息
 
-- 最近构建时间: 2026-07-29（AI 能力生产就绪 + 演示链路统一）
-- 构建版本: v1.8.0（Knowledge Gateway 正式上线，AI 门户可演示）
+- 最近一次完整 RC 构建: 2026-07-29（V1.8.0 — AI 能力生产就绪 + 演示链路统一）
+- 该次构建版本: v1.8.0（Knowledge Gateway 正式上线，AI 门户可演示）
+- 其后的 v1.8.1 / v1.8.2 / v1.8.5 都是门户界面迭代，v1.9.0 是后台界面迭代，按「BUILD_LOG 只在大版本更新」的约定都没有新增完整构建记录；**当前版本以 `CHANGELOG.md` 为准，不要拿这一节的 v1.8.0 当现值。**
 - 构建环境: /home/AI-PIM/RiChangPIM
 - 后端根目录: /home/AI-PIM/RiChangPIM/backend
 - 前端根目录: /home/AI-PIM/RiChangPIM/frontend

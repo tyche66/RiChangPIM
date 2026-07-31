@@ -92,12 +92,6 @@ const routes = [
         meta: { permissions: ['ai:use'] },
       },
       {
-        path: 'knowledge-debug',
-        name: 'KnowledgeDebug',
-        component: () => import('@/views/KnowledgeDebug.vue'),
-        meta: { permissions: ['knowledge:debug', 'ai:access'], permissionsMode: 'any' },
-      },
-      {
         path: 'manuals',
         name: 'Manuals',
         component: () => import('@/views/Manuals.vue'),

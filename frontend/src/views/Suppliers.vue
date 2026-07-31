@@ -19,20 +19,24 @@
           border
           stripe
         >
+          <!-- 排版层级用 class-name（不是 class）：class 会落到 hidden-columns 的隐藏占位 div 上，规则不生效 -->
           <el-table-column
             prop="supplierName"
             label="供应商名称"
             min-width="200"
+            class-name="cell-strong"
           />
           <el-table-column
             prop="contact"
             label="联系人"
             width="120"
+            class-name="cell-soft"
           />
           <el-table-column
             prop="phone"
             label="联系电话"
             width="140"
+            class-name="cell-num cell-soft"
           />
           <el-table-column
             prop="cooperationStatus"
@@ -53,6 +57,7 @@
             prop="createTime"
             label="创建时间"
             width="160"
+            class-name="cell-meta"
           >
             <template #default="{ row }">
               {{ formatDate(row.createTime) }}
@@ -304,8 +309,6 @@ onMounted(fetchSuppliers)
 
 .suppliers-page :deep(.el-card) {
   background: rgba(255, 255, 255, 0.68);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
   border-radius: 28px;
   border: 1px solid rgba(255, 255, 255, 0.6);
   box-shadow: 0 4px 32px rgba(30, 50, 90, 0.06);

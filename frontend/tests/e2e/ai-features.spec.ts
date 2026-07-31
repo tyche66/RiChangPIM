@@ -1,11 +1,66 @@
 import { test, expect } from '@playwright/test'
-import { ADMIN_TOKEN } from './helpers'
+import { ADMIN_TOKEN, installApiFallback } from './helpers'
+
+/**
+ * AI 选品（/ai-select）现在只是一个壳：标题条 + 指向门户 `/chat?embed=1` 的 iframe。
+ * 原来这个文件里的 9 条用例测的是后台自己的 AI 对话 / 推荐表单，那些 UI 已经整体搬进
+ * 门户，选择器改不回来，所以覆盖按不变量真正的执行位置重新分层：
+ *
+ * - 「结果里不得出现 cost_price / supplier_id」是接口契约，锁在
+ *   backend/tests/unit/test_ai_recommend_sensitive_fields.py（DOM 断言证明不了接口没泄露）。
+ * - 对话渲染、空回答兜底、接口失败提示、来源列表 → portal/tests/e2e/chat-contract.spec.ts。
+ * - 这里只留后台真正负责的事：iframe 是否指向门户、令牌交接是否只发给门户、
+ *   握手超时的兜底 UI 是否真的能用。
+ *
+ * 刻意不断言 iframe 内部内容：dev 下后台与门户不同源，父页面读不到子文档，硬写只会
+ * 得到一条永远不稳的测试。下面用 route 把门户 `/chat` 换成替身页，替身页复刻门户对外
+ * 的契约（发 pim-embed-ready、收 pim-embed-session），这样这套用例不依赖门户 dev
+ * server 起没起，也不会去测门户的内部实现。
+ */
 
 const MOCK_REFRESH_TOKEN = 'mock-refresh-token'
 const USER_PERMS = ['product:view', 'ai:use', 'proposal:view', 'proposal:edit', 'share:view']
 
+/** AISelect.vue 在 DEV 下的 portalOrigin 默认值。用正则精确匹配，避免误拦后台自己的请求。 */
+const PORTAL_CHAT_URL = /^http:\/\/localhost:5174\/chat(\?|$)/
+
+/** 另一个 origin 的页面，用来验证令牌不会被广播给它。 */
+const OTHER_ORIGIN_URL = /^http:\/\/localhost:5999\//
+
+const PORTAL_STUB_HTML = `<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>portal chat stub</title></head>
+<body>
+<p id="handshake">未收到会话</p>
+<script>
+  window.addEventListener('message', function (event) {
+    var data = event.data || {}
+    if (data.type !== 'pim-embed-session') return
+    document.getElementById('handshake').textContent =
+      'token=' + (data.token || '') + ' refresh=' + (data.refreshToken || '') + ' origin=' + event.origin
+  })
+  parent.postMessage({ type: 'pim-embed-ready' }, '*')
+</script>
+</body></html>`
+
+/** 冒充「别的站点」：同样喊 ready，但它不该收到任何令牌。 */
+const OTHER_ORIGIN_STUB_HTML = `<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>other origin stub</title></head>
+<body>
+<p id="handshake">未收到会话</p>
+<script>
+  window.addEventListener('message', function (event) {
+    var data = event.data || {}
+    if (data.type !== 'pim-embed-session') return
+    document.getElementById('handshake').textContent = 'leaked=' + (data.token || '')
+  })
+  parent.postMessage({ type: 'pim-embed-ready' }, '*')
+</script>
+</body></html>`
+
 test.beforeEach(async ({ page }) => {
-  // Pass token as argument to make it available in browser context
+  // 兜底必须最先注册（route 是后注册者优先），否则会盖掉下面各用例自己的 mock。
+  await installApiFallback(page)
+
   await page.addInitScript(
     (arg: { token: string; refreshToken: string }) => {
       localStorage.setItem('token', arg.token)
@@ -29,239 +84,126 @@ test.beforeEach(async ({ page }) => {
   })
 })
 
-test.describe('AI Chat Source Display', () => {
-  test('displays AI chat response with source citations', async ({ page }) => {
-    await page.route('**/api/v1/ai/chat', (route: any) => {
-      route.fulfill({
+async function stubPortalChat(page: any, html = PORTAL_STUB_HTML) {
+  await page.route(PORTAL_CHAT_URL, (route: any) => {
+    route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: html })
+  })
+}
+
+test.describe('AI 选品：门户 /chat 的嵌入壳', () => {
+  test('renders an iframe pointing at the portal /chat?embed=1', async ({ page }) => {
+    await stubPortalChat(page)
+    await page.goto('/ai-select')
+
+    // 「AI 选品」在页面上出现三次（侧边菜单项、布局的 h1、壳自己的 kicker），
+    // 按文本找会撞 strict mode，所以直接锚定壳自己的那一处。
+    await expect(page.locator('.portal-kicker')).toHaveText('AI 选品')
+
+    const frame = page.locator('iframe.portal-frame')
+    await expect(frame).toHaveAttribute('src', 'http://localhost:5174/chat?embed=1')
+    await expect(frame).toHaveAttribute('title', 'AI 选品工作台')
+  })
+
+  test('shows the loading hint until the portal document finishes loading', async ({ page }) => {
+    // 故意让 /chat 慢 1.5 秒返回，才能稳定观察到「正在载入」这一帧。
+    await page.route(PORTAL_CHAT_URL, async (route: any) => {
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+      await route.fulfill({
         status: 200,
-        json: {
-          data: {
-            answer: '根据您的需求，我推荐以下几款产品。',
-            sources: [
-              { product_name: '保湿洁面乳', doc_title: '产品文档A' },
-              { product_name: '清爽爽肤水', doc_title: '产品文档B' },
-            ],
-            session_id: 'test-session',
-            tool_calls: [],
-          },
-        },
+        contentType: 'text/html; charset=utf-8',
+        body: PORTAL_STUB_HTML,
       })
     })
 
     await page.goto('/ai-select')
-
-    await expect(page.getByText('AI 智能对话')).toBeVisible()
-
-    await page.getByPlaceholder('输入您的问题').fill('推荐适合夏季的护肤品', { force: true })
-    await page.getByRole('button', { name: '发送' }).click({ force: true })
-
-    await expect(page.getByText('推荐适合夏季的护肤品')).toBeVisible()
-    await expect(page.getByText('根据您的需求，我推荐以下几款产品。')).toBeVisible()
-    await expect(page.locator('.message-sources .el-tag').first()).toBeVisible()
+    await expect(page.getByText('正在载入 AI 选品工作台…')).toBeVisible()
+    await expect(page.getByText('正在载入 AI 选品工作台…')).toBeHidden({ timeout: 10_000 })
   })
 
-  test('shows fallback message when AI chat returns empty answer', async ({ page }) => {
-    await page.route('**/api/v1/ai/chat', (route: any) => {
+  test('hands the admin session to the portal frame with an explicit target origin', async ({
+    page,
+  }) => {
+    await stubPortalChat(page)
+    await page.goto('/ai-select')
+
+    const adminOrigin = new URL(page.url()).origin
+    const handshake = page.frameLocator('iframe.portal-frame').locator('#handshake')
+    await expect(handshake).toHaveText(
+      `token=${ADMIN_TOKEN} refresh=${MOCK_REFRESH_TOKEN} origin=${adminOrigin}`
+    )
+
+    // 握手成功就不该出现超时兜底提示。
+    await expect(page.locator('.portal-alert')).toHaveCount(0)
+  })
+
+  test('never posts the session to a frame from another origin', async ({ page }) => {
+    await stubPortalChat(page)
+    await page.route(OTHER_ORIGIN_URL, (route: any) => {
       route.fulfill({
         status: 200,
-        json: { data: { answer: '', sources: [], session_id: 's1', tool_calls: [] } },
+        contentType: 'text/html; charset=utf-8',
+        body: OTHER_ORIGIN_STUB_HTML,
       })
     })
 
     await page.goto('/ai-select')
-    await page.getByPlaceholder('输入您的问题').fill('hello', { force: true })
-    await page.getByRole('button', { name: '发送' }).click({ force: true })
+    await expect(page.frameLocator('iframe.portal-frame').locator('#handshake')).toContainText(
+      `token=${ADMIN_TOKEN}`
+    )
 
-    await expect(page.getByText('暂无回复')).toBeVisible()
+    // 再塞一个别的 origin 的 iframe，它也喊 ready，但 origin / source 都不匹配。
+    await page.evaluate(() => {
+      const rogue = document.createElement('iframe')
+      rogue.id = 'rogue-frame'
+      rogue.src = 'http://localhost:5999/embed.html'
+      document.body.appendChild(rogue)
+    })
+
+    const rogue = page.frameLocator('#rogue-frame').locator('#handshake')
+    await expect(rogue).toHaveText('未收到会话')
+    // 给父页面留出反应时间，确认不是「还没来得及泄露」。
+    await page.waitForTimeout(1000)
+    await expect(rogue).toHaveText('未收到会话')
   })
 
-  test('shows error message when AI chat API fails', async ({ page }) => {
-    await page.route('**/api/v1/ai/chat', (route: any) => {
-      route.fulfill({ status: 500, json: { detail: { msg: 'Internal Server Error' } } })
+  test('offers reload fallback when the portal never completes the handshake', async ({ page }) => {
+    let requests = 0
+    await page.route(PORTAL_CHAT_URL, (route: any) => {
+      requests += 1
+      route.abort()
     })
 
     await page.goto('/ai-select')
-    await page.getByPlaceholder('输入您的问题').fill('hello', { force: true })
-    await page.getByRole('button', { name: '发送' }).click({ force: true })
+    // iframe 的子资源请求是文档 load 之后才发的，goto 返回时计数可能还是 0，
+    // 所以这里必须轮询而不是立即断言。
+    await expect.poll(() => requests, { timeout: 10_000 }).toBe(1)
 
-    await expect(page.getByText('AI 服务暂时不可用，请稍后重试')).toBeVisible()
+    // 看门狗 8 秒，留足余量。
+    const alert = page.locator('.portal-alert')
+    await expect(alert).toBeVisible({ timeout: 15_000 })
+    await expect(alert).toContainText('AI 选品工作台还没有响应')
+
+    await alert.getByRole('button', { name: '重新加载' }).click()
+    await expect(alert).toBeHidden()
+    await expect.poll(() => requests, { timeout: 10_000 }).toBe(2)
   })
 
-  test('limits sources display to first 3', async ({ page }) => {
-    const manySources = Array.from({ length: 5 }, (_, i) => ({
-      product_name: `Product ${i + 1}`,
-      doc_title: `Doc ${i + 1}`,
-    }))
-
-    await page.route('**/api/v1/ai/chat', (route: any) => {
+  test('opens the portal chat standalone in a new tab', async ({ page, context }) => {
+    await stubPortalChat(page)
+    await context.route(PORTAL_CHAT_URL, (route: any) => {
       route.fulfill({
         status: 200,
-        json: {
-          data: {
-            answer: 'Here are results.',
-            sources: manySources,
-            session_id: 's1',
-            tool_calls: [],
-          },
-        },
+        contentType: 'text/html; charset=utf-8',
+        body: PORTAL_STUB_HTML,
       })
     })
-
-    await page.goto('/ai-select')
-    await page.getByPlaceholder('输入您的问题').fill('test', { force: true })
-    await page.getByRole('button', { name: '发送' }).click({ force: true })
-
-    await expect(page.getByText('Here are results.')).toBeVisible()
-    await expect(page.getByText('Product 1')).toBeVisible()
-    await expect(page.getByText('Product 3')).toBeVisible()
-  })
-})
-
-test.describe('AI Recommendation - Verified Products', () => {
-  test('displays verified badge for AI-recommended products', async ({ page }) => {
-    await page.route('**/api/v1/ai/recommend', (route: any) => {
-      route.fulfill({
-        status: 200,
-        json: {
-          data: {
-            status: 'success',
-            filters_applied: { category_id: 'cat-skincare', max_face_price: 200 },
-            products: [
-              {
-                id: 'p1',
-                product_no: 'P001',
-                product_name: '氨基酸洁面泡沫',
-                brand_id: 'b1',
-                category_id: 'cat-skincare',
-                face_price: 128,
-                stock_status: 'in_stock',
-                description: '温和清洁，适合敏感肌',
-                _verified: true,
-                _verified_by: 'ai-model-v3',
-              },
-            ],
-            rationale: '基于您的预算和肤质需求筛选',
-            total: 1,
-            sources: [],
-          },
-        },
-      })
-    })
-
     await page.goto('/ai-select')
 
-    await page.getByLabel('需求描述').fill('需要一款温和的洁面产品，预算200以内', { force: true })
-    await page.getByRole('button', { name: 'AI 推荐' }).click({ force: true })
-
-    await expect(page.getByText('氨基酸洁面泡沫')).toBeVisible()
-    await expect(page.getByText('已验证')).toBeVisible()
-    await expect(page.getByText('by ai-model-v3')).toBeVisible()
-    await expect(page.getByText('基于您的预算和肤质需求筛选')).toBeVisible()
-    await expect(page.getByText('筛选条件')).toBeVisible()
-  })
-
-  test('does NOT display cost_price in recommendation results', async ({ page }) => {
-    await page.route('**/api/v1/ai/recommend', (route: any) => {
-      route.fulfill({
-        status: 200,
-        json: {
-          data: {
-            status: 'success',
-            filters_applied: {},
-            products: [
-              {
-                id: 'p1',
-                product_no: 'P001',
-                product_name: 'Test Product',
-                face_price: 100,
-                cost_price: 50,
-                supplier_id: 'sup-123',
-                stock_status: 'in_stock',
-                _verified: true,
-              },
-            ],
-            rationale: 'test rationale',
-            total: 1,
-            sources: [],
-          },
-        },
-      })
-    })
-
-    await page.goto('/ai-select')
-    await page.getByLabel('需求描述').fill('test')
-    await page.getByRole('button', { name: 'AI 推荐' }).click()
-
-    await expect(page.locator('text=/cost_price|进价|成本/')).toHaveCount(0)
-  })
-
-  test('does NOT display supplier_id in recommendation results', async ({ page }) => {
-    await page.route('**/api/v1/ai/recommend', (route: any) => {
-      route.fulfill({
-        status: 200,
-        json: {
-          data: {
-            status: 'success',
-            filters_applied: {},
-            products: [
-              {
-                id: 'p1',
-                product_name: 'Test Product',
-                face_price: 100,
-                supplier_id: 'SUP-SECRET-123',
-                stock_status: 'in_stock',
-              },
-            ],
-            rationale: 'test',
-            total: 1,
-            sources: [],
-          },
-        },
-      })
-    })
-
-    await page.goto('/ai-select')
-    await page.getByLabel('需求描述').fill('test')
-    await page.getByRole('button', { name: 'AI 推荐' }).click()
-
-    await expect(page.locator('text=/supplier_id|供应商ID/')).toHaveCount(0)
-  })
-
-  test('shows degraded banner when AI parse fails', async ({ page }) => {
-    await page.route('**/api/v1/ai/recommend', (route: any) => {
-      route.fulfill({
-        status: 200,
-        json: {
-          data: {
-            status: 'parse_failed',
-            filters_applied: {},
-            products: [{ product_name: 'Fallback' }],
-            rationale: 'AI 解析失败',
-            total: 1,
-            sources: [],
-          },
-        },
-      })
-    })
-
-    await page.goto('/ai-select')
-    await page.getByLabel('需求描述').fill('vague request')
-    await page.getByRole('button', { name: 'AI 推荐' }).click()
-
-    await expect(page.locator('.el-alert--warning')).toBeVisible()
-    await expect(page.getByText('AI 解析失败，请修正需求后重试')).toBeVisible()
-  })
-
-  test('shows error toast when recommend API fails', async ({ page }) => {
-    await page.route('**/api/v1/ai/recommend', (route: any) => {
-      route.fulfill({ status: 500, json: { detail: { msg: 'Service Unavailable' } } })
-    })
-
-    await page.goto('/ai-select')
-    await page.getByLabel('需求描述').fill('test')
-    await page.getByRole('button', { name: 'AI 推荐' }).click()
-
-    // Wait for the error message to appear (it may auto-dismiss after 3s)
-    await page.waitForSelector('.el-message--error', { state: 'visible', timeout: 10000 })
+    const [opened] = await Promise.all([
+      context.waitForEvent('page'),
+      page.locator('.portal-tools').getByRole('button', { name: '新窗口打开' }).click(),
+    ])
+    expect(opened.url()).toBe('http://localhost:5174/chat')
+    await opened.close()
   })
 })

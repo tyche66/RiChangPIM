@@ -1,0 +1,44 @@
+# 根构建上下文忽略清单。
+#
+# 只有 nginx 镜像用仓库根当构建上下文（docker/nginx/Dockerfile 只 COPY
+# conf.d/default.conf + portal/dist + frontend/dist），但没有这份清单时
+# docker 会把整个 1.4G 仓库（node_modules / venv / .git / 备份）都打包发给
+# daemon，构建慢且白占空间。
+#
+# 注意：**不要**忽略 frontend/dist 和 portal/dist —— 那两个目录就是 nginx
+# 镜像要装进去的东西（前端没有独立 Dockerfile，dist 由宿主机 npm run build
+# 产出，见 CHANGELOG.md「已知缺口」）。
+
+# 依赖与虚拟环境
+**/node_modules
+backend/venv
+backend/.venv
+
+# 版本库与工具目录
+.git
+.gitignore
+.github
+.opencode
+.claude
+
+# 缓存与产物
+**/__pycache__
+**/*.py[cod]
+**/.pytest_cache
+**/.ruff_cache
+**/.mypy_cache
+**/.vite
+frontend/coverage
+portal/coverage
+**/playwright-report
+**/test-results
+
+# 数据与密钥（绝不进镜像）
+backups
+.env
+.env.*
+!.env.example
+
+# 开发期文档与清单
+MANIFEST.txt
+*.log

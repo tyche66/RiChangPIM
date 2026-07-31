@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
-import { createMockToken } from './helpers'
+import { createMockToken, installApiFallback } from './helpers'
 
 const MOCK_REFRESH_TOKEN = 'mock-refresh-token-sales'
 
@@ -24,7 +24,9 @@ function routeAuth(page: Page) {
       json: { data: { id: '1', username: 'admin', role_code: 'admin', perms: USER_PERMS } },
     })
   })
-  page.route('**/api/v1/auth/refresh', (route) => {
+  // refresh 是带查询串发的（api/index.ts: params: { refresh_token }），pattern 结尾必须留 `*`，
+  // 否则这个 mock 永远匹配不上，真出现 401 时会打到真后端并把页面硬跳去 /login。
+  page.route('**/api/v1/auth/refresh*', (route) => {
     route.fulfill({ status: 200, json: { data: { access_token: SALES_TOKEN, refresh_token: MOCK_REFRESH_TOKEN } } })
   })
 }
@@ -79,6 +81,8 @@ test.describe('Sales Flow: Proposal → Quotation → Share', () => {
   let proposalState: 'original' | 'edited' = 'original'
 
   test.beforeEach(async ({ page }) => {
+    // 兜底必须最先注册（route 是后注册者优先），否则会盖掉下面各条具体 mock。
+    await installApiFallback(page)
     await page.addInitScript((arg) => {
       localStorage.setItem('token', arg.token)
       localStorage.setItem('refresh_token', arg.refreshToken)
@@ -217,7 +221,9 @@ test.describe('Sales Flow: Proposal → Quotation → Share', () => {
   test('full sales flow: create proposal with 2 items, edit, create quotation, share, verify public view', async ({ page }) => {
     // ===== PHASE 1: Create proposal with 2 products =====
 
-    await page.route('**/api/v1/proposals', async (route) => {
+    // 结尾的 `*` 用来容纳列表的 ?page=1&size=20：没有它，下面 GET 分支永远不会被调用
+    // （只有无查询串的 POST 能匹配），方案列表会静默落进兜底。
+    await page.route('**/api/v1/proposals*', async (route) => {
       if (route.request().method() === 'GET') {
         route.fulfill({ status: 200, json: { code: 200, data: { list: [], total: 0, page: 1, size: 20 } } })
       } else if (route.request().method() === 'POST') {
@@ -370,7 +376,10 @@ test.describe('Sales Flow: Proposal → Quotation → Share', () => {
     // Verify share link shown in input
     const shareLinkText = await page.locator('.share-url-input .el-input__inner').inputValue()
     expect(shareLinkText).toContain(shareToken)
-    expect(shareLinkText).toBe(`http://localhost:5173/share/${shareToken}`)
+    // 分享链接必须是「当前应用 origin + /share/<token>」的完整绝对地址。原来把 5173
+    // 写死，e2e 用 E2E_PORT 换端口跑时必红——锁的是 origin 拼接逻辑，不是某个端口号。
+    const appOrigin = new URL(page.url()).origin
+    expect(shareLinkText).toBe(`${appOrigin}/share/${shareToken}`)
 
     // Verify QR code canvas is present and has content
     const canvas = page.locator('.qr-canvas')

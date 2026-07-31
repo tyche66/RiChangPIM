@@ -10,6 +10,17 @@
 - 前端版本以 `frontend/package.json` 为代码内基准；发布构建通过 `APP_VERSION` 和 `VITE_APP_VERSION` 注入同一版本。
 - 每个正式版本必须有 annotated tag，例如 `v1.0.1`。
 
+## 1.1 版本号的单一事实来源
+
+规范只说了「锚点是 `frontend/package.json`」，没说版本号一共散落在几处，结果 `v1.8.0` → `v1.8.5` 之间有 7 个文件停在旧值（`README.md` 报 v1.8.0、后端兜底报 0.1.0、门户 `package.json` 报 0.1.0）。补一条硬规则：
+
+- **当前版本号的现值只认 `CHANGELOG.md` 顶部。** 任何文档要写「当前版本」，要么引用 `CHANGELOG.md`，要么就不写。
+- **手改的位置只有 `CHANGELOG.md`「改版本号要动哪几处」列出的那几处**（前端 `package.json`、门户 `package.json`、`backend/app/core/config.py` 的 `VERSION`、`CHANGELOG.md`、`README.md`、`AI-Docs/README.md`、annotated tag）。发版时按那张表逐项打勾。
+- **派生值不许手写**：`frontend/src/config/version.ts`、`/api/v1/version`、`/health`、OpenAPI 的 `version` 都从上面几处推出来；CI 的 `APP_VERSION` 从 tag 或 `frontend/package.json` 读，不许在脚本里写死版本号。
+- **兜底值也必须是真话**：`settings.VERSION` 这类「没注入时用什么」的默认值要跟着发版一起改，否则忘传构建参数的部署会对外报一个不存在的版本。
+- **后端不替前端报版本**：前后端各自独立构建，一致性由 `compareBuilds()` 比对得出，不能由某一端凭空补全另一端的版本号。
+- **历史记录不跟版本走**：`BUILD_LOG.md`、`PROJECT_MANAGEMENT.md`、`TODO.md` 的已发布条目、`docs/08-开发路线图.md` 的里程碑行记的是当时的事实，发新版时不要改写；`RELEASE_GATE.md` 定义的是每次发布都要过的门禁，保持版本无关。
+
 ## 2. 分支策略
 
 - `main`：唯一长期分支，始终保持可构建、可部署。
@@ -69,7 +80,7 @@ git push -u origin feature/example
 ## 6. 发布流程
 
 1. 确认工作区干净并同步 `origin/main`。
-2. 更新版本号、发布说明和必要文档。
+2. 按 `CHANGELOG.md`「改版本号要动哪几处」逐项更新版本号、发布说明和必要文档（§1.1）。
 3. 完成后端专项及完整测试、前端测试、类型检查、构建和关键 E2E。
 4. 合并发布提交到 `main`。
 5. 创建 annotated tag：`git tag -a vX.Y.Z -m "Release vX.Y.Z"`。

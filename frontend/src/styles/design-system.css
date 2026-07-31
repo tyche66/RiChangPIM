@@ -1,9 +1,69 @@
+/*
+ * 字体：HarmonyOS Sans（华为鸿蒙开源字体，免费商用）。
+ *
+ * 只自托管拉丁 + 数字 + 标点的字形档（4 档字重共 ~172KB）。鸿蒙的中文字库
+ * （HarmonyOS Sans SC）单档就有 3~8MB，塞进构建产物会把后台首屏拖垮，所以
+ * 中文按「本机装了鸿蒙就用鸿蒙，没装就退回系统中文」处理——数字、编号、
+ * 价格、时间这些真正需要科技感的字符都落在自托管的拉丁档里。
+ *
+ * 4 档都写 unicode-range 限定在拉丁 / 标点 / 货币 / 字母式符号区间，理由有两条：
+ * 1. @font-face 会「遮住」同名的本机字体。不限定区间的话，'HarmonyOS Sans' 这个
+ *    族名对中文字符也只认这 4 个拉丁档（档里没有中文字形），本机装的完整鸿蒙
+ *    反而轮不到，上面那句「装了鸿蒙就用鸿蒙」就只剩 HarmonyOS Sans SC 能兜。
+ * 2. 纯中文的文案（空态、提示语）不再触发这 4 个用不上的档的下载判断。
+ * 区间宁可放宽不要收窄：多写的区间里没有字形时，浏览器按字符继续往后回退；
+ * 写窄了才会把子集里本来有的字形（± ™ ℃ € 之类）挡在外面。
+ */
+@font-face {
+  font-family: 'HarmonyOS Sans';
+  src: url('../assets/fonts/HarmonyOS_Sans_Light.woff2') format('woff2');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0100-024F, U+2000-206F, U+2070-209F, U+20A0-20BF, U+2100-214F,
+    U+2190-21FF;
+}
+
+@font-face {
+  font-family: 'HarmonyOS Sans';
+  src: url('../assets/fonts/HarmonyOS_Sans_Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0100-024F, U+2000-206F, U+2070-209F, U+20A0-20BF, U+2100-214F,
+    U+2190-21FF;
+}
+
+@font-face {
+  font-family: 'HarmonyOS Sans';
+  src: url('../assets/fonts/HarmonyOS_Sans_Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0100-024F, U+2000-206F, U+2070-209F, U+20A0-20BF, U+2100-214F,
+    U+2190-21FF;
+}
+
+@font-face {
+  font-family: 'HarmonyOS Sans';
+  src: url('../assets/fonts/HarmonyOS_Sans_Bold.woff2') format('woff2');
+  font-weight: 600 700;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0100-024F, U+2000-206F, U+2070-209F, U+20A0-20BF, U+2100-214F,
+    U+2190-21FF;
+}
+
 :root {
-  font-family: "Helvetica Regular", "Helvetica Neue", "PingFang SC", "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--pim-font-sans);
   color: #5e6470;
   background: #f0f0f0;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
+  --pim-font-sans: 'HarmonyOS Sans', 'HarmonyOS Sans SC', 'PingFang SC', 'Microsoft YaHei',
+    ui-sans-serif, system-ui, sans-serif;
+  --pim-font-mono: 'HarmonyOS Sans', ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas,
+    monospace;
   --pim-brand: 30, 50, 90;
   --pim-primary: rgb(var(--pim-brand));
   --pim-primary-90: rgba(var(--pim-brand), 0.9);
@@ -20,6 +80,28 @@
   --pim-radius: 28px;
   --pim-radius-sm: 18px;
   --pim-shadow: 0 20px 60px rgba(var(--pim-brand), 0.09);
+  /* 表格排版：靠字重 + 颜色分主次，不靠加粗边框 */
+  --pim-text-strong: rgba(var(--pim-brand), 0.92);
+  --pim-text-soft: rgba(var(--pim-brand), 0.54);
+  --pim-text-faint: rgba(var(--pim-brand), 0.38);
+  --pim-line: rgba(var(--pim-brand), 0.08);
+  --pim-line-strong: rgba(var(--pim-brand), 0.14);
+  /*
+   * 铜色副色：品牌蓝之外唯一的强调色，目前只有「版本 / 构建指纹」这类元信息在用。
+   * 跟 brand/primary 一个套法（triplet + rgb() 双形态），需要调透明度时能直接 rgba()。
+   */
+  --pim-copper: 230, 139, 81;
+  --pim-accent: rgb(var(--pim-copper));
+  --pim-accent-mid: rgb(181, 109, 61);
+  --pim-accent-deep: rgb(155, 97, 62);
+  /* 品牌蓝的提亮档，用在渐变中段（纯 --pim-primary 到铜色之间缺一个过渡点） */
+  --pim-brand-lift: rgb(41, 76, 125);
+  /*
+   * 这里故意不覆盖 --el-font-family：Element Plus 只在 :root 声明了它，整个包里
+   * 没有任何一处 var(--el-font-family) 真的在读（dist/index.css 的显式 font-family
+   * 只有 3 处 inherit），覆盖它是空操作。组件字体靠 :root 的 font-family 继承生效，
+   * 而 main.ts 里本文件在 element-plus/dist/index.css 之后引入，继承链没有被盖。
+   */
   --el-color-primary: rgb(var(--pim-brand));
   --el-color-primary-light-3: rgba(var(--pim-brand), 0.72);
   --el-color-primary-light-5: rgba(var(--pim-brand), 0.5);
@@ -58,13 +140,15 @@ a {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* 卡片刻意不加 backdrop-filter。
+   卡片是整页高的滚动容器，模糊会让浏览器每帧重算一次可见区域的高斯模糊；而它
+   背后只有 .xxx-page 的纯色 #f0f0f0 或 body 的大尺度渐变 —— 模糊纯色看不出差别，
+   代价却是滚动掉帧。要毛玻璃就加在压着内容的浮层上（见 .el-dialog）。 */
 .el-card {
   border: 1px solid var(--pim-border);
   border-radius: var(--pim-radius);
   background: var(--pim-glass);
   box-shadow: var(--pim-shadow);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
 }
 
 .el-card__header {
@@ -192,18 +276,116 @@ a {
   box-shadow: 0 0 0 1px rgba(var(--pim-brand), 0.09) inset;
 }
 
+/* =========================================================================
+ * 表格
+ * 现代科技简洁：去掉竖线、只留极细横线；表头小字号 + 字距 + 中等字重；
+ * 数字统一等宽（tabular-nums）保证列对齐；主次信息靠字重和颜色区分。
+ * ========================================================================= */
 .el-table {
   --el-table-bg-color: transparent;
   --el-table-tr-bg-color: transparent;
-  --el-table-header-bg-color: rgba(var(--pim-brand), 0.055);
-  --el-table-row-hover-bg-color: rgba(var(--pim-brand), 0.045);
+  --el-table-header-bg-color: rgba(var(--pim-brand), 0.035);
+  --el-table-row-hover-bg-color: rgba(var(--pim-brand), 0.04);
+  --el-table-current-row-bg-color: rgba(var(--pim-brand), 0.06);
+  --el-table-border-color: var(--pim-line);
+  --el-table-text-color: var(--pim-text);
+  --el-table-header-text-color: var(--pim-text-soft);
   border-radius: var(--pim-radius-sm);
   overflow: hidden;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Element Plus 用伪元素画表格底边，科技感版式里不要（带 border 的表格保留） */
+.el-table:not(.el-table--border) .el-table__inner-wrapper::before,
+.el-table:not(.el-table--border)::before {
+  display: none;
 }
 
 .el-table th.el-table__cell {
-  color: var(--pim-primary-80);
+  padding: 9px 0;
+  border-bottom: 1px solid var(--pim-line-strong);
+  color: var(--pim-text-soft);
+  font-size: 12px;
   font-weight: 500;
+  letter-spacing: 0.06em;
+}
+
+.el-table td.el-table__cell {
+  padding: 11px 0;
+  border-bottom: 1px solid var(--pim-line);
+}
+
+.el-table:not(.el-table--border) th.el-table__cell,
+.el-table:not(.el-table--border) td.el-table__cell {
+  border-right: 0;
+}
+
+.el-table .cell {
+  padding-inline: 14px;
+  line-height: 1.55;
+  word-break: break-word;
+}
+
+.el-table__body tr:last-child td.el-table__cell {
+  border-bottom-color: transparent;
+}
+
+.el-table__body tr.el-table__row:hover > td.el-table__cell {
+  /* hover 只换底色，不动字重，避免整行抖动 */
+  transition: background-color 140ms ease;
+}
+
+.el-table--striped .el-table__body tr.el-table__row--striped td.el-table__cell {
+  background: rgba(var(--pim-brand), 0.022);
+}
+
+.el-table .el-table__empty-block {
+  min-height: 180px;
+}
+
+.el-table .el-table__empty-text {
+  color: var(--pim-text-faint);
+  font-size: 13px;
+  letter-spacing: 0.04em;
+}
+
+/* 表格里的通用排版原子类，各页面按语义套用 */
+.cell-strong {
+  color: var(--pim-text-strong);
+  font-weight: 600;
+}
+
+.cell-soft {
+  color: var(--pim-text-soft);
+  font-weight: 400;
+}
+
+.cell-meta {
+  color: var(--pim-text-faint);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.cell-num {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+}
+
+.cell-code {
+  font-family: var(--pim-font-mono);
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  color: var(--pim-text-soft);
+}
+
+.el-descriptions {
+  --el-descriptions-item-bordered-label-background: rgba(var(--pim-brand), 0.035);
+}
+
+.el-descriptions__label {
+  color: var(--pim-text-soft) !important;
+  font-weight: 500 !important;
 }
 
 .el-dialog {
@@ -230,6 +412,28 @@ a {
 .el-pagination {
   flex-wrap: wrap;
   gap: 4px;
+  --el-pagination-button-color: var(--pim-text-soft);
+  --el-pagination-bg-color: transparent;
+  --el-pagination-hover-color: var(--el-color-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.el-pagination button,
+.el-pagination .el-pager li {
+  border-radius: 10px;
+  font-weight: 400;
+}
+
+.el-pagination .el-pager li.is-active {
+  background: rgba(var(--pim-brand), 0.1);
+  color: var(--pim-text-strong);
+  font-weight: 500;
+}
+
+.el-pagination__total,
+.el-pagination__jump {
+  color: var(--pim-text-faint);
+  font-size: 12px;
 }
 
 @media (max-width: 767px) {

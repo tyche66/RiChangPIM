@@ -1,9 +1,11 @@
 import { test, expect } from '@playwright/test'
 
-import { ADMIN_TOKEN } from './helpers'
+import { ADMIN_TOKEN, installApiFallback } from './helpers'
 
 test.describe('Previously missing UI coverage', () => {
   test.beforeEach(async ({ page }) => {
+    // 兜底必须最先注册（route 是后注册者优先），否则会盖掉下面的 auth/me 与各用例 mock。
+    await installApiFallback(page)
     await page.addInitScript((token) => {
       localStorage.setItem('token', token)
       localStorage.setItem('refresh_token', 'test-refresh')

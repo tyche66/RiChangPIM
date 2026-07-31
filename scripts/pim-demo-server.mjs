@@ -95,8 +95,26 @@ function resolveExistingFile(urlPath, baseDir) {
   return resolvedPath
 }
 
+function cacheHeadersFor(filePath) {
+  // dist 里带内容哈希的资源可以长缓存；index.html 必须每次回源，
+  // 否则改完前端刷新还是旧壳子。
+  if (/\/assets\/.+\.[0-9a-zA-Z_-]{8,}\.(js|css|woff2?|png|jpe?g|svg|webp)$/.test(filePath)) {
+    return { 'cache-control': 'public, max-age=31536000, immutable' }
+  }
+  if (filePath.endsWith('.html')) {
+    return { 'cache-control': 'no-cache' }
+  }
+  return { 'cache-control': 'public, max-age=3600' }
+}
+
 function serveFile(req, res, filePath) {
-  res.writeHead(200, { 'content-type': contentTypeFor(filePath) })
+  const headers = { 'content-type': contentTypeFor(filePath), ...cacheHeadersFor(filePath) }
+  try {
+    headers['content-length'] = String(statSync(filePath).size)
+  } catch {
+    // 拿不到大小就退回 chunked，不值得为此 500。
+  }
+  res.writeHead(200, headers)
   if (req.method === 'HEAD') {
     res.end()
     return
@@ -104,44 +122,22 @@ function serveFile(req, res, filePath) {
   createReadStream(filePath).pipe(res)
 }
 
-function serveText(req, res, status, filePath, body) {
-  res.writeHead(status, { 'content-type': contentTypeFor(filePath) })
-  if (req.method === 'HEAD') {
-    res.end()
-    return
-  }
-  res.end(body)
-}
-
-function rewriteAdminHtml(html) {
-  return html
-    .replaceAll('href="/assets/', 'href="/admin/assets/')
-    .replaceAll('src="/assets/', 'src="/admin/assets/')
-    .replaceAll('href="/RiChangPIM.png"', 'href="/admin/RiChangPIM.png"')
-}
-
-function rewriteAdminJavaScript(source) {
-  return source
-    .replace('history:K("/")', 'history:K("/admin/")')
-    .replaceAll('window.location.href="/login"', 'window.location.href="/admin/login"')
-    .replaceAll('return"/"+e', 'return"/admin/"+e')
-}
-
+/**
+ * 后台静态资源。
+ *
+ * 这里曾经在响应时改写 admin 包（把 /assets/ 前缀、history base 和
+ * window.location.href="/login" 都替换成 /admin/…）。那是后台按 base '/' 构建
+ * 时代的补丁：它只能救 5173 这一条链路，:888 的 nginx 依旧白屏，而且每个 .js
+ * 请求都要 readFileSync 整包 + 4 次 replaceAll。
+ * 现在 scripts/build_frontends.sh 用 VITE_BASE_PATH=/admin/ 构建后台，产物里
+ * 本来就是 /admin/assets/，改写全部失效也不再需要——原样发即可（见启动时的
+ * base 自检，构建方式回退时会打印告警）。
+ */
 function serveAdminStatic(req, res, urlPath) {
   const adminUrl = urlPath.replace(/^\/admin/, '') || '/'
   const filePath = resolveExistingFile(adminUrl, adminRootDir)
 
   if (filePath) {
-    if (filePath.endsWith('.html')) {
-      const html = rewriteAdminHtml(readFileSync(filePath, 'utf8'))
-      return serveText(req, res, 200, filePath, html)
-    }
-
-    if (filePath.endsWith('.js')) {
-      const js = rewriteAdminJavaScript(readFileSync(filePath, 'utf8'))
-      return serveText(req, res, 200, filePath, js)
-    }
-
     return serveFile(req, res, filePath)
   }
 
@@ -150,8 +146,7 @@ function serveAdminStatic(req, res, urlPath) {
     return send(res, 404, { 'content-type': 'text/plain; charset=utf-8' }, 'admin index.html not found')
   }
 
-  const html = rewriteAdminHtml(readFileSync(indexPath, 'utf8'))
-  return serveText(req, res, 200, indexPath, html)
+  return serveFile(req, res, indexPath)
 }
 
 function serveSharedStatic(req, res, urlPath) {
@@ -191,6 +186,26 @@ function serveStatic(req, res, baseDir, fallback = 'index.html') {
   serveFile(req, res, filePath)
 }
 
+/**
+ * 启动自检：后台产物必须是按 base '/admin/' 构建的。
+ * 这个 demo server 不再在响应里改写 admin 包，所以一旦有人用 `npm run build`
+ * （没有 VITE_BASE_PATH）覆盖了 frontend/dist，/admin/ 会去请求 /assets/…，
+ * 被门户接住 → 白屏。宁可启动时喊一声，也不要让人对着白屏猜。
+ */
+function checkAdminBase() {
+  const indexPath = path.join(adminRootDir, 'index.html')
+  if (!existsSync(indexPath)) {
+    console.warn(`WARN: ${indexPath} 不存在，/admin/ 会 404。先跑 bash scripts/build_frontends.sh`)
+    return
+  }
+  const html = readFileSync(indexPath, 'utf8')
+  if (!html.includes('/admin/assets/')) {
+    console.warn('WARN: frontend/dist 不是按 base /admin/ 构建的（index.html 里没有 /admin/assets/）。')
+    console.warn('      /admin/ 会去请求 /assets/… 并被门户接住 → 白屏。')
+    console.warn('      修法：bash scripts/build_frontends.sh（它会 export VITE_BASE_PATH=/admin/）')
+  }
+}
+
 const server = http.createServer((req, res) => {
   const urlPath = req.url || '/'
   if (urlPath === demoHealthPath) {
@@ -206,12 +221,26 @@ const server = http.createServer((req, res) => {
     return proxyToBackend(req, res)
   }
 
+  if (urlPath === '/admin') {
+    // 不带尾斜杠时 301 到 /admin/，否则相对资源会解析到站点根（门户）上去。
+    return send(res, 301, { location: '/admin/', 'content-type': 'text/plain; charset=utf-8' }, '')
+  }
+
+  if (urlPath.startsWith('/admin?') || urlPath.startsWith('/admin#')) {
+    return send(res, 301, { location: `/admin/${urlPath.slice('/admin'.length)}`, 'content-type': 'text/plain; charset=utf-8' }, '')
+  }
+
   if (urlPath.startsWith('/admin/')) {
     return serveAdminStatic(req, res, urlPath)
   }
 
-  if (urlPath.startsWith('/share/')) {
-    return serveStatic({ ...req, url: '/' }, res, adminRootDir)
+  // /share/{token} 以及不带 token 的 /share 都由门户 SPA 承载
+  // （portal/src/views/SharePage.vue）：serveStatic 找不到同名文件就回退到门户
+  // index.html，交给门户路由匹配 /share/:token。
+  // 这里写成显式分支而不是靠最后的兜底，是为了不依赖「token 里没有点号」这个假设
+  // ——下面那条带扩展名的判断会把 a.b 形状的路径当静态文件去找。
+  if (urlPath === '/share' || urlPath.startsWith('/share/') || urlPath.startsWith('/share?')) {
+    return serveStatic(req, res, portalRootDir)
   }
 
   if (urlPath === '/favicon.ico') {
@@ -230,4 +259,5 @@ server.listen(listenPort, listenHost, () => {
   console.log(`Serving portal ${portalRootDir}`)
   console.log(`Serving admin ${adminRootDir}`)
   console.log(`Proxying API to ${backendTarget.origin}`)
+  checkAdminBase()
 })

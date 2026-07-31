@@ -230,4 +230,48 @@ describe('AuthStore', () => {
     expect(store.userId).toBe('u9')
     expect(store.isAuthenticated).toBe(true)
   })
+
+  it('ensureUser() accepts a bare /auth/me body (no data envelope)', async () => {
+    const token = makeToken({
+      sub: 'u5',
+      role_code: 'admin',
+      perms: ['*'],
+      exp: Math.floor(Date.now() / 1000) + 3600,
+    })
+    localStorage.setItem('token', token)
+    localStorage.setItem('refresh_token', 'RT')
+    // /auth/me 用 response_model=UserResponse 直接返回裸用户对象，没有 {code,data} 信封；
+    // 只按 res.data 解包会让 currentUser 永远为空，顶栏永久停在「加载中…」。
+    ;(authApi.getCurrentUser as any).mockResolvedValue({
+      id: 'u5',
+      username: 'admin',
+      email: null,
+      phone: null,
+      status: 'active',
+      role_id: 'r1',
+      last_login_time: null,
+      create_time: '2026-07-01T00:00:00',
+    })
+    const store = useAuthStore()
+    const profile = await store.ensureUser()
+    expect(profile?.username).toBe('admin')
+    expect(store.currentUser?.username).toBe('admin')
+    expect(store.userId).toBe('u5')
+  })
+
+  it('init() accepts a bare /auth/me body (no data envelope)', async () => {
+    const token = makeToken({
+      sub: 'u6',
+      role_code: 'purchaser',
+      perms: ['product:view'],
+      exp: Math.floor(Date.now() / 1000) + 3600,
+    })
+    localStorage.setItem('token', token)
+    localStorage.setItem('refresh_token', 'RT')
+    ;(authApi.getCurrentUser as any).mockResolvedValue({ id: 'u6', username: 'buyer' })
+    const store = useAuthStore()
+    await store.init()
+    expect(store.currentUser?.username).toBe('buyer')
+    expect(store.roleCode).toBe('purchaser')
+  })
 })

@@ -62,9 +62,11 @@
           stripe
           class="quotation-table"
         >
+          <!-- 排版层级用 class-name（不是 class）：class 会落到 hidden-columns 的隐藏占位 div 上，规则不生效 -->
           <el-table-column
             prop="quotation_no"
             label="报价单号"
+            class-name="cell-code"
             width="180"
           />
           <el-table-column
@@ -78,6 +80,7 @@
           </el-table-column>
           <el-table-column
             label="总金额"
+            class-name="cell-num cell-strong"
             width="130"
             align="right"
           >
@@ -87,6 +90,7 @@
           </el-table-column>
           <el-table-column
             label="税率"
+            class-name="cell-num"
             width="80"
             align="center"
           >
@@ -112,6 +116,7 @@
           <el-table-column
             prop="create_time"
             label="创建时间"
+            class-name="cell-meta"
             width="170"
           >
             <template #default="{ row }">
@@ -406,18 +411,18 @@
               </div>
             </template>
           </el-table-column>
-          <el-table-column prop="quantity" label="数量" width="80" align="center" />
-          <el-table-column label="单价" width="100" align="right">
+          <el-table-column prop="quantity" label="数量" class-name="cell-num" width="80" align="center" />
+          <el-table-column label="单价" class-name="cell-num" width="100" align="right">
             <template #default="{ row }">
               <span class="price-text">¥{{ row.unit_price?.toFixed(2) ?? '-' }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="税率" width="80" align="center">
+          <el-table-column label="税率" class-name="cell-num" width="80" align="center">
             <template #default="{ row }">
               {{ row.tax_rate !== undefined ? (row.tax_rate * 100).toFixed(0) + '%' : '-' }}
             </template>
           </el-table-column>
-          <el-table-column label="未税小计" width="120" align="right">
+          <el-table-column label="未税小计" class-name="cell-num" width="120" align="right">
             <template #default="{ row }">
               <span class="subtotal-text">¥{{ row.subtotal?.toFixed(2) ?? '-' }}</span>
             </template>
@@ -835,8 +840,6 @@ onMounted(() => {
 /* ===== Glass Card ===== */
 .glass-card {
   background: var(--glass-bg);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-soft);
@@ -969,40 +972,26 @@ onMounted(() => {
   overflow: hidden;
 }
 
-.quotation-table :deep(.el-table__header-wrapper) {
-  background: var(--brand-lighter);
-}
-
-.quotation-table :deep(.el-table__header th) {
-  background: var(--brand-lighter);
-  color: var(--text-primary);
-  font-weight: 600;
-  font-size: 13px;
-  padding: 14px 0;
-}
-
-.quotation-table :deep(.el-table__row td) {
-  padding: 12px 0;
-}
-
-.quotation-table :deep(.el-table__row:hover td) {
-  background: var(--brand-lighter);
-}
-
+/*
+ * 表头底色 / 字号 / 字重 / 单元格 padding / hover 底色都交给 design-system.css 的
+ * 全局表格规则；原先这里的 .el-table__header th / .el-table__row td 覆盖跟它打架，
+ * 会把「金额粗、时间弱」的层级压回统一字重。
+ */
 .price-text {
   color: var(--brand-deep);
   font-weight: 600;
-  font-family: monospace;
+  /* 走 --pim-font-mono（鸿蒙优先）；裸 monospace 在 Windows 上会掉成 Courier New */
+  font-family: var(--pim-font-mono);
 }
 
 .mono-text {
-  font-family: monospace;
+  font-family: var(--pim-font-mono);
   color: var(--text-secondary);
   font-size: 12px;
 }
 
 .proposal-no {
-  font-family: monospace;
+  font-family: var(--pim-font-mono);
   font-size: 13px;
   color: var(--text-primary);
   margin-right: 6px;
@@ -1139,7 +1128,7 @@ onMounted(() => {
 .quote-product-no {
   font-size: 11px;
   color: var(--text-secondary);
-  font-family: monospace;
+  font-family: var(--pim-font-mono);
   display: block;
 }
 
@@ -1150,7 +1139,7 @@ onMounted(() => {
 }
 
 .subtotal-text {
-  font-family: monospace;
+  font-family: var(--pim-font-mono);
   color: var(--brand-deep);
   font-weight: 600;
 }
@@ -1175,7 +1164,7 @@ onMounted(() => {
 }
 
 .totals-value {
-  font-family: monospace;
+  font-family: var(--pim-font-mono);
   color: var(--text-primary);
   font-weight: 500;
 }
@@ -1210,22 +1199,9 @@ onMounted(() => {
 
 .items-table {
   width: 100%;
+  /* 弹窗内的嵌套表格用更小的圆角，故意不跟全局 18px 一致 */
   border-radius: var(--radius-sm);
   overflow: hidden;
-}
-
-.items-table :deep(.el-table__header-wrapper) {
-  background: var(--brand-lighter);
-}
-
-.items-table :deep(.el-table__header th) {
-  background: var(--brand-lighter);
-  color: var(--text-primary);
-  font-weight: 600;
-}
-
-.items-table :deep(.el-table__row:hover td) {
-  background: var(--brand-lighter);
 }
 
 .product-cell {
@@ -1244,7 +1220,7 @@ onMounted(() => {
 .product-cell-no {
   font-size: 11px;
   color: var(--text-secondary);
-  font-family: monospace;
+  font-family: var(--pim-font-mono);
   display: block;
 }
 

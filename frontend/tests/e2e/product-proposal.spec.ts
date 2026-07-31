@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
-import { createMockToken } from './helpers'
+import { createMockToken, installApiFallback } from './helpers'
 
 const MOCK_REFRESH_TOKEN = 'mock-refresh-token-proposal'
 
@@ -52,12 +52,27 @@ function visibleSelectionRow(page: Page, productName: string) {
 }
 
 async function selectActiveProduct(page: Page) {
-  const mobileCard = page.locator('.proposal-mobile-item').filter({ hasText: PROD_ACTIVE.product_name })
+  // 点「制作方案」之后，el-table 要插入一列复选框并重排整张表；重排期间点下去的
+  // 那一下会落在被替换掉的旧节点上，静默丢失（这就是 152/164 交替失败的原因）。
+  // 先等选择条出现，确认 proposalMode 已经渲染完，再点。
+  await expect(page.getByText('已选 0 项')).toBeVisible()
+
+  const mobileCard = page
+    .locator('.proposal-mobile-item')
+    .filter({ hasText: PROD_ACTIVE.product_name })
   if (await mobileCard.isVisible()) {
     await mobileCard.click()
+    await expect(mobileCard).toHaveClass(/selected/)
     return
   }
-  await visibleSelectionRow(page, PROD_ACTIVE.product_name).locator('.el-checkbox').click({ force: true })
+
+  const row = visibleSelectionRow(page, PROD_ACTIVE.product_name)
+  const checkbox = row.getByRole('checkbox')
+  await expect(checkbox).toBeEnabled()
+  // el-checkbox 的真实 input 是 opacity:0 的，只能点外层包装 + force。
+  await row.locator('.el-checkbox').click({ force: true })
+  // 自证这一下真的选上了：否则失败会指向下游的「已选 1 项」，看不出是点击丢了。
+  await expect(checkbox).toBeChecked()
 }
 
 function routeProducts(page: Page) {
@@ -78,7 +93,10 @@ function routeProducts(page: Page) {
 }
 
 function routeProposals(page: Page, createdProposalId: { value: string }) {
-  page.route('/api/v1/proposals', async (route) => {
+  // 原来写的 '/api/v1/proposals' 是「无通配的相对 URL」，只能精确匹配不带查询串的请求，
+  // 于是只有 POST 命中、GET 列表（?page=1&size=20）永远落进兜底。加 `**` 前缀和 `*` 结尾
+  // 才能把两种都接住；详情 /proposals/<id> 因为含 `/` 不会被 `*` 吃掉。
+  page.route('**/api/v1/proposals*', async (route) => {
     if (route.request().method() === 'GET') {
       route.fulfill({
         status: 200,
@@ -115,6 +133,8 @@ test.describe('Products → Proposal flow', () => {
   let createdProposalId: { value: string }
 
   test.beforeEach(async ({ page }) => {
+    // 兜底必须最先注册（route 是后注册者优先），否则会盖掉下面 routeAuth/routeProducts/routeProposals。
+    await installApiFallback(page)
     await page.addInitScript((arg) => {
       localStorage.setItem('token', arg.token)
       localStorage.setItem('refresh_token', arg.refreshToken)

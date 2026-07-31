@@ -370,3 +370,24 @@ def test_rolling_5xx_counter_counts_only_5xx():
 
 if __name__ == "__main__":
     asyncio.run(test_success_records_action_module_user_ip())
+
+
+@pytest.mark.anyio
+async def test_username_none_for_anonymous_request():
+    """匿名请求：user_id=None → username=None，不编造。"""
+    from app.middleware.audit import _user_id_from_request
+
+    # test the request extraction
+    req = _Request(state_user_id=None)
+    assert _user_id_from_request(req) is None
+
+
+@pytest.mark.anyio
+async def test_username_none_for_expired_token():
+    """令牌过期：decode_access_token returns None → username=None。"""
+    from app.middleware.audit import _user_id_from_request
+
+    req = _Request(authorization="Bearer expired-token", state_user_id=None)
+    assert _user_id_from_request(req) is None
+
+

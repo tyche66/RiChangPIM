@@ -18,6 +18,7 @@ async def list_operation_logs(
     action: str | None = None,
     module: str | None = None,
     user_id: UUID | None = None,
+    username: str | None = None,
     response_code: int | None = None,
     start_time: datetime | None = None,
     end_time: datetime | None = None,
@@ -33,6 +34,9 @@ async def list_operation_logs(
         stmt = stmt.where(OperationLog.module == module)
     if user_id:
         stmt = stmt.where(OperationLog.user_id == user_id)
+    if username:
+        # 用户名按包含匹配，方便只记得一半名字的时候也能查。
+        stmt = stmt.where(OperationLog.username.ilike(f"%{username}%"))
     if response_code is not None:
         stmt = stmt.where(OperationLog.response_code == response_code)
     if start_time:

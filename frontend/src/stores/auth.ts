@@ -36,6 +36,20 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  // 两个认证端点的响应信封不一致：/auth/login 返回 { code, data: {...} }，
+  // 而 /auth/me 用 response_model=UserResponse 直接返回裸用户对象（backend/app/api/v1/auth.py:142）。
+  // 响应拦截器（src/api/index.ts:64）已经把 axios 外层剥成 HTTP body，
+  // 所以这里必须同时接受两种形状：只按 res.data 取会在真实后端下恒为 undefined，
+  // user 永远填不上，顶栏就永久停在占位文案。测试与 e2e 的 mock 走 { data: ... } 那一支，一并兼容。
+  // 抽成一个函数给 ensureUser()/init() 共用，避免两处解包逻辑漂移。
+  function unwrapProfile(res: unknown): UserResponse | null {
+    if (!res || typeof res !== 'object') return null
+    const body = res as Record<string, unknown>
+    const raw = body.data && typeof body.data === 'object' ? body.data : body
+    const profile = raw as UserResponse
+    return profile.id ? profile : null
+  }
+
   function persistTokens(access: string, refresh: string) {
     accessToken.value = access
     refreshToken.value = refresh
@@ -105,9 +119,8 @@ export const useAuthStore = defineStore('auth', () => {
       }
     }
     try {
-      const userRes = await authApi.getCurrentUser()
-      const profile = (userRes as any)?.data
-      if (profile && profile.id) {
+      const profile = unwrapProfile(await authApi.getCurrentUser())
+      if (profile) {
         user.value = profile
       }
       return user.value
@@ -145,9 +158,8 @@ export const useAuthStore = defineStore('auth', () => {
     // Without this guard, any transient /auth/me 5xx would force a re-login
     // and surface as "用户信息尚未加载" on the very next user action.
     try {
-      const userRes = await authApi.getCurrentUser()
-      const profile = (userRes as any)?.data
-      if (profile && profile.id) {
+      const profile = unwrapProfile(await authApi.getCurrentUser())
+      if (profile) {
         user.value = profile
       }
     } catch {

@@ -51,7 +51,7 @@
         class="glass-descriptions"
       >
         <el-descriptions-item label="方案编号">
-          <span class="mono-text">{{ proposal.proposal_no }}</span>
+          <span class="cell-code">{{ proposal.proposal_no }}</span>
         </el-descriptions-item>
         <el-descriptions-item label="方案名称">
           {{ proposal.proposal_name }}
@@ -83,13 +83,13 @@
           >{{ proposal.ai_polish_model }}</span>
         </el-descriptions-item>
         <el-descriptions-item label="创建时间">
-          <span class="mono-text">{{ formatDate(proposal.create_time) }}</span>
+          <span class="cell-meta">{{ formatDate(proposal.create_time) }}</span>
         </el-descriptions-item>
         <el-descriptions-item
           v-if="proposal.ai_polish_at"
           label="润色时间"
         >
-          <span class="mono-text">{{ formatDate(proposal.ai_polish_at) }}</span>
+          <span class="cell-meta">{{ formatDate(proposal.ai_polish_at) }}</span>
         </el-descriptions-item>
       </el-descriptions>
 
@@ -108,6 +108,7 @@
           stripe
           class="items-table"
         >
+          <!-- 排版层级用 class-name（不是 class）：class 会落到 hidden-columns 的隐藏占位 div 上，规则不生效 -->
           <el-table-column
             label="商品信息"
             min-width="260"
@@ -124,8 +125,8 @@
                   {{ row.product_name ? row.product_name.slice(0, 2) : '无图' }}
                 </div>
                 <div class="product-cell-info">
-                  <span class="product-cell-name">{{ row.product_name || '-' }}</span>
-                  <span class="product-cell-no">{{ row.product_no || '-' }}</span>
+                  <span class="product-cell-name cell-strong">{{ row.product_name || '-' }}</span>
+                  <span class="cell-code">{{ row.product_no || '-' }}</span>
                 </div>
               </div>
             </template>
@@ -134,6 +135,7 @@
             label="面价"
             width="120"
             align="right"
+            class-name="cell-num"
           >
             <template #default="{ row }">
               <span class="price-text">¥{{ row.face_price?.toFixed(2) ?? '-' }}</span>
@@ -143,6 +145,7 @@
             label="库存"
             width="80"
             align="center"
+            class-name="cell-num cell-soft"
           >
             <template #default="{ row }">
               {{ row.stock ?? '-' }}
@@ -153,11 +156,13 @@
             label="数量"
             width="80"
             align="center"
+            class-name="cell-num"
           />
           <el-table-column
             prop="remark"
             label="备注"
             min-width="140"
+            class-name="cell-meta"
           />
         </el-table>
       </div>
@@ -553,8 +558,6 @@ onMounted(fetchProposal)
 /* ===== Glass Card ===== */
 .glass-card {
   background: var(--glass-bg);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-soft);
@@ -641,16 +644,12 @@ onMounted(fetchProposal)
   margin-left: 8px;
 }
 
-.mono-text {
-  font-family: monospace;
-  color: var(--text-secondary);
-  font-size: 12px;
-}
-
 .price-text {
   color: var(--brand-deep);
   font-weight: 600;
-  font-family: monospace;
+  /* 走 --pim-font-mono（鸿蒙优先），裸 monospace 在 Windows 上会掉成 Courier New */
+  font-family: var(--pim-font-mono);
+  font-variant-numeric: tabular-nums;
 }
 
 /* ===== Descriptions ===== */
@@ -660,10 +659,12 @@ onMounted(fetchProposal)
   overflow: hidden;
 }
 
+/*
+ * label 的颜色 / 字重由 design-system.css 的 .el-descriptions__label 统一给出（带 !important），
+ * 这里再写一遍是死代码，只留页面自己的底色。
+ */
 .glass-descriptions :deep(.el-descriptions__label) {
   background: var(--brand-lighter);
-  color: var(--text-primary);
-  font-weight: 600;
 }
 
 .glass-descriptions :deep(.el-descriptions__content) {
@@ -698,10 +699,12 @@ onMounted(fetchProposal)
   background: var(--brand-lighter);
 }
 
+/*
+ * 表头的字号 / 字重 / 颜色交给 design-system.css 的全局表格规则，这里原先的覆盖
+ * 会把主次层级压回「一个字重」。只留页面自己的表头底色和 hover 底色。
+ */
 .items-table :deep(.el-table__header th) {
   background: var(--brand-lighter);
-  color: var(--text-primary);
-  font-weight: 600;
 }
 
 .items-table :deep(.el-table__row:hover td) {
@@ -738,19 +741,12 @@ onMounted(fetchProposal)
   min-width: 0;
 }
 
+/* 字重和颜色由 .cell-strong 给（作用域选择器权重更高，写在这里会盖掉原子类） */
 .product-cell-name {
-  font-weight: 600;
-  color: var(--brand-deep);
   font-size: 13px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.product-cell-no {
-  font-size: 11px;
-  color: var(--text-secondary);
-  font-family: monospace;
 }
 
 /* ===== Polish Section ===== */

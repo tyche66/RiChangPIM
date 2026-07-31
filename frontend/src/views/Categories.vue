@@ -355,8 +355,6 @@ onMounted(() => {
 
 .categories-page :deep(.el-card) {
   background: rgba(255, 255, 255, 0.68);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
   border-radius: 28px;
   border: 1px solid rgba(255, 255, 255, 0.6);
   box-shadow: 0 4px 32px rgba(30, 50, 90, 0.06);

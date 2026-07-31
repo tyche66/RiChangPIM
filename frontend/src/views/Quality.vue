@@ -215,14 +215,17 @@
               stripe
               size="small"
             >
+              <!-- 排版层级用 class-name（不是 class）：class 会落到 hidden-columns 的隐藏占位 div 上，规则不生效 -->
               <el-table-column
                 prop="product_no"
                 label="编号"
+                class-name="cell-code"
                 min-width="140"
               />
               <el-table-column
                 prop="product_name"
                 label="名称"
+                class-name="cell-strong"
                 min-width="180"
               />
               <el-table-column
@@ -254,29 +257,35 @@
                   </el-tag>
                 </template>
               </el-table-column>
+              <!-- 面价可能是「待核价」占位文案，所以只给等宽数字、不给强调字重 -->
               <el-table-column
                 prop="face_price_label"
                 label="面价"
+                class-name="cell-num"
                 min-width="110"
               />
               <el-table-column
                 prop="specification"
                 label="规格"
+                class-name="cell-soft"
                 min-width="180"
               />
               <el-table-column
                 prop="supplier_name"
                 label="供应商"
+                class-name="cell-soft"
                 min-width="140"
               />
               <el-table-column
                 prop="data_source"
                 label="数据来源"
+                class-name="cell-meta"
                 min-width="160"
               />
               <el-table-column
                 prop="update_time"
                 label="更新时间"
+                class-name="cell-meta"
                 min-width="180"
               />
             </el-table>

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { ADMIN_TOKEN } from './helpers'
+import { ADMIN_TOKEN, installApiFallback } from './helpers'
 
 const MOCK_REFRESH_TOKEN = 'mock-refresh-token-admin'
 
@@ -27,6 +27,8 @@ async function loginViaUI(page: any, username = 'admin', password = 'admin123') 
 
 test.describe('Admin Login UI', () => {
   test.beforeEach(async ({ page }) => {
+    // 兜底必须最先注册（后注册者优先），否则会盖掉下面两个具体 mock。
+    await installApiFallback(page)
     await mockLogin(page)
     await mockCurrentUser(page)
   })
@@ -100,7 +102,18 @@ test.describe('Admin Login UI', () => {
     await loginViaUI(page)
     await expect(page).toHaveURL(/\/products/)
 
-    await page.getByRole('button', { name: '退出' }).dispatchEvent('click')
+    // 顶层已经没有「退出」按钮了：退出登录收进了账户弹窗，先点顶栏 chip 打开它。
+    await page.getByRole('button', { name: '账户操作' }).click()
+    const logoutBtn = page.getByRole('button', { name: '退出登录' })
+    await expect(logoutBtn).toBeVisible()
+
+    // 键盘可达性：Esc 必须能关掉弹窗，且不会顺手把人退出。
+    await page.keyboard.press('Escape')
+    await expect(logoutBtn).toBeHidden()
+    await expect(page).toHaveURL(/\/products/)
+
+    await page.getByRole('button', { name: '账户操作' }).click()
+    await page.getByRole('button', { name: '退出登录' }).click()
 
     await expect(page).toHaveURL(/\/login/, { timeout: 10000 })
     await expect.poll(async () => {
@@ -110,5 +123,38 @@ test.describe('Admin Login UI', () => {
         return 'navigation-in-progress'
       }
     }).toBeNull()
+  })
+
+  test('顶栏显示「当前用户 + 用户名」，375px 下仍保留用户名', async ({ page }) => {
+    await page.route('**/api/v1/products', (route: any) => {
+      route.fulfill({ status: 200, json: { items: [], total: 0 } })
+    })
+
+    await loginViaUI(page)
+    await expect(page).toHaveURL(/\/products/)
+
+    // 桌面宽度：标签和用户名都在。
+    await expect(page.locator('.user-copy small')).toHaveText('当前用户')
+    await expect(page.locator('.user-copy strong')).toHaveText('admin')
+
+    // ≤600px：标签行让位，用户名必须还看得见，且标题不能被挤换行。
+    await page.setViewportSize({ width: 375, height: 812 })
+    await expect(page.locator('.user-copy small')).toBeHidden()
+    await expect(page.locator('.user-copy strong')).toBeVisible()
+
+    const layout = await page.evaluate(() => {
+      const header = document.querySelector('.el-header') as HTMLElement
+      const chip = document.querySelector('.user-chip') as HTMLElement
+      const title = document.querySelector('.header-heading h1') as HTMLElement
+      return {
+        titleHeight: title.getBoundingClientRect().height,
+        titleLineHeight: parseFloat(getComputedStyle(title).lineHeight),
+        chipRight: chip.getBoundingClientRect().right,
+        headerRight: header.getBoundingClientRect().right,
+      }
+    })
+    // 单行标题的盒高不会超过一个行高（换行会翻倍）。
+    expect(layout.titleHeight).toBeLessThan(layout.titleLineHeight * 1.6)
+    expect(layout.chipRight).toBeLessThanOrEqual(layout.headerRight + 1)
   })
 })

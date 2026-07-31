@@ -41,6 +41,7 @@ import SourceCard from '@/components/SourceCard.vue'
 import SourceDialog from '@/components/SourceDialog.vue'
 import { useAuthStore } from '@/stores/auth'
 import { buildAnswer, citationIndexBySource } from '@/utils/citations'
+import { isEmbedded } from '@/utils/embed'
 import { confidenceLabel, formatDuration, phaseLabel, shortId } from '@/utils/format'
 import { vReveal } from '@/utils/reveal'
 
@@ -56,6 +57,12 @@ const RECOMMEND_SIZE = 5
 const auth = useAuthStore()
 const route = useRoute()
 const router = useRouter()
+
+/**
+ * 被后台「AI 选品」以 iframe 嵌入时不重复渲染门户自己的顶栏：后台已经有一整
+ * 套顶栏和账户操作，这里再出一个「退出」按钮会误清共享的登录态。
+ */
+const embedded = isEmbedded()
 
 const busy = ref(false)
 const error = ref('')
@@ -357,12 +364,12 @@ onMounted(() => {
 </script>
 
 <template>
-  <AppHeader>
+  <AppHeader v-if="!embedded">
     <button v-if="started" type="button" class="button button--secondary button--small" @click="reset">清空结果</button>
     <button type="button" class="button button--ghost button--small" @click="signOut">退出</button>
   </AppHeader>
 
-  <main class="chat-shell">
+  <main class="chat-shell" :class="{ 'chat-shell--embedded': embedded }">
     <section class="chat-hero" :class="{ 'chat-hero--compact': started }">
       <div class="chat-intro">
         <h1>把产品、资料和质量记录放到同一个查询入口。</h1>

@@ -19,15 +19,18 @@
           border
           stripe
         >
+          <!-- 排版层级用 class-name（不是 class）：class 会落到 hidden-columns 的隐藏占位 div 上，规则不生效 -->
           <el-table-column
             prop="brandName"
             label="品牌名称"
             min-width="180"
+            class-name="cell-strong"
           />
           <el-table-column
             prop="logoUrl"
             label="Logo"
             min-width="200"
+            class-name="cell-soft"
             show-overflow-tooltip
           >
             <template #default="{ row }">
@@ -39,7 +42,7 @@
               >{{ row.logoUrl }}</a>
               <span
                 v-else
-                class="text-muted"
+                class="cell-meta"
               >-</span>
             </template>
           </el-table-column>
@@ -47,6 +50,7 @@
             prop="description"
             label="描述"
             min-width="200"
+            class-name="cell-soft"
             show-overflow-tooltip
           />
           <el-table-column
@@ -261,8 +265,6 @@ onMounted(fetchBrands)
 
 .brands-page :deep(.el-card) {
   background: rgba(255, 255, 255, 0.68);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
   border-radius: 28px;
   border: 1px solid rgba(255, 255, 255, 0.6);
   box-shadow: 0 4px 32px rgba(30, 50, 90, 0.06);
@@ -352,10 +354,6 @@ onMounted(fetchBrands)
 
 .link:hover {
   text-decoration: underline;
-}
-
-.text-muted {
-  color: #909399;
 }
 
 :global(.el-dialog) {

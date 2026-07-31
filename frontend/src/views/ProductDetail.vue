@@ -107,7 +107,7 @@
         class="glass-descriptions"
       >
         <el-descriptions-item label="产品编号">
-          <span class="mono-text">{{ product.productNo }}</span>
+          <span class="cell-code">{{ product.productNo }}</span>
         </el-descriptions-item>
         <el-descriptions-item label="产品名称">
           {{ product.productName }}
@@ -125,7 +125,7 @@
           <span v-if="canViewCost">{{ product.supplierName || '-' }}</span>
           <span
             v-else
-            class="text-muted"
+            class="cell-meta"
           >无权限查看</span>
         </el-descriptions-item>
         <el-descriptions-item label="面价">
@@ -152,7 +152,7 @@
           >¥{{ product.costPrice.toFixed(2) }}</span>
           <span
             v-else
-            class="text-muted"
+            class="cell-meta"
           >-</span>
         </el-descriptions-item>
         <el-descriptions-item
@@ -203,21 +203,26 @@
             empty-text="暂无说明书"
             class="mini-table"
           >
+            <!-- 排版层级用 class-name（不是 class）：class 会落到 hidden-columns 的隐藏占位 div 上，规则不生效 -->
             <el-table-column
               prop="doc_type"
               label="类型"
+              class-name="cell-strong"
             />
             <el-table-column
               prop="parse_status"
               label="解析状态"
+              class-name="cell-soft"
             />
             <el-table-column
               prop="index_status"
               label="索引状态"
+              class-name="cell-soft"
             />
             <el-table-column
               label="失败原因"
               min-width="180"
+              class-name="cell-meta"
             >
               <template #default="scope">
                 {{ scope.row.parse_error || scope.row.index_error || '-' }}
@@ -914,8 +919,6 @@ watch(editMode, (val) => {
 /* ===== Glass Card ===== */
 .glass-card {
   background: var(--glass-bg);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-soft);
@@ -953,7 +956,8 @@ watch(editMode, (val) => {
 .product-no {
   font-size: 14px;
   color: var(--text-secondary);
-  font-family: monospace;
+  /* 走 --pim-font-mono（鸿蒙优先），裸 monospace 在 Windows 上会掉成 Courier New */
+  font-family: var(--pim-font-mono);
 }
 
 .product-name {
@@ -1024,25 +1028,24 @@ watch(editMode, (val) => {
   background: transparent;
 }
 
+/*
+ * label 的颜色 / 字重由 design-system.css 的 .el-descriptions__label 统一给出（带 !important），
+ * 这里再写一遍是死代码，只留页面自己的底色。
+ */
 .glass-descriptions :deep(.el-descriptions__label) {
   background: var(--brand-lighter);
-  color: var(--text-primary);
-  font-weight: 600;
 }
 
 .glass-descriptions :deep(.el-descriptions__content) {
   color: var(--text-primary);
 }
 
-.mono-text {
-  font-family: monospace;
-  color: var(--text-secondary);
-}
-
 .price-text {
   color: var(--brand-deep);
   font-weight: 600;
-  font-family: monospace;
+  /* 走 --pim-font-mono（鸿蒙优先），裸 monospace 在 Windows 上会掉成 Courier New */
+  font-family: var(--pim-font-mono);
+  font-variant-numeric: tabular-nums;
 }
 
 /* ===== Sections ===== */
@@ -1076,11 +1079,12 @@ watch(editMode, (val) => {
   background: var(--brand-light);
 }
 
+/*
+ * 表头的字号 / 字重 / 颜色交给 design-system.css 的全局表格规则，这里原先的覆盖
+ * 会把主次层级压回「一个字重」。只留页面自己的表头底色和 hover 底色。
+ */
 .mini-table :deep(.el-table__header th) {
   background: var(--brand-light);
-  color: var(--text-primary);
-  font-weight: 600;
-  font-size: 12px;
 }
 
 .mini-table :deep(.el-table__row:hover td) {
@@ -1164,10 +1168,6 @@ watch(editMode, (val) => {
   justify-content: center;
   align-items: center;
   min-height: 400px;
-}
-
-.text-muted {
-  color: var(--text-secondary);
 }
 
 /* ===== Responsive ===== */

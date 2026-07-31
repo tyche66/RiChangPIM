@@ -1,4 +1,5 @@
-from datetime import timedelta
+import logging
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -17,6 +18,8 @@ from app.core.security import (
 from app.middleware.audit import audit_action
 from app.models.user import Permission, Role, RolePermission, User
 from app.schemas.user import LoginRequest, UserResponse
+
+logger = logging.getLogger("app.auth")
 
 router = APIRouter()
 
@@ -67,6 +70,15 @@ async def login(request: Request, login_data: LoginRequest, db: AsyncSession = D
     _, role_code, perms = await _load_role_and_user(user.id, db)
 
     request.state.user_id = str(user.id)
+
+    # 登录时间要真的落库，用户管理里的「最后登录」才不是空壳。
+    # 写失败不能把已经通过校验的登录卡住，所以单独 try 一次并降级为日志。
+    user.last_login_time = datetime.now(UTC)
+    try:
+        await db.commit()
+    except Exception:  # noqa: BLE001
+        await db.rollback()
+        logger.warning("last_login_time 写入失败 user_id=%s", user.id, exc_info=True)
 
     access_token = create_access_token(
         data={"sub": str(user.id), "role_code": role_code, "perms": perms},

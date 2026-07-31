@@ -19,7 +19,14 @@ class Settings(BaseSettings):
     )
     APP_NAME: str = "AI-PIM"
     DEBUG: bool = False
-    VERSION: str = "0.1.0"
+    # 产品版本基线。`版本控制规范和Git.md` §1 规定版本号锚点是
+    # `frontend/package.json` 的 version，这里必须跟着一起改（发版清单见
+    # `CHANGELOG.md` 顶部的「改版本号要动哪几处」）。
+    #
+    # 这个值是 APP_VERSION 没被注入时的兜底：原来写死 "0.1.0"，于是任何忘记传
+    # 构建参数的部署（以及全部开发环境）都会在 /api/v1/version、/health、
+    # OpenAPI 文档里报 0.1.0，和真实产品版本差了 8 个 MINOR。兜底值必须是真话。
+    VERSION: str = "1.9.0"
     APP_VERSION: str | None = None
     BUILD_ID: str = "dev-local"
     GIT_COMMIT: str = "unknown"

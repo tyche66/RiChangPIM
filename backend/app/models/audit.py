@@ -100,6 +100,9 @@ class OperationLog(Base):
 
     id = Column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
     user_id = Column(PGUUID(as_uuid=True), ForeignKey("user.id"))
+    # 操作人用户名快照。审计是历史事实，用户改名或被删除后日志仍要显示当时的操作人，
+    # 所以写入时定格，不在读取时 join user。
+    username = Column(String(64))
     module = Column(String(64), nullable=False)
     action = Column(String(32), nullable=False)
     target_id = Column(PGUUID(as_uuid=True))
@@ -107,6 +110,8 @@ class OperationLog(Base):
     response_code = Column(Integer, nullable=False)
     ip = Column(String(64))
     operate_time = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (Index("idx_operation_log_username", "username"),)
 
 
 class AIConversation(Base):

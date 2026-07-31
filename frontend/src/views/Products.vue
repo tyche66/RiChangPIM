@@ -245,9 +245,10 @@
             <strong>{{ row.productName }}</strong>
             <small>{{ row.productNo }} · ¥{{ row.facePrice.toFixed(2) }}</small>
           </span>
-          <el-tag size="small" :type="row.status === 'active' ? 'success' : 'info'">
-            {{ statusMap[row.status] || row.status }}
-          </el-tag>
+          <span
+            class="status-text"
+            :class="`tone-${statusTone(row.status)}`"
+          >{{ statusMap[row.status] || row.status }}</span>
         </button>
       </div>
 
@@ -259,10 +260,9 @@
           ref="productTableRef"
           v-loading="loading"
           :data="products"
-          border
           stripe
           class="product-table"
-          :fit="false"
+          :fit="!autoFit"
           :row-key="(row: any) => row.id"
           :reserve-selection="true"
           @header-dragend="onHeaderDragEnd"
@@ -271,13 +271,13 @@
           <el-table-column
             v-if="proposalMode"
             type="selection"
-            width="50"
+            :width="SELECTION_WIDTH"
             fixed="left"
             :selectable="isSelectable"
           />
           <el-table-column
             label="图片"
-            width="80"
+            :width="IMAGE_WIDTH"
             align="center"
           >
             <template #default="{ row }">
@@ -289,6 +289,7 @@
                   v-if="row.primaryImage?.thumbnailUrl || row.primaryImage?.url"
                   :src="row.primaryImage.thumbnailUrl || row.primaryImage.url"
                   fit="cover"
+                  loading="lazy"
                   class="thumb-img"
                 >
                   <template #error>
@@ -309,53 +310,59 @@
           <el-table-column
             prop="productNo"
             label="产品编号"
-            :width="autoFit ? colWidths['productNo'] : 120"
+            class-name="cell-code"
+            :width="colWidth('productNo')"
+            :min-width="colMin('productNo')"
             :show-overflow-tooltip="{ teleported: true, placement: 'top' }"
           />
           <el-table-column
             prop="productName"
             label="产品名称"
-            :width="autoFit ? colWidths['productName'] : 180"
+            class-name="cell-strong"
+            :width="colWidth('productName')"
+            :min-width="colMin('productName')"
             :show-overflow-tooltip="{ teleported: true, placement: 'top' }"
           />
           <el-table-column
             prop="brandName"
             label="品牌"
-            :width="autoFit ? colWidths['brandName'] : 100"
+            class-name="cell-soft"
+            :width="colWidth('brandName')"
+            :min-width="colMin('brandName')"
             :show-overflow-tooltip="{ teleported: true, placement: 'top' }"
           />
           <el-table-column
             prop="categoryName"
             label="分类"
-            :width="autoFit ? colWidths['categoryName'] : 100"
+            class-name="cell-soft"
+            :width="colWidth('categoryName')"
+            :min-width="colMin('categoryName')"
             :show-overflow-tooltip="{ teleported: true, placement: 'top' }"
           />
           <el-table-column
             prop="facePrice"
             label="面价"
-            width="90"
+            :width="colWidth('facePrice')"
+            :min-width="colMin('facePrice')"
             align="right"
           >
             <template #default="{ row }">
-              <el-tag
-                v-if="row.facePrice === 99999 && row.completenessStatus === 'pending'"
-                size="small"
-                type="warning"
-                class="capsule-tag"
-              >
-                待核价
-              </el-tag>
+              <span
+                v-if="isPendingPrice(row)"
+                class="status-text tone-warn"
+              >待核价</span>
               <span
                 v-else
                 class="price-text"
-              >¥{{ row.facePrice.toFixed(2) }}</span>
+              >{{ facePriceText(row) }}</span>
             </template>
           </el-table-column>
           <el-table-column
             v-if="canViewCost"
             prop="costPrice"
             label="成本价"
-            width="90"
+            :width="colWidth('costPrice')"
+            :min-width="colMin('costPrice')"
             align="right"
           >
             <template #header>
@@ -389,40 +396,36 @@
           <el-table-column
             prop="stockStatus"
             label="库存"
-            width="80"
+            :width="colWidth('stockStatus')"
+            :min-width="colMin('stockStatus')"
             align="center"
           >
             <template #default="{ row }">
-              <el-tag
-                :type="row.stockStatus === 'in_stock' ? 'success' : row.stockStatus === 'out_of_stock' ? 'danger' : row.stockStatus === 'unknown' ? 'info' : 'warning'"
-                size="small"
-                class="capsule-tag"
-              >
-                {{ stockStatusMap[row.stockStatus] || row.stockStatus }}
-              </el-tag>
+              <span
+                class="status-text"
+                :class="`tone-${stockTone(row.stockStatus)}`"
+              >{{ stockStatusMap[row.stockStatus] || row.stockStatus }}</span>
             </template>
           </el-table-column>
           <el-table-column
             prop="status"
             label="状态"
-            width="88"
+            :width="colWidth('status')"
+            :min-width="colMin('status')"
             align="center"
           >
             <template #default="{ row }">
-              <el-tag
-                :type="row.status === 'active' ? 'success' : row.status === 'draft' ? 'info' : 'danger'"
-                size="small"
-                class="capsule-tag"
-              >
-                {{ statusMap[row.status] || row.status }}
-              </el-tag>
+              <span
+                class="status-text"
+                :class="`tone-${statusTone(row.status)}`"
+              >{{ statusMap[row.status] || row.status }}</span>
             </template>
           </el-table-column>
           <el-table-column
             label="操作"
-            class="op-col"
-            min-width="240"
-            :width="autoFit ? colWidths['operation'] : 240"
+            class-name="op-col"
+            :width="colWidth('operation')"
+            :min-width="colMin('operation')"
             align="center"
           >
             <template #default="{ row }">
@@ -494,9 +497,10 @@
           >
             <div class="product-tile-image">
               <el-image
-                v-if="row.primaryImage?.thumbnailUrl || row.primaryImage?.url"
-                :src="row.primaryImage.thumbnailUrl || row.primaryImage.url"
+                v-if="row.primaryImage?.tileUrl || row.primaryImage?.url"
+                :src="row.primaryImage.tileUrl || row.primaryImage.url"
                 fit="cover"
+                loading="lazy"
                 class="tile-img"
               >
                 <template #error>
@@ -515,13 +519,10 @@
             <div class="product-tile-body">
               <div class="product-tile-meta">
                 <span class="product-tile-no">{{ row.productNo }}</span>
-                <el-tag
-                  size="small"
-                  :type="row.status === 'active' ? 'success' : row.status === 'draft' ? 'info' : 'danger'"
-                  class="capsule-tag tile-status"
-                >
-                  {{ statusMap[row.status] || row.status }}
-                </el-tag>
+                <span
+                  class="status-text tile-status"
+                  :class="`tone-${statusTone(row.status)}`"
+                >{{ statusMap[row.status] || row.status }}</span>
               </div>
               <h3 class="product-tile-name">
                 {{ row.productName }}
@@ -825,12 +826,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, nextTick } from 'vue'
+import { ref, reactive, computed, onMounted, nextTick, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { View, Hide, Operation, Grid, List, ArrowDown } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 import { productApi, categoryApi, brandApi, supplierApi, tagApi } from '@/api'
+import { usePreference } from '@/composables/usePreference'
+import { fillColumnWidths, type FillColumn } from '@/utils/columnFill'
 import { useAuthStore } from '@/stores/auth'
 import { hasPermission } from '@/types/permissions'
 import type { ProductOption, ProposalToken } from '@/types/sales'
@@ -854,6 +857,18 @@ const canProposalCreate = computed(() => hasPermission(userPermissions.value, 'p
 
 const statusMap: Record<string, string> = { active: '上架', inactive: '下架', draft: '草稿' }
 const stockStatusMap: Record<string, string> = { in_stock: '有货', out_of_stock: '缺货', preorder: '预售', unknown: '未知' }
+/**
+ * 状态只是次要信息，不再用实色标签，改成低饱和的纯文字（.status-text）。
+ * 这里只决定语义色调，具体颜色在样式里；找不到映射就退化成最弱的 muted。
+ */
+const STATUS_TONE: Record<string, string> = { active: 'ok', inactive: 'danger', draft: 'muted' }
+const STOCK_TONE: Record<string, string> = { in_stock: 'ok', out_of_stock: 'danger', preorder: 'warn', unknown: 'muted' }
+const statusTone = (value: string) => STATUS_TONE[value] || 'muted'
+const stockTone = (value: string) => STOCK_TONE[value] || 'muted'
+
+// 面价 99999 + 资料待完善 = 还没核过价，列里显示「待核价」而不是那个占位数字。
+const isPendingPrice = (row: any) => row.facePrice === 99999 && row.completenessStatus === 'pending'
+const facePriceText = (row: any) => (isPendingPrice(row) ? '待核价' : `¥${Number(row.facePrice).toFixed(2)}`)
 
 const loading = ref(false)
 const products = ref<any[]>([])
@@ -863,10 +878,14 @@ const editingProduct = ref<any>(null)
 const submitting = ref(false)
 const productFormRef = ref<FormInstance>()
 
-const autoFit = ref(true)
-const viewMode = ref<'table' | 'grid'>('table')
+// 视图模式和列宽策略是用户习惯，记在浏览器里，下次进来沿用上次的选择。
+const viewMode = usePreference<'table' | 'grid'>('products.viewMode', 'table', ['table', 'grid'] as const)
+const autoFit = usePreference('products.autoFit', true)
+// 成本价开关是敏感信息的临时揭示，只在本次会话生效，不做持久化。
 const costVisible = ref(false)
 const colWidths = ref<Record<string, number>>({})
+// 手动拖过的列宽（自适应模式下当固定列用），切换列宽策略时清空
+const pinnedWidths = ref<Record<string, number>>({})
 const productTableRef = ref()
 const previewUrl = ref('')
 
@@ -982,30 +1001,112 @@ const fetchProducts = async () => {
   }
 }
 
-// 文本列：按内容自适应（设最小/最大阈值）
-const FIT_TEXT = [
-  { prop: 'productNo', label: '产品编号', min: 110, max: 240 },
-  { prop: 'brandName', label: '品牌', min: 90, max: 200 },
-  { prop: 'categoryName', label: '分类', min: 90, max: 200 },
-]
-// 固定列宽（不参与内容测量）
-const FIXED_WIDTHS: Record<string, number> = {
-  image: 80,
-  facePrice: 90,
-  stockStatus: 90,
-  status: 90,
-  costPrice: 90,
-  operation: 360,
+/**
+ * 量宽用的字体串必须跟 design-system.css 对齐：正文取 --pim-font-sans，产品编号列套了
+ * .cell-code（--pim-font-mono 12px），产品名称是 .cell-strong（600），价格是 .price-text
+ * （--pim-font-mono 600），表头统一 12px/500。换字体不同步这里，列宽就会整体偏窄或偏宽。
+ * canvas 的 font 简写不接受 ui-sans-serif / system-ui，所以只留能被解析的部分。
+ */
+const FAMILY_SANS = '"HarmonyOS Sans", "HarmonyOS Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif'
+const FAMILY_MONO = '"HarmonyOS Sans", Menlo, Consolas, monospace'
+const FONT_BODY = `14px ${FAMILY_SANS}`
+const FONT_STRONG = `600 14px ${FAMILY_SANS}`
+const FONT_CODE = `12px ${FAMILY_MONO}`
+const FONT_PRICE = `600 14px ${FAMILY_MONO}`
+const FONT_STATUS = `500 13px ${FAMILY_SANS}`
+const FONT_HEAD = `500 12px ${FAMILY_SANS}`
+// 表头 letter-spacing: 0.06em @12px、产品编号列 0.02em @12px，canvas 量不到字距，按字数补
+const TRACK_HEAD = 0.72
+const TRACK_CODE = 0.24
+/**
+ * 操作列宽度。只需容纳「查看 / 编辑 / 更多」三个控件。chromium 实测（132px 列宽下）：
+ * 两个 12px 双字文本按钮各 24px、更多按钮 28px + 6px 左外边距；按钮之间除了
+ * .op-col .cell 的 gap: 4px，还叠着 Element Plus 默认的
+ * `.el-button + .el-button { margin-left: 12px }`（本页没有重置它），所以两个文本按钮
+ * 之间实际是 16px、文本按钮到更多按钮之间是 10px，按钮组实测 102px。
+ * 再加单元格左右内边距 2×14px（design-system.css 的 .el-table .cell），合计 130px，
+ * 132px 只剩约 2px 余量 —— 改按钮尺寸/文案/间距或收窄列宽都会立刻溢出。
+ * 它只是操作列的**下限**，宽屏上 computeFillWidths() 会按权重再分一点给它。
+ */
+const OPERATION_WIDTH = 132
+const SELECTION_WIDTH = 50
+const IMAGE_WIDTH = 80
+// 单元格左右内边距：design-system.css 的 .el-table .cell 是 padding-inline: 14px
+const CELL_PADDING = 28
+
+/**
+ * 列宽模型：每列给「最小宽 / 最大宽 / 弹性权重」，算法见 @/utils/columnFill。
+ * grow 是**剩余空间的分配权重**，不是绝对宽度 —— 产品名称拿最大一份，状态类列只拿一点点
+ * （内容就两三个字，拉太宽只会让整行更散）。max 是上限，产品名称不设上限，兜住所有余量，
+ * 所以 2K / 4K 屏上列宽之和始终等于容器宽度，右侧不留白。
+ * text/font 决定量哪段文本、用哪个字体串；headExtra 给表头里除文字之外的控件留位置。
+ */
+interface ColumnSpec {
+  prop: string
+  label: string
+  min: number
+  max: number
+  grow: number
+  font: string
+  track?: number
+  headExtra?: number
+  text?: (row: any) => string
 }
-const NAME_MIN = 140
-const NAME_MAX = 520
+const COLUMNS: ColumnSpec[] = [
+  { prop: 'productNo', label: '产品编号', min: 110, max: 260, grow: 0.6, font: FONT_CODE, track: TRACK_CODE },
+  { prop: 'productName', label: '产品名称', min: 180, max: Number.POSITIVE_INFINITY, grow: 3, font: FONT_STRONG },
+  { prop: 'brandName', label: '品牌', min: 92, max: 220, grow: 0.7, font: FONT_BODY },
+  { prop: 'categoryName', label: '分类', min: 96, max: 240, grow: 0.7, font: FONT_BODY },
+  {
+    prop: 'facePrice',
+    label: '面价',
+    min: 104,
+    max: 180,
+    grow: 0.5,
+    font: FONT_PRICE,
+    text: (row) => facePriceText(row),
+  },
+  {
+    prop: 'costPrice',
+    label: '成本价',
+    min: 108,
+    max: 180,
+    grow: 0.5,
+    font: FONT_PRICE,
+    headExtra: 26,
+    text: (row) => (row.costPrice == null ? '—' : `¥${Number(row.costPrice).toFixed(2)}`),
+  },
+  { prop: 'stockStatus', label: '库存', min: 76, max: 130, grow: 0.4, font: FONT_STATUS, text: (row) => stockStatusMap[row.stockStatus] || row.stockStatus || '' },
+  { prop: 'status', label: '状态', min: 72, max: 130, grow: 0.4, font: FONT_STATUS, text: (row) => statusMap[row.status] || row.status || '' },
+  { prop: 'operation', label: '操作', min: OPERATION_WIDTH, max: 200, grow: 0.6, font: FONT_BODY, text: () => '' },
+]
+const COL_MIN: Record<string, number> = {}
+for (const spec of COLUMNS) COL_MIN[spec.prop] = spec.min
 
-const _measureCanvas = document.createElement('canvas')
-const _measureCtx = _measureCanvas.getContext('2d')!
+/*
+ * 量宽用的 canvas 上下文按需创建，不要在 setup 里就建：jsdom 根本没实现 getContext('2d')，
+ * 提前调用会让每个挂载 Products.vue 的组件测试都吐一堆 "Not implemented" 噪音。
+ * 而 jsdom 里量不到容器宽度（clientWidth 恒为 0），computeFillWidths() 会提前返回，
+ * 也就永远走不到这里。
+ */
+let _measureCtx: CanvasRenderingContext2D | null = null
+let _measureTried = false
 
-function measureTextWidth(text: string): number {
-  _measureCtx.font = '14px "Helvetica Neue", Helvetica, Arial, "PingFang SC", "Microsoft YaHei", sans-serif'
-  return _measureCtx.measureText(text == null ? '' : String(text)).width
+function measureCtx(): CanvasRenderingContext2D | null {
+  if (!_measureTried) {
+    _measureTried = true
+    _measureCtx = document.createElement('canvas').getContext('2d')
+  }
+  return _measureCtx
+}
+
+// 拿不到上下文时退化成按字数估宽，不要在这里抛异常。
+function measureTextWidth(text: string, font = FONT_BODY): number {
+  const str = text == null ? '' : String(text)
+  const ctx = measureCtx()
+  if (!ctx) return str.length * 8
+  ctx.font = font
+  return ctx.measureText(str).width
 }
 
 function getTableWidth(): number {
@@ -1013,58 +1114,87 @@ function getTableWidth(): number {
   return el ? el.clientWidth : 0
 }
 
-// 确定性填充：所有列宽之和 == 表格容器宽度，productName 作为弹性填充列。
-// 这样不会留下右侧空白，操作列始终吸附右边缘（即便手动拖拽其它列）。
+// 一列的「自然宽度」：表头和本页所有行里最宽的那段文本 + 单元格内边距。
+// +2 是取整余量，宁可多 2px，也别让文字刚好被 ellipsis 掉一个字。
+function naturalWidth(spec: ColumnSpec): number {
+  let w = measureTextWidth(spec.label, FONT_HEAD) + spec.label.length * TRACK_HEAD + (spec.headExtra ?? 0)
+  for (const row of products.value) {
+    const txt = spec.text ? spec.text(row) : row[spec.prop] == null ? '' : String(row[spec.prop])
+    w = Math.max(w, measureTextWidth(txt, spec.font) + txt.length * (spec.track ?? 0))
+  }
+  return Math.ceil(w) + CELL_PADDING + 2
+}
+
+/**
+ * 确定性填充：所有列宽之和 == 表格容器宽度（见 @/utils/columnFill）。
+ * 图片列和方案模式的勾选列是死宽度，但也要算进去，否则总宽会差出一列来。
+ * 手动拖过的列按拖出来的宽度钉住，不再参与分配。
+ */
 function computeFillWidths() {
   if (!autoFit.value) return
   const container = getTableWidth()
   if (!container) return
-  const result: Record<string, number> = {}
-  for (const c of FIT_TEXT) {
-    let w = measureTextWidth(c.label) + 28
-    for (const row of products.value) {
-      const txt = row[c.prop] == null ? '' : String(row[c.prop])
-      w = Math.max(w, measureTextWidth(txt) + 24)
-    }
-    result[c.prop] = Math.round(Math.min(Math.max(w, c.min), c.max))
+  const cols: FillColumn[] = []
+  const fixed = (prop: string, width: number) => ({ prop, natural: width, min: width, max: width, grow: 0 })
+  if (proposalMode.value) cols.push(fixed('selection', SELECTION_WIDTH))
+  cols.push(fixed('image', IMAGE_WIDTH))
+  for (const spec of COLUMNS) {
+    if (spec.prop === 'costPrice' && !canViewCost.value) continue
+    const pinned = pinnedWidths.value[spec.prop]
+    cols.push(
+      pinned
+        ? fixed(spec.prop, pinned)
+        : { prop: spec.prop, natural: naturalWidth(spec), min: spec.min, max: spec.max, grow: spec.grow },
+    )
   }
-  for (const [k, v] of Object.entries(FIXED_WIDTHS)) {
-    if (k === 'costPrice' && !canViewCost.value) continue
-    if (k === 'operation') continue
-    result[k] = v
-  }
-  const others = Object.values(result).reduce((a, b) => a + b, 0)
-  let nameW = container - others - FIXED_WIDTHS.operation
-  nameW = Math.min(Math.max(nameW, NAME_MIN), NAME_MAX)
-  result.productName = Math.round(nameW)
-  result.operation = FIXED_WIDTHS.operation
-  colWidths.value = result
+  colWidths.value = fillColumnWidths(cols, container, 'productName')
   nextTick(() => productTableRef.value?.doLayout())
 }
 
-// 手动拖拽列宽后，重新计算填充列使总宽仍等于容器宽度（消除右侧空白）
+/**
+ * 拖过的列宽记进 pinnedWidths，之后每次重算都当固定列。产品名称是吸收余量的锚列，
+ * 钉住它就等于把右侧留白重新放回来，所以拖它只触发重算。「自适应/紧凑」按钮清空记忆。
+ */
 function onHeaderDragEnd(newWidth: number, _oldWidth: number, column: any) {
   if (!autoFit.value) return
   const prop = column?.property
-  if (!prop || prop === 'productName') {
-    computeFillWidths()
-    return
+  if (prop && prop !== 'productName') {
+    pinnedWidths.value = { ...pinnedWidths.value, [prop]: Math.round(newWidth) }
   }
-  colWidths.value = { ...colWidths.value, [prop]: Math.round(newWidth) }
-  const container = getTableWidth()
-  const others = Object.entries(colWidths.value)
-    .filter(([k]) => k !== 'productName')
-    .reduce((a, [, v]) => a + (v as number), 0)
-  let nameW = container - others
-  nameW = Math.min(Math.max(nameW, NAME_MIN), NAME_MAX)
-  colWidths.value = { ...colWidths.value, productName: Math.round(nameW) }
-  nextTick(() => productTableRef.value?.doLayout())
+  computeFillWidths()
 }
 
 function toggleAutoFit() {
   autoFit.value = !autoFit.value
+  pinnedWidths.value = {}
   if (autoFit.value) computeFillWidths()
   nextTick(() => productTableRef.value?.doLayout())
+}
+
+// 紧凑模式交回 Element Plus 的 fit 平均分配，此时只给 min-width；自适应模式给算好的定宽。
+function colWidth(prop: string): number | undefined {
+  return autoFit.value ? colWidths.value[prop] : undefined
+}
+
+function colMin(prop: string): number {
+  return COL_MIN[prop] ?? 90
+}
+
+/*
+ * 列表里的图一律走后端缩略图（GET .../content?w=<短边>），不要直接挂原图。
+ * 库里的封面基本都是 4000×3000（12MP）的相机原图，一页 20 行光解码就是 ~3GB
+ * RGBA，滚动时浏览器反复丢弃/重解码位图 —— 这是滚轮卡顿的主因。
+ * 宽度必须落在后端 _THUMB_WIDTHS 白名单里（backend/app/api/v1/files.py），
+ * 写错后端直接回 422（故意不静默回退成原图，否则这种 typo 永远发现不了）。
+ * 64px 的表格方框取 192（retina 上 3 倍密度，单张也就十几 KB）；
+ * 网格瓦片最宽约 360px，取 480 够用。灯箱预览仍用原图 url。
+ */
+const TABLE_THUMB_WIDTH = 192
+const TILE_THUMB_WIDTH = 480
+
+function withThumbWidth(url: string, width: number): string {
+  if (!url) return url
+  return `${url}${url.includes('?') ? '&' : '?'}w=${width}`
 }
 
 const normalizeProduct = (item: any) => ({
@@ -1089,7 +1219,8 @@ const normalizeProduct = (item: any) => ({
     ? {
         id: item.cover_image_id,
         url: item.cover_image_url,
-        thumbnailUrl: item.cover_image_url,
+        thumbnailUrl: withThumbWidth(item.cover_image_url, TABLE_THUMB_WIDTH),
+        tileUrl: withThumbWidth(item.cover_image_url, TILE_THUMB_WIDTH),
         name: item.cover_image_filename,
       }
     : null,
@@ -1204,7 +1335,10 @@ const handleSubmit = async () => {
 }
 
 const handleView = (row: any) => {
-  window.open(`/products/${row.id}`, '_self')
+  // 必须走 router.push：后台是以 base '/admin/' 构建的，`window.open('/products/x')`
+  // 会打到 nginx 的 location /（门户），门户没有这条路由 → 白屏。
+  // router.push 会自动带上 import.meta.env.BASE_URL，且免掉一次整页重载。
+  router.push({ name: 'ProductDetail', params: { id: String(row.id) } })
 }
 
 const handleEdit = (row: any) => {
@@ -1376,6 +1510,16 @@ onMounted(() => {
     resizeTimer = setTimeout(() => computeFillWidths(), 150) as unknown as number
   })
 })
+
+/**
+ * 视图模式是持久化的，可能一进页面就是卡片视图，此时表格没渲染、量不到容器宽度。
+ * 切回表格视图时补一次测量，否则列宽会全部回落到 min-width。
+ * 方案模式增删勾选列同样要重算。
+ */
+watch([viewMode, proposalMode], () => {
+  if (viewMode.value !== 'table') return
+  nextTick(() => computeFillWidths())
+})
 </script>
 
 <style scoped>
@@ -1402,10 +1546,11 @@ onMounted(() => {
 }
 
 /* ===== Glass Card ===== */
+/* 这里不要再加 backdrop-filter：卡片背后是 .products-page 的纯色 #f0f0f0，
+   模糊纯色画面上毫无变化，但滚动时每帧都要重算整卡可见区域 —— 列表页滚轮卡顿
+   的主因之一。毛玻璃只留给压在内容上的浮层（弹窗、遮罩）。 */
 .glass-card {
   background: var(--glass-bg);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-soft);
@@ -1659,35 +1804,82 @@ onMounted(() => {
   white-space: nowrap;
 }
 
-.product-table :deep(.el-table__header-wrapper) {
-  background: var(--brand-lighter);
-}
-
-.product-table :deep(.el-table__header th) {
-  background: var(--brand-lighter);
-  color: var(--text-primary);
-  font-weight: 600;
-  font-size: 13px;
-  padding: 14px 0;
-}
-
-.product-table :deep(.el-table__row td) {
-  padding: 12px 0;
-}
-
+/* 表头与单元格的字号、字重、颜色统一由 design-system.css 的表格规则给出，
+   这里只留页面自己的东西（悬停底色、分割线形态），避免两套排版互相打架。 */
 .product-table :deep(.el-table__row:hover td) {
   background: var(--brand-lighter);
 }
 
-.product-table :deep(.el-table--border)::after,
-.product-table :deep(.el-table--border)::before {
-  background: rgba(30, 50, 90, 0.06);
+/*
+ * 分割线：竖线全部去掉（`border` 属性已从 el-table 上摘掉，design-system.css 里
+ * `.el-table:not(.el-table--border) td` 的 border-right 本就是 0），列之间只靠 cell 的
+ * 左右内边距留白分隔。横线保留，但两端各内缩一个 cell padding，不再顶到表格边缘 ——
+ * 这就是「不满行的横分割线」。
+ *
+ * 为什么用 td::after 而不是 border-bottom 或 background-image：
+ * border-bottom 只能满格，画不出内缩；background-image 会被 design-system.css 里
+ * 斑马行那条 `background:` **简写**连着 background-image 一起重置掉，隔行就断线。
+ */
+.product-table :deep(.el-table__body td.el-table__cell) {
+  position: relative;
+  border-bottom: 0;
+}
+
+.product-table :deep(.el-table__body td.el-table__cell)::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: var(--pim-line);
+  pointer-events: none;
+}
+
+.product-table :deep(.el-table__body td.el-table__cell:first-child)::after {
+  left: 14px;
+}
+
+.product-table :deep(.el-table__body td.el-table__cell:last-child)::after {
+  right: 14px;
+}
+
+/* 最后一行不画线（design-system.css 对 border-bottom 也是这个口径），
+   否则表格底边会和分页区之间多出一条无意义的线。 */
+.product-table :deep(.el-table__body tr:last-child td.el-table__cell)::after {
+  display: none;
+}
+
+/* 表头下面那条同样内缩，和行分割线的左右端点对齐 */
+.product-table :deep(.el-table__header th.el-table__cell) {
+  position: relative;
+  border-bottom: 0;
+}
+
+.product-table :deep(.el-table__header th.el-table__cell)::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: var(--pim-line-strong);
+  pointer-events: none;
+}
+
+.product-table :deep(.el-table__header th.el-table__cell:first-child)::after {
+  left: 14px;
+}
+
+.product-table :deep(.el-table__header th.el-table__cell:last-child)::after {
+  right: 14px;
 }
 
 .price-text {
   color: var(--brand-deep);
   font-weight: 600;
-  font-family: monospace;
+  font-family: var(--pim-font-mono);
+  font-variant-numeric: tabular-nums;
 }
 
 .product-grid-wrap {
@@ -1849,10 +2041,34 @@ onMounted(() => {
   user-select: none;
 }
 
-.capsule-tag {
-  border-radius: 12px;
-  padding: 2px 10px;
+/*
+ * 状态标识：不要实色标签、不要按钮容器，只留一行低饱和的字。
+ * 状态在这张表里不是重点（上架/有货是绝大多数行的常态），做成 chip 反而抢了名称和价格的视线。
+ * 色相保留（绿=正常、琥珀=待定、砖红=异常），但把彩度压到接近灰，同时靠加深保证
+ * 对白底 ≥ 4.5:1 的对比度 —— 弱化的是饱和度，不是可读性。
+ */
+.status-text {
+  display: inline-block;
+  font-size: 13px;
   font-weight: 500;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.status-text.tone-ok {
+  color: #4f6b57;
+}
+
+.status-text.tone-warn {
+  color: #8a6a3c;
+}
+
+.status-text.tone-danger {
+  color: #8f5b57;
+}
+
+.status-text.tone-muted {
+  color: rgba(30, 50, 90, 0.7);
 }
 
 /* ===== Pagination ===== */
@@ -2097,7 +2313,7 @@ onMounted(() => {
     width: 90vw !important;
   }
 
-  .product-table :deep(.el-table__header-wrapper),
+  .product-table :deep(.el-table__header th),
   .product-table :deep(.el-table__row td) {
     font-size: 12px;
   }
