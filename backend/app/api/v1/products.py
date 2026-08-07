@@ -1,17 +1,23 @@
+import asyncio
 import datetime
 import io
 import logging
+import os
+from collections.abc import Callable
 from decimal import Decimal
+from typing import Any
 from uuid import UUID
 
-import pandas as pd
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 from pydantic import BaseModel
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
+from app.core.config import settings
 from app.core.database import get_db
+from app.core.minio_client import get_minio_client
 from app.core.permission import PermissionChecker
 from app.core.security import create_access_token
 from app.core.serializers import filter_sensitive_fields
@@ -33,6 +39,24 @@ from app.schemas.product import (
     ProductCreate,
     ProductResponse,
     ProductUpdate,
+)
+from app.services.excel_images import extract_embedded_images
+from app.services.product_import import (
+    ProductRow,
+    RowFields,
+    SheetError,
+    build_import_template,
+    parse_row,
+    read_product_sheet,
+)
+from app.services.product_import_media import (
+    ROLE_MAIN,
+    ROLE_SCENE,
+    MediaError,
+    MediaResolver,
+    MediaUploader,
+    fetch_image_url,
+    load_bundle,
 )
 from app.services.products_export import (
     build_excel_bytes,
@@ -86,13 +110,17 @@ async def list_products(
             detail={"code": 42206, "msg": f"quality_flag 不支持: {quality_flag}"},
         )
 
-    query = select(Product).options(
-        selectinload(Product.tags),
-        joinedload(Product.brand),
-        joinedload(Product.supplier),
-        joinedload(Product.category),
-        selectinload(Product.images).joinedload(ProductImage.attachment),
-    ).where(Product.is_deleted.is_(False))
+    query = (
+        select(Product)
+        .options(
+            selectinload(Product.tags),
+            joinedload(Product.brand),
+            joinedload(Product.supplier),
+            joinedload(Product.category),
+            selectinload(Product.images).joinedload(ProductImage.attachment),
+        )
+        .where(Product.is_deleted.is_(False))
+    )
 
     if category_id:
         query = query.where(Product.category_id == category_id)
@@ -121,9 +149,18 @@ async def list_products(
     if stock_status:
         query = query.where(Product.stock_status == stock_status)
     if keyword:
+        tag_keyword_subq = (
+            select(ProductTag.product_id)
+            .join(Tag, ProductTag.tag_id == Tag.id)
+            .where(
+                Tag.tag_name.ilike(f"%{keyword}%"),
+                Tag.is_deleted.is_(False),
+            )
+        )
         query = query.where(
             (Product.product_name.ilike(f"%{keyword}%"))
             | (Product.product_no.ilike(f"%{keyword}%"))
+            | (Product.id.in_(tag_keyword_subq))
         )
     if min_price is not None:
         query = query.where(Product.face_price != 99999, Product.face_price >= min_price)
@@ -207,6 +244,28 @@ async def export_products(
         headers={
             "Content-Disposition": 'attachment; filename="products_export.xlsx"',
             "X-Total-Count": str(total),
+        },
+    )
+
+
+# 同样要排在 /{product_id} 之前。
+@router.get("/import-template", dependencies=[Depends(PermissionChecker("product:import"))])
+async def download_import_template():
+    """下载批量导入模板（列名和导出一致，另附「填写说明」页讲三种给图方式）。
+
+    Import.vue 里一直写着「请下载模板文件」却没有下载入口，用户只能照页面上那段
+    中文说明猜列名。模板由 services/product_import.build_import_template 生成，
+    tests/unit/test_product_import.py 有一条用例保证它能被本项目的导入器读回来。
+    """
+    payload = build_import_template()
+
+    from fastapi.responses import StreamingResponse
+
+    return StreamingResponse(
+        io.BytesIO(payload),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": 'attachment; filename="products_import_template.xlsx"',
         },
     )
 
@@ -332,17 +391,19 @@ async def products_quality_export(
         "update_time",
     ]
     df = pd.DataFrame(rows, columns=columns) if rows else pd.DataFrame(columns=columns)
-    df = df.rename(columns={
-        "product_no": "产品编号",
-        "product_name": "产品名称",
-        "completeness_status": "完整度状态",
-        "face_price_label": "面价",
-        "specification": "规格",
-        "data_source": "数据来源",
-        "supplier_name": "供应商",
-        "create_time": "创建时间",
-        "update_time": "更新时间",
-    })
+    df = df.rename(
+        columns={
+            "product_no": "产品编号",
+            "product_name": "产品名称",
+            "completeness_status": "完整度状态",
+            "face_price_label": "面价",
+            "specification": "规格",
+            "data_source": "数据来源",
+            "supplier_name": "供应商",
+            "create_time": "创建时间",
+            "update_time": "更新时间",
+        }
+    )
     bio = io.BytesIO()
     with pd.ExcelWriter(bio, engine="openpyxl") as writer:
         df.to_excel(writer, index=False, sheet_name="待补充清单")
@@ -426,14 +487,16 @@ async def _fetch_scene_images_for_product(
                 si.attachment_id,
             )
             continue
-        scene_images.append({
-            "id": str(si.id),
-            "name": si.name,
-            "attachment_id": str(si.attachment_id),
-            "file_url": _create_content_url(request, si.attachment_id),
-            "file_name": si.attachment.file_name,
-            "sort": sort_map.get(str(si.id), 0),
-        })
+        scene_images.append(
+            {
+                "id": str(si.id),
+                "name": si.name,
+                "attachment_id": str(si.attachment_id),
+                "file_url": _create_content_url(request, si.attachment_id),
+                "file_name": si.attachment.file_name,
+                "sort": sort_map.get(str(si.id), 0),
+            }
+        )
     scene_images.sort(key=lambda image: image["sort"])
     return scene_images
 
@@ -586,7 +649,9 @@ async def add_product_images(
 
     # Check current image count
     current_count_result = await db.execute(
-        select(func.count()).select_from(ProductImage).where(
+        select(func.count())
+        .select_from(ProductImage)
+        .where(
             ProductImage.product_id == product_id,
             ProductImage.is_deleted.is_(False),
         )
@@ -614,7 +679,9 @@ async def add_product_images(
     for aid in data.attachment_ids:
         aid_str = str(aid)
         if aid_str not in attachment_map:
-            raise HTTPException(status_code=404, detail={"code": 40401, "msg": f"附件 {aid} 不存在"})
+            raise HTTPException(
+                status_code=404, detail={"code": 40401, "msg": f"附件 {aid} 不存在"}
+            )
         if attachment_map[aid_str].file_type != "image":
             raise HTTPException(
                 status_code=422, detail={"code": 42201, "msg": "仅允许 image 类型的附件"}
@@ -816,7 +883,9 @@ async def bind_product_scene_images(
 
     for sid in data.scene_image_ids:
         if str(sid) not in scene_map:
-            raise HTTPException(status_code=404, detail={"code": 40401, "msg": f"场景图 {sid} 不存在"})
+            raise HTTPException(
+                status_code=404, detail={"code": 40401, "msg": f"场景图 {sid} 不存在"}
+            )
 
     # Check for existing bindings and insert new ones
     bound = 0
@@ -945,9 +1014,9 @@ async def create_product(
     request: Request, product_data: ProductCreate, db: AsyncSession = Depends(get_db)
 ):
     result = await db.execute(
-        select(Product).options(selectinload(Product.tags)).where(
-            Product.product_no == product_data.product_no, Product.is_deleted.is_(False)
-        )
+        select(Product)
+        .options(selectinload(Product.tags))
+        .where(Product.product_no == product_data.product_no, Product.is_deleted.is_(False))
     )
     if result.scalar_one_or_none():
         raise HTTPException(status_code=409, detail={"code": 40901, "msg": "产品编号已存在"})
@@ -1008,9 +1077,7 @@ async def update_product(
         setattr(product, field, value)
 
     if tag_ids is not None:
-        await db.execute(
-            ProductTag.__table__.delete().where(ProductTag.product_id == product.id)
-        )
+        await db.execute(ProductTag.__table__.delete().where(ProductTag.product_id == product.id))
         for tag_id in tag_ids:
             db.add(ProductTag(product_id=product.id, tag_id=tag_id))
 
@@ -1121,6 +1188,102 @@ async def clone_product(
     return filter_sensitive_fields(body, role_code or "sales")
 
 
+# ---------------------------------------------------------------------------
+# 批量导入（表格 + 图片）
+# ---------------------------------------------------------------------------
+# 拆成三层：services/product_import.py 认表头和解析行，
+# services/excel_images.py 抠内嵌图片，services/product_import_media.py 决定图片
+# 归哪一行、上传到对象存储。这里只做「查库 + 写库」，所以上面那三层能在
+# tests/unit 里被单独钉住（归属算错时图会挂到相邻产品身上，是最难发现的一类错）。
+
+# 导入结果里最多回显多少条提示。两千行的表能攒出几千条降级提示，全塞进 JSON 会把
+# 响应撑到几 MB，前端表格也没法看。
+_MAX_REPORTED_NOTES = 200
+
+
+def _capped(items: list[str]) -> list[str]:
+    if len(items) <= _MAX_REPORTED_NOTES:
+        return items
+    return [*items[:_MAX_REPORTED_NOTES], f"…另有 {len(items) - _MAX_REPORTED_NOTES} 条提示未显示"]
+
+
+def _url_fetcher(*, timeout: float, max_bytes: int) -> Callable[[str], tuple[bytes, str]]:
+    """图片直链的抓取器（默认关闭，见 settings.PRODUCT_IMPORT_ALLOW_URL_FETCH）。
+
+    fetch_image_url 内部先把域名解析成 IP 并要求是公网地址，重定向逐跳复查 —— 服务端
+    替用户 GET 任意地址就是 SSRF，云上的元数据接口（169.254.169.254）是现成的目标。
+    """
+
+    def fetch(url: str) -> tuple[bytes, str]:
+        return fetch_image_url(url, timeout=timeout, max_bytes=max_bytes)
+
+    return fetch
+
+
+async def _name_to_id(
+    db: AsyncSession, model: Any, column: Any, names: set[str]
+) -> dict[str, UUID]:
+    """名字 → 主键。一次查完，避免每行一条 SELECT。
+
+    分类名在库里不唯一（不同父级下可以同名），按 create_time 排序后取第一条：同一份
+    表重导两次至少落到同一个分类上，随机挑一个会让两次导入的归属不一致。
+    """
+    if not names:
+        return {}
+    result = await db.execute(
+        select(column, model.id)
+        .where(column.in_(names), model.is_deleted.is_(False))
+        .order_by(model.create_time)
+    )
+    out: dict[str, UUID] = {}
+    for name, ident in result.all():
+        out.setdefault(name, ident)
+    return out
+
+
+def _db_failure_reason(exc: Exception) -> str:
+    """行级失败原因。原始 SQL 报错既看不懂也可能回显库结构，只给能行动的那句。"""
+    if isinstance(exc, IntegrityError):
+        return "违反数据库约束（编号重复或枚举值不合法），已跳过该行"
+    return f"写入数据库失败（{type(exc).__name__}），已跳过该行"
+
+
+def _ingest_row_media(
+    resolver: MediaResolver,
+    uploader: MediaUploader,
+    rows: list[tuple[ProductRow, str]],
+) -> tuple[dict[int, dict[str, Any]], list[str], set[str]]:
+    """在线程里跑完「图片归属 → 取字节 → 传对象存储」，返回每行该绑的图。
+
+    minio 客户端和 httpx 都是同步阻塞的：两百张图直接在事件循环里传会把整个进程堵住
+    十几秒，同时在线的其他请求全部排队。所以这段整体放进 asyncio.to_thread。
+
+    一张图传不上去只影响那一张，记条提示继续 —— 图能事后补，为它回滚整份导入不值得。
+    """
+    per_row: dict[int, dict[str, Any]] = {}
+    warnings: list[str] = []
+    sources: set[str] = set()
+    for row, product_no in rows:
+        media = resolver.resolve(row, product_no=product_no)
+        warnings.extend(media.warnings)
+        bucket: dict[str, Any] = {"cover": None, "images": [], "scenes": []}
+        for blob in media.blobs:
+            try:
+                uploaded = uploader.upload(blob)
+            except MediaError as exc:
+                warnings.append(f"第 {row.excel_row} 行：{exc}")
+                continue
+            sources.add(blob.source)
+            if blob.role == ROLE_MAIN:
+                bucket["cover"] = uploaded
+            elif blob.role == ROLE_SCENE:
+                bucket["scenes"].append(uploaded)
+            else:
+                bucket["images"].append(uploaded)
+        per_row[row.excel_row] = bucket
+    return per_row, warnings, sources
+
+
 @router.post("/import", dependencies=[Depends(PermissionChecker("product:import"))])
 @audit_action("product_import", module="products")
 async def import_products(
@@ -1129,158 +1292,320 @@ async def import_products(
     skip_if_exists: bool = Query(False, alias="skipIfExists"),
     db: AsyncSession = Depends(get_db),
 ):
-    content = await file.read()
+    """批量导入产品，连产品图和场景图一起导。
+
+    收三种给图方式（都在 tests/unit/test_product_import_media.py 里钉着）：
+
+    1. 图片贴在表格里（浮动图片 / WPS 的 DISPIMG / M365 的「置于单元格内」）——
+       按图片落在哪一行哪一列决定归属：主图列→封面，产品图列→产品图，场景图列→场景图；
+    2. 上传一个 zip：表格 + 图片文件，格子里写文件名，或者干脆把文件名以产品编号开头
+       （SUNON-001-1.jpg），后者只在这一行没写任何图片名时才启用；
+    3. 格子里写 http(s) 直链 —— 默认关闭（SSRF），要开见
+       settings.PRODUCT_IMPORT_ALLOW_URL_FETCH。
+
+    写库分两段：先把图片对象和 attachment/scene_image 落下来（同一 sha256 全批只传一次、
+    只建一条 attachment），再按行开 SAVEPOINT 建产品。老实现是整批一次 commit，一行撞
+    约束就把前面几百行一起带走；现在一行失败只回滚那一行，其余照常入库。
+    """
+    # UploadFile 的底层就是个临时文件（Starlette 超过 1MB 就落盘），所以体积用 seek
+    # 量、字节交给 load_bundle 按需读：一个 259MB 的包不该先在内存里躺成一份 bytes，
+    # 再由 zipfile 解成第二份几百兆。
+    upload = file.file
+    upload.seek(0, os.SEEK_END)
+    size = upload.tell()
+    upload.seek(0)
+    if size > settings.PRODUCT_IMPORT_MAX_FILE_BYTES:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": 40004,
+                "msg": f"上传 {size} 字节，超过上限 "
+                f"{settings.PRODUCT_IMPORT_MAX_FILE_BYTES} 字节，请拆成多份导入",
+            },
+        )
+
+    # 上传的可能是裸 xlsx，也可能是「表格 + 图片」的 zip。xlsx 自己就是 zip，所以
+    # load_bundle 是靠里面有没有 xl/workbook.xml 区分的。
     try:
-        df = pd.read_excel(io.BytesIO(content), engine="openpyxl")
-    except Exception as e:
-        raise HTTPException(
-            status_code=400, detail={"code": 40001, "msg": f"文件解析失败: {e}"}
-        ) from e
-
-    required_cols = {"product_no", "product_name", "face_price"}
-    if not required_cols.issubset(set(df.columns)):
-        missing = required_cols - set(df.columns)
-        raise HTTPException(
-            status_code=400, detail={"code": 40002, "msg": f"缺少必填列: {missing}"}
+        bundle = load_bundle(
+            upload,
+            max_image_bytes=settings.PRODUCT_IMPORT_MAX_IMAGE_BYTES,
+            max_total_bytes=settings.PRODUCT_IMPORT_MAX_FILE_BYTES,
         )
+    except MediaError as exc:
+        raise HTTPException(status_code=400, detail={"code": 40003, "msg": str(exc)}) from exc
 
-    brand_names = df.get("brand_name", pd.Series()).dropna().unique().tolist()
-    supplier_names = df.get("supplier_name", pd.Series()).dropna().unique().tolist()
-    category_names = df.get("category_name", pd.Series()).dropna().unique().tolist()
-    tag_names = set()
-    if "tag_names" in df.columns:
-        for v in df["tag_names"].dropna():
-            tag_names.update([t.strip() for t in str(v).split(",") if t.strip()])
+    # zip 包在整段取图期间都开着（成员是按需读的），所以下面无论从哪儿退出都要关掉它：
+    # 请求一结束 UploadFile 就没了，不能留着还能去读它的 loader。
+    try:
+        try:
+            sheet = read_product_sheet(bundle.xlsx)
+        except SheetError as exc:
+            raise HTTPException(
+                status_code=400, detail={"code": 40001, "msg": str(exc)}
+            ) from exc
 
-    brand_map = {}
-    if brand_names:
-        result = await db.execute(select(Brand).where(Brand.brand_name.in_(brand_names)))
-        brand_map = {b.brand_name: b.id for b in result.scalars().all()}
+        if len(sheet.rows) > settings.PRODUCT_IMPORT_MAX_ROWS:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "code": 40004,
+                    "msg": f"表里有 {len(sheet.rows)} 行数据，超过单次上限 "
+                    f"{settings.PRODUCT_IMPORT_MAX_ROWS} 行，请拆分后导入",
+                },
+            )
 
-    supplier_map = {}
-    if supplier_names:
-        result = await db.execute(
-            select(Supplier).where(Supplier.supplier_name.in_(supplier_names))
+        notes: list[str] = list(sheet.warnings)
+        image_warnings: list[str] = list(bundle.warnings)
+        if sheet.unknown_headers:
+            notes.append("这些列没认出来，已忽略：" + "、".join(sheet.unknown_headers))
+
+        # 内嵌图片解析失败不该让整份表进不来：表格文字部分照常导，图片那部分给条提示。
+        embedded = []
+        try:
+            extracted = await asyncio.to_thread(
+                extract_embedded_images,
+                bundle.xlsx,
+                max_image_bytes=settings.PRODUCT_IMPORT_MAX_IMAGE_BYTES,
+            )
+        except Exception:  # noqa: BLE001 - 任何解析异常都降级，原因写日志
+            logger.warning("批量导入：内嵌图片解析失败", exc_info=True)
+            image_warnings.append("表格里的内嵌图片没解析成功，本次只按文件名/直链导入图片")
+        else:
+            embedded = extracted.images
+            image_warnings.extend(extracted.warnings)
+
+        parsed = [parse_row(row) for row in sheet.rows]
+        brand_map = await _name_to_id(
+            db, Brand, Brand.brand_name, {f.brand_name for f in parsed if f.brand_name}
         )
-        supplier_map = {s.supplier_name: s.id for s in result.scalars().all()}
-
-    category_map = {}
-    if category_names:
-        result = await db.execute(
-            select(Category).where(Category.category_name.in_(category_names))
+        supplier_map = await _name_to_id(
+            db,
+            Supplier,
+            Supplier.supplier_name,
+            {f.supplier_name for f in parsed if f.supplier_name},
         )
-        category_map = {c.category_name: c.id for c in result.scalars().all()}
+        # 分类名在库里不唯一（不同父级下可以同名），这里取创建最早的那个。
+        category_map = await _name_to_id(
+            db,
+            Category,
+            Category.category_name,
+            {f.category_name for f in parsed if f.category_name},
+        )
+        tag_map = await _name_to_id(db, Tag, Tag.tag_name, {t for f in parsed for t in f.tag_names})
 
-    tag_map = {}
-    if tag_names:
-        result = await db.execute(select(Tag).where(Tag.tag_name.in_(tag_names)))
-        tag_map = {t.tag_name: t.id for t in result.scalars().all()}
+        # 编号查重一次查完。老实现是每行一条 SELECT，两千行就是两千个来回。
+        taken: set[str] = set()
+        wanted = {f.product_no for f in parsed if f.product_no}
+        if wanted:
+            found = await db.execute(
+                select(Product.product_no).where(
+                    Product.product_no.in_(wanted), Product.is_deleted.is_(False)
+                )
+            )
+            taken = {value for (value,) in found.all()}
 
-    success_count = 0
-    failures = []
-    total = len(df)
+        # 先把「这行能不能进库」判完，再去动图片：解析不了的行没必要为它下载/上传图片。
+        failures: list[dict[str, Any]] = []
+        todo: list[tuple[ProductRow, RowFields, dict[str, UUID]]] = []
+        missing_tags: set[str] = set()
+        seen: set[str] = set()
+        for row, fields in zip(sheet.rows, parsed, strict=True):
+            reasons = list(fields.errors)
+            refs: dict[str, UUID] = {}
+            if not reasons:
+                if fields.product_no in seen:
+                    reasons.append("表里有重复的产品编号，只导入第一次出现的那行")
+                elif fields.product_no in taken:
+                    reasons.append("编号已存在，已跳过" if skip_if_exists else "产品编号已存在")
+                # brand_id/supplier_id/category_id 在库里都是 NOT NULL，缺一个这行就进不去。
+                # 主数据由各自的管理页维护，导入不替用户新建：一个错别字凭空造出个品牌，
+                # 比这行导不进去更难收拾。
+                for label, name, mapping, key in (
+                    ("品牌", fields.brand_name, brand_map, "brand_id"),
+                    ("供应商", fields.supplier_name, supplier_map, "supplier_id"),
+                    ("分类", fields.category_name, category_map, "category_id"),
+                ):
+                    if not name:
+                        reasons.append(f"{label}为空（产品必须挂在{label}下）")
+                        continue
+                    ident = mapping.get(name)
+                    if ident is None:
+                        reasons.append(f"{label}「{name}」系统里没有，请先建好再导入")
+                    else:
+                        refs[key] = ident
+            if reasons:
+                failures.append(
+                    {
+                        "row": row.excel_row,
+                        "product_no": fields.product_no,
+                        "reason": "；".join(reasons),
+                    }
+                )
+                continue
+            seen.add(fields.product_no)
+            missing_tags.update(name for name in fields.tag_names if name not in tag_map)
+            notes.extend(f"第 {fields.excel_row} 行：{note}" for note in fields.notes)
+            todo.append((row, fields, refs))
 
-    for idx, row in df.iterrows():
-        row_num = idx + 2
-        product_no = str(row.get("product_no", "")).strip()
-        product_name = str(row.get("product_name", "")).strip()
+        if missing_tags:
+            notes.append("这些标签系统里没有，已忽略：" + "、".join(sorted(missing_tags)))
 
-        if not product_no or not product_name:
+        uploaded_count = 0
+        sources: set[str] = set()
+        per_row: dict[int, dict[str, Any]] = {}
+        if todo:
+            resolver = MediaResolver(
+                sheet,
+                embedded=embedded,
+                bundle=bundle,
+                url_fetcher=(
+                    _url_fetcher(
+                        timeout=settings.PRODUCT_IMPORT_URL_TIMEOUT,
+                        max_bytes=settings.PRODUCT_IMPORT_MAX_IMAGE_BYTES,
+                    )
+                    if settings.PRODUCT_IMPORT_ALLOW_URL_FETCH
+                    else None
+                ),
+                # 每行的上限不能超过 /images 接口的上限，否则导进来的产品一打开就是「已达上限」。
+                max_images=min(settings.PRODUCT_IMPORT_MAX_IMAGES_PER_ROW, MAX_PRODUCT_IMAGES),
+                max_scenes=min(
+                    settings.PRODUCT_IMPORT_MAX_SCENES_PER_ROW, MAX_PRODUCT_SCENE_IMAGES
+                ),
+                max_image_bytes=settings.PRODUCT_IMPORT_MAX_IMAGE_BYTES,
+            )
+            image_warnings.extend(resolver.warnings)
+            uploader = MediaUploader(get_minio_client(), settings.MINIO_BUCKET)
+            per_row, media_warnings, sources = await asyncio.to_thread(
+                _ingest_row_media,
+                resolver,
+                uploader,
+                [(row, fields.product_no) for row, fields, _ in todo],
+            )
+            image_warnings.extend(media_warnings)
+            uploaded_count = uploader.uploaded
+    finally:
+        # 图片已经全部读完并传到对象存储，后面只动数据库，zip 可以撒手了。
+        bundle.close()
+
+    # 同一 sha256 全批只建一条 attachment：一张品牌形象场景图被三十行引用时，对象存储里
+    # 只存一份，三十个产品共用它（product_scene_image 本来就是多对多）。
+    attachments: dict[str, Attachment] = {}
+    for buckets in per_row.values():
+        cover = buckets["cover"]
+        gallery = [cover] if cover is not None else []
+        for obj in [*gallery, *buckets["images"], *buckets["scenes"]]:
+            attachments.setdefault(
+                obj.sha256,
+                Attachment(
+                    file_name=obj.name,
+                    file_url=obj.file_url,
+                    file_type="image",
+                    file_size=obj.size,
+                    storage_type="minio",
+                    oss_key=obj.oss_key,
+                ),
+            )
+    if attachments:
+        db.add_all(attachments.values())
+        await db.flush()
+
+    scene_images: dict[str, SceneImage] = {}
+    for buckets in per_row.values():
+        for obj in buckets["scenes"]:
+            scene_images.setdefault(
+                obj.sha256,
+                SceneImage(name=obj.name[:128], attachment_id=attachments[obj.sha256].id),
+            )
+    if scene_images:
+        db.add_all(scene_images.values())
+        await db.flush()
+
+    empty: dict[str, Any] = {"cover": None, "images": [], "scenes": []}
+    success = 0
+    image_count = 0
+    scene_count = 0
+    for row, fields, refs in todo:
+        buckets = per_row.get(row.excel_row, empty)
+        cover = buckets["cover"]
+        gallery = ([cover] if cover is not None else []) + buckets["images"]
+        scenes = buckets["scenes"]
+        # 一行一个 SAVEPOINT：撞了约束只回滚这一行，前面已经建好的产品照常保留。
+        try:
+            async with db.begin_nested():
+                product = Product(
+                    product_no=fields.product_no,
+                    product_name=fields.product_name,
+                    brand_id=refs["brand_id"],
+                    supplier_id=refs["supplier_id"],
+                    category_id=refs["category_id"],
+                    face_price=fields.face_price,
+                    cost_price=fields.cost_price,
+                    material=fields.material,
+                    specification=fields.specification,
+                    colors=fields.colors,
+                    description=fields.description,
+                    data_source=fields.data_source,
+                    stock_status=fields.stock_status,
+                    status=fields.status,
+                    completeness_status=fields.completeness_status,
+                )
+                db.add(product)
+                await db.flush()
+                for tag_name in fields.tag_names:
+                    tag_id = tag_map.get(tag_name)
+                    if tag_id is not None:
+                        db.add(ProductTag(product_id=product.id, tag_id=tag_id))
+                for index, obj in enumerate(gallery):
+                    db.add(
+                        ProductImage(
+                            product_id=product.id,
+                            attachment_id=attachments[obj.sha256].id,
+                            sort=index,
+                            is_cover=index == 0,
+                        )
+                    )
+                for index, obj in enumerate(scenes):
+                    await db.execute(
+                        product_scene_image.insert().values(
+                            product_id=product.id,
+                            scene_image_id=scene_images[obj.sha256].id,
+                            sort=index,
+                        )
+                    )
+                await db.flush()
+        except SQLAlchemyError as exc:
+            logger.warning("批量导入第 %s 行入库失败", row.excel_row, exc_info=True)
             failures.append(
                 {
-                    "row": row_num,
-                    "product_no": product_no,
-                    "reason": "product_no 或 product_name 为空",
+                    "row": row.excel_row,
+                    "product_no": fields.product_no,
+                    "reason": _db_failure_reason(exc),
                 }
             )
             continue
-
-        existing = await db.execute(
-            select(Product)
-        .options(selectinload(Product.tags))
-        .where(Product.product_no == product_no, Product.is_deleted.is_(False))
-        )
-        if existing.scalar_one_or_none():
-            if skip_if_exists:
-                failures.append(
-                    {"row": row_num, "product_no": product_no, "reason": "编号已存在，已跳过"}
-                )
-                continue
-            else:
-                failures.append(
-                    {"row": row_num, "product_no": product_no, "reason": "产品编号已存在"}
-                )
-                continue
-
-        brand_name = (
-            str(row.get("brand_name", "")).strip() if pd.notna(row.get("brand_name")) else None
-        )
-        supplier_name = (
-            str(row.get("supplier_name", "")).strip()
-            if pd.notna(row.get("supplier_name"))
-            else None
-        )
-        category_name = (
-            str(row.get("category_name", "")).strip()
-            if pd.notna(row.get("category_name"))
-            else None
-        )
-
-        brand_id = brand_map.get(brand_name) if brand_name else None
-        supplier_id = supplier_map.get(supplier_name) if supplier_name else None
-        category_id = category_map.get(category_name) if category_name else None
-
-        if not brand_id or not supplier_id or not category_id:
-            missing = []
-            if brand_name and not brand_id:
-                missing.append(f"品牌'{brand_name}'不存在")
-            if supplier_name and not supplier_id:
-                missing.append(f"供应商'{supplier_name}'不存在")
-            if category_name and not category_id:
-                missing.append(f"分类'{category_name}'不存在")
-            failures.append(
-                {"row": row_num, "product_no": product_no, "reason": "; ".join(missing)}
-            )
-            continue
-
-        face_price = float(row.get("face_price", 0))
-        cost_price = float(row["cost_price"]) if pd.notna(row.get("cost_price")) else None
-        material = str(row["material"]).strip() if pd.notna(row.get("material")) else None
-        stock_status = str(row.get("stock_status", "in_stock")).strip()
-        status = str(row.get("status", "draft")).strip()
-
-        product = Product(
-            product_no=product_no,
-            product_name=product_name,
-            brand_id=brand_id,
-            supplier_id=supplier_id,
-            category_id=category_id,
-            face_price=face_price,
-            cost_price=cost_price,
-            material=material,
-            stock_status=stock_status,
-            status=status,
-        )
-        db.add(product)
-        await db.flush()
-
-        if "tag_names" in df.columns and pd.notna(row.get("tag_names")):
-            tag_list = [t.strip() for t in str(row["tag_names"]).split(",") if t.strip()]
-            for tag_name in tag_list:
-                tag_id = tag_map.get(tag_name)
-                if tag_id:
-                    db.add(ProductTag(product_id=product.id, tag_id=tag_id))
-
-        success_count += 1
+        success += 1
+        image_count += len(gallery)
+        scene_count += len(scenes)
 
     await db.commit()
+    failures.sort(key=lambda item: item["row"])
 
     return {
         "code": 200,
         "data": {
-            "total": total,
-            "success_count": success_count,
+            "total": len(sheet.rows),
+            "success_count": success,
             "fail_count": len(failures),
             "failures": failures,
+            "notes": _capped(notes),
+            "image_count": image_count,
+            "scene_image_count": scene_count,
+            "uploaded_count": uploaded_count,
+            "image_sources": sorted(sources),
+            "image_warnings": _capped(image_warnings),
+            "header_row": sheet.header_row,
+            "unknown_headers": sheet.unknown_headers,
+            "blank_rows": sheet.blank_rows,
         },
     }

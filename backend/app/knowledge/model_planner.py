@@ -84,6 +84,25 @@ class ModelToolPlanner:
 
         if not selected:
             return fallback
+        if "product.search" in params_by_tool:
+            model_params = params_by_tool["product.search"]
+            # The model may omit entities that the deterministic parser already
+            # extracted. Never let model planning discard an explicit tag/product
+            # constraint or price bound.
+            model_params["keywords"] = list(dict.fromkeys(
+                fallback.entities.keywords + model_params.get("keywords", [])
+            ))
+            model_params["product_nos"] = list(dict.fromkeys(
+                fallback.entities.product_nos + model_params.get("product_nos", [])
+            ))
+            model_params["product_ids"] = list(dict.fromkeys(
+                fallback.entities.product_ids + model_params.get("product_ids", [])
+            ))
+            fallback_params = self.fallback.plan(request)
+            model_params["filters"] = {
+                **fallback_params.tool_params.get("product.search", {}).get("filters", {}),
+                **model_params.get("filters", {}),
+            }
         return fallback.model_copy(
             update={
                 "required_tools": selected,

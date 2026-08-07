@@ -7,7 +7,7 @@ from pydantic import ValidationError
 
 from app.adapters.none import NoneAdapter
 from app.knowledge.events import sse_event
-from app.knowledge.gateway import _deterministic_answer
+from app.knowledge.gateway import _deterministic_answer, _params_for_tool
 from app.knowledge.model_gateway import AdapterModelGateway
 from app.knowledge.permission_pool import RoleBasedPoolResolver
 from app.knowledge.planner import RuleBasedPlanner
@@ -85,6 +85,28 @@ def test_planner_extracts_unknown_short_category_as_fallback_search_term():
     assert plan.entities.keywords == ["洽谈桌"]
     assert plan.required_tools == ["product.search"]
     assert plan.entities.price_sort == "asc"
+
+
+def test_planner_keeps_mixed_tag_and_specification_number():
+    plan = RuleBasedPlanner().plan(KnowledgeQueryRequest(message="MT有3000的会议桌吗"))
+
+    assert plan.entities.keywords == ["MT", "3000", "会议桌"]
+    assert plan.entities.price_max is None
+
+
+def test_planner_extracts_explicit_price_bound_without_turning_it_into_keyword():
+    plan = RuleBasedPlanner().plan(KnowledgeQueryRequest(message="预算3000元以内的会议桌"))
+
+    assert plan.entities.keywords == ["会议桌"]
+    assert plan.entities.price_max == 3000
+    assert (
+        _params_for_tool(
+            "product.search",
+            plan,
+            KnowledgeQueryRequest(message="预算3000元以内的会议桌"),
+        )["filters"]["face_price_max"]
+        == 3000
+    )
 
 
 def test_planner_routes_natural_language_to_knowledge_retrieval():

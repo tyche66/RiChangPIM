@@ -18,6 +18,8 @@ def build_adapter(
     api_key: str | None = None,
     chat_model: str | None = None,
     embedding_model: str | None = None,
+    embedding_api_url: str | None = None,
+    embedding_api_key: str | None = None,
     timeout: float = 30.0,
 ) -> AIServiceAdapter:
     """Build an adapter instance from a type selector.
@@ -42,6 +44,8 @@ def build_adapter(
             chat_model=chat_model or "gpt-4o-mini",
             embedding_model=embedding_model or "nvidia/nemotron-3-embed-1b:free",
             timeout=timeout,
+            embedding_api_key=embedding_api_key,
+            embedding_api_url=embedding_api_url,
         )
         return OpenAIAdapter(cfg)
 
@@ -75,6 +79,8 @@ def get_ai_adapter() -> AIServiceAdapter:
         api_key=settings.AI_API_KEY,
         chat_model=getattr(settings, "AI_CHAT_MODEL", None),
         embedding_model=getattr(settings, "AI_EMBEDDING_MODEL", None),
+        embedding_api_url=getattr(settings, "AI_EMBEDDING_API_URL", None),
+        embedding_api_key=getattr(settings, "AI_EMBEDDING_API_KEY", None),
         timeout=getattr(settings, "AI_TIMEOUT", 30.0),
     )
     return _cached_adapter

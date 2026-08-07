@@ -30,14 +30,15 @@ def mock_db():
 
 
 @pytest.fixture
-def mock_adapter():
+def mock_adapter(monkeypatch):
+    monkeypatch.setattr("app.services.rag_index.settings.AI_EMBEDDING_DIM", 2048)
     adapter = AsyncMock()
 
     def _embed(texts):
-        return [[0.1] * 1536 for _ in texts]
+        return [[0.1] * 2048 for _ in texts]
 
     adapter.embed = AsyncMock(side_effect=_embed)
-    adapter.embed_one = AsyncMock(return_value=[0.1] * 1536)
+    adapter.embed_one = AsyncMock(return_value=[0.1] * 2048)
     return adapter
 
 
@@ -177,7 +178,7 @@ class TestIndexManualEmbeddingValidation:
     async def test_count_mismatch_raises(self, mock_db, mock_adapter):
         manual = _make_manual(parsed_content="x" * 2000)
         mock_db.execute.return_value = _scalar_result(manual)
-        mock_adapter.embed = AsyncMock(return_value=[[0.1] * 1536])  # only 1 vector
+        mock_adapter.embed = AsyncMock(return_value=[[0.1] * 2048])  # only 1 vector
         indexer = RagIndexer(mock_db)
         with pytest.raises(ValueError, match="count"):
             await indexer.index_manual("m1", adapter=mock_adapter)

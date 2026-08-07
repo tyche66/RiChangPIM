@@ -1,6 +1,6 @@
 # 04 - 接口规范（OpenAPI）
 
-> 本文档定义 AI-PIM 全部 RESTful API 契约，覆盖 15 个模块 65 个接口。
+> 本文档定义 AI-PIM 当前 RESTful API 业务契约。实际路由以运行中的 FastAPI `/openapi.json` 为机器可读基准；本文补充认证、权限、错误处理、SSE 和存储约束。
 > FastAPI 运行时会在 `/openapi.json` 自动生成机器可读的 OpenAPI 3.0 规范，本文档为人工契约定义，两者须保持一致。
 
 ---
@@ -11,7 +11,7 @@
 
 | 项目 | 规范 |
 | --- | --- |
-| 协议 | HTTPS（全站强制） |
+| 协议 | 本机 Compose 验收为 HTTP `:888`；公网部署由上游 TLS 终止层提供 HTTPS |
 | 风格 | RESTful |
 | 版本 | URL 路径版本 `/api/v1/` |
 | 数据格式 | JSON（`Content-Type: application/json`） |
@@ -23,7 +23,7 @@
 ### 1.2 命名规范
 
 - URL 路径：小写 + 连字符（kebab-case），资源名用复数
-- 请求/响应字段：小驼峰（camelCase）
+- 请求/响应字段：以当前 Pydantic schema 为准，业务字段主要使用 snake_case
 - 枚举值：小写 + 下划线（snake_case）
 
 ### 1.3 HTTP 方法语义
@@ -115,11 +115,11 @@
 
 ---
 
-## 四、接口总览（15 模块 / 65 接口）
+## 四、接口总览（运行时 OpenAPI 为准）
 
-| 模块 | 接口数 | 核心路径 |
+| 模块 | 当前覆盖范围 | 核心路径 |
 | --- | --- | --- |
-| 健康检查 | 1 | `/api/v1/health` |
+| 健康检查 | health、live、ready | `/api/v1/health`、`/health/live`、`/health/ready` |
 | 鉴权 | 5 | `/api/v1/auth/*` |
 | 用户管理 | 5 | `/api/v1/users` |
 | 角色权限 | 4 | `/api/v1/roles`, `/api/v1/permissions` |
@@ -131,9 +131,13 @@
 | 方案管理 | 6 | `/api/v1/proposals` |
 | 报价管理 | 5 | `/api/v1/quotations` |
 | 分享管理 | 4 | `/api/v1/shares`, `/api/v1/share/{token}` |
-| 文件管理 | 4 | `/api/v1/files` |
-| AI 对话 | 4 | `/api/v1/ai/*` |
-| 数据统计 | 2 | `/api/v1/stats/*` |
+| 文件管理 | 5 | `/api/v1/files` |
+| AI 与待确认动作 | `/ai/*`、`/ai/actions/*` | `/api/v1/ai/*` |
+| Knowledge Gateway | 查询与来源 | `/api/v1/knowledge/*` |
+| 文件、说明书、场景图 | 媒体、解析、缩略图 | `/api/v1/files/*`、`/manuals/*`、`/scene-images/*` |
+| 审计、观测、版本 | 日志、指标、运行状态 | `/api/v1/audit/*`、`/metrics`、`/ops/status`、`/version` |
+
+接口数量不在人工文档中固定维护，发布验收必须同时检查 `/openapi.json` 与本文新增业务说明。
 
 ---
 
@@ -508,13 +512,32 @@ POST /api/v1/products/{id}/clone
 
 > 复制产品基础信息（不含编号、附件、向量），生成 draft 状态副本，返回新产品 ID。
 
-### 8.8 批量导入产品
+### 8.8 批量导入产品（含产品图 / 场景图）
 
 ```
-POST /api/v1/products/import
+POST /api/v1/products/import?skipIfExists=false
 ```
 
-> 上传 Excel 文件（`multipart/form-data`，字段 `file`），按标准模板解析批量创建。返回成功/失败条数及失败详情。
+> `multipart/form-data`，字段 `file`；需 `product:import` 权限。上传形态二选一：
+>
+> - **`.xlsx` / `.xlsm`**：表格里贴着的图片也会被识别 —— WPS 的「嵌入单元格」（`DISPIMG`）、Excel 365 的「置于单元格内」（richValue）、压在某一行上的浮动图片，按图片落在哪一列决定归属；
+> - **`.zip`**：一个表格 + 一批图片文件。格里写图片文件名即可，或者干脆不写 —— 文件名以产品编号开头的图（`SUNON-001.jpg`、`SUNON-001_2.jpg`）自动归到该行，名字里带「场景 / scene / 效果图 / 实景」的进场景图。
+>
+> 图片列为 `主图`（第一张设为封面）、`产品图`、`场景图`。第三种给法「格里写 `http(s)` 直链」默认关闭（服务端替用户抓任意地址即 SSRF），要开由管理员置 `PRODUCT_IMPORT_ALLOW_URL_FETCH=true`，开启后每一跳都校验解析出的 IP 必须是公网地址。
+>
+> 同一张图（按 sha256）全批只上传一次、只建一条 `attachment`；同一张场景图被多行引用时只建一条 `scene_image`，由多个产品共享。
+>
+> 品牌 / 供应商 / 分类必须填系统里**已存在**的名称，导入不会替用户新建（三者在库里都是 NOT NULL 外键），三列有一列对不上这行就失败。
+>
+> 每行一个 SAVEPOINT：一行撞约束只回滚那一行，其余行照常入库。
+>
+> 默认上限：单文件 512MB、单次 5000 行、单张图片 20MB、每行 10 张产品图 / 30 张场景图（`PRODUCT_IMPORT_*` 配置项）。zip 成员按需解压，图片不会整包读进内存；文件上限与 nginx 的 `client_max_body_size` 必须一起改，否则用户只会看到网关那张 413 页面。
+
+**Query:**
+
+| 参数 | 类型 | 默认 | 说明 |
+| --- | --- | --- | --- |
+| `skipIfExists` | bool | `false` | 编号已存在时的失败原因写「编号已存在，已跳过」；`false` 时写「产品编号已存在」。两种情况都只进失败明细，不会覆盖已有产品 |
 
 **Response:**
 
@@ -526,13 +549,46 @@ POST /api/v1/products/import
     "success_count": 95,
     "fail_count": 5,
     "failures": [
-      { "row": 12, "product_no": "P-X1-001", "reason": "编号已存在" }
-    ]
+      { "row": 12, "product_no": "P-X1-001", "reason": "产品编号已存在" }
+    ],
+    "notes": ["第 8 行：面价为空，已按待核价（99999）导入并标记为待补充"],
+    "image_count": 143,
+    "scene_image_count": 20,
+    "uploaded_count": 96,
+    "image_sources": ["dispimg", "zip"],
+    "image_warnings": ["第 30 行主图列有多张图，第一张作封面，其余按产品图导入"],
+    "header_row": 1,
+    "unknown_headers": ["内部备注"],
+    "blank_rows": 2
   }
 }
 ```
 
-### 8.9 导出产品
+| 字段 | 说明 |
+| --- | --- |
+| `total` | 表里的数据行数（不含表头和空行） |
+| `success_count` / `fail_count` | 入库成功 / 失败的行数 |
+| `failures[]` | `row` 是 Excel 里的真实行号，`product_no` 可能为空（编号本身没填时），`reason` 多条原因用 `；` 连接 |
+| `notes` | 数据层面的提示（占位面价、字段截断、标签不存在等），不影响入库 |
+| `image_count` / `scene_image_count` | 实际绑定的产品图（含封面）/ 场景图条数，按行累计 |
+| `uploaded_count` | 真正写进对象存储的文件数；去重后通常小于 `image_count + scene_image_count` |
+| `image_sources` | 这批图是怎么取到的：`anchor`（浮动图片）、`dispimg`（WPS 嵌入单元格）、`richvalue`（Excel 置于单元格内）、`zip`（压缩包内文件名）、`convention`（压缩包内按编号前缀匹配）、`url`（外链抓取） |
+| `image_warnings` | 图片层面的提示（超限、格式不支持、直链未开启、单张传失败等），不影响该行入库 |
+| `header_row` | 识别到的表头所在行（表头不必是第一行，向下扫 16 行） |
+| `unknown_headers` | 没认出来、已忽略的列名 |
+| `blank_rows` | 跳过的空行数 |
+
+> 失败原因是给业务人员看的中文，例如「品牌「索菲亚」系统里没有，请先建好再导入」「表里有重复的产品编号，只导入第一次出现的那行」「面价无法识别：'面议价'」。
+
+### 8.9 下载导入模板
+
+```
+GET /api/v1/products/import-template
+```
+
+> 返回 xlsx 文件流（`Content-Disposition: attachment; filename="products_import_template.xlsx"`），需 `product:import` 权限。两张工作表：`产品`（列名即导入识别的表头，必填列带 `*`）与 `填写说明`（三种给图方式、主数据必须先建、面价占位值等规则）。列名与 8.10 导出产品保持一致，因此「导出 → 改 → 导回」这条路可用。
+
+### 8.10 导出产品
 
 ```
 GET /api/v1/products/export
@@ -977,6 +1033,56 @@ GET /api/v1/files/{attachment_id}/preview
   "data": {
     "preview_url": "https://minio.example.com/bucket/xxx?X-Amz-Signature=...",
     "expire_in": 900
+  }
+}
+```
+
+### 14.5 媒体库文件列表
+
+```
+GET /api/v1/files
+```
+
+> 鉴权：`media:view`。媒体库页面（后台 `/media`）的数据源，分页返回未删除的 attachment。
+
+| Query 参数 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| keyword | string | 否 | 文件名模糊匹配 |
+| file_type | string | 否 | image / video / pdf / doc / other，其余值返回 422（42201） |
+| referenced | bool | 否 | true 只看被产品图/场景图/说明书引用的，false 只看未引用的 |
+| sort | string | 否 | newest（默认，按上传时间倒序）/ nameAsc / nameDesc / size（按大小倒序），其余值返回 422（42206） |
+| page | int | 否 | 页码，默认 1 |
+| size | int | 否 | 每页条数，默认 20，最大 100 |
+
+> **排序必须是全序**：`sort` 的每种取值在服务端都会追加 `id` 作为末位比较键。
+> 带图导入会把成千个附件写成同一个 `create_time`，只按 `create_time` 排序时
+> `OFFSET/LIMIT` 的行序不确定，翻页会重复吐同一个文件、同时让另一些文件一页都进不去
+> （线上实测 3104 个文件里有 476 个翻不到）。新增排序字段时同样要带上 `id`。
+
+**Response:**
+
+```json
+{
+  "code": 200,
+  "data": {
+    "list": [
+      {
+        "id": "0192_att_1...",
+        "file_name": "产品图_X1.jpg",
+        "file_url": "https://pim.example.com/files/0192_att_1...",
+        "preview_url": "/api/v1/files/0192_att_1.../content?token=...",
+        "file_type": "image",
+        "file_size": 245678,
+        "storage_type": "minio",
+        "oss_key": "media/2026/08/xxx.jpg",
+        "create_time": "2026-08-01T10:00:00+00:00",
+        "update_time": "2026-08-01T10:00:00+00:00",
+        "ref_count": 2
+      }
+    ],
+    "total": 3104,
+    "page": 1,
+    "size": 20
   }
 }
 ```

@@ -195,6 +195,65 @@ async def test_media_list_search_and_filter(client: AsyncClient):
 
 
 # ---------------------------------------------------------------------------
+# 6b. 翻页必须能把每个文件都翻到一次（create_time 大量重复时也一样）
+# ---------------------------------------------------------------------------
+# 回归用例：带图导入会把几千个附件写成同一个 create_time（线上 3104 行只有 25 个
+# 不同的时间戳）。只按 create_time 排序时 OFFSET/LIMIT 的行序不确定，同一个文件
+# 会在两页里都出现、另一个文件哪一页都进不去（线上实测漏掉 476 个）。
+# 这里造一批同一时间戳的附件，逐页走完，断言「取到的 id 去重后正好是全部」。
+
+@pytest.mark.anyio
+async def test_media_list_paging_covers_every_file_with_tied_create_time(
+    client: AsyncClient, db: AsyncSession
+):
+    headers = await _auth_header(client)
+
+    tied_time = datetime.now(UTC) - timedelta(days=1)
+    marker = uuid4().hex[:8]
+    attachments = []
+    for i in range(10):
+        att = Attachment(
+            file_name=f"tied_{marker}_{i}.jpg",
+            file_url=f"/media/tied_{marker}_{i}.jpg",
+            file_type="image",
+            file_size=1024 + i,
+            oss_key=f"media/tied_{marker}_{i}.jpg",
+            create_time=tied_time,
+        )
+        db.add(att)
+        attachments.append(att)
+    # id 是 INSERT 时才生成的（CommonBase 上 default=uuid4），flush 之后才能读。
+    await db.flush()
+    expected_ids = {str(att.id) for att in attachments}
+    await db.commit()
+
+    for sort in ("newest", "nameAsc", "nameDesc", "size"):
+        seen: list[str] = []
+        for page in range(1, 6):
+            resp = await client.get(
+                f"/api/v1/files?keyword=tied_{marker}&sort={sort}&page={page}&size=2",
+                headers=headers,
+            )
+            assert resp.status_code == 200
+            data = resp.json()["data"]
+            assert data["total"] == 10
+            seen.extend(item["id"] for item in data["list"])
+
+        assert len(seen) == 10, f"sort={sort} 少返回了行"
+        assert len(set(seen)) == 10, f"sort={sort} 有文件被重复返回、另有文件翻不到"
+        assert set(seen) == expected_ids
+
+
+@pytest.mark.anyio
+async def test_media_list_rejects_unknown_sort(client: AsyncClient):
+    headers = await _auth_header(client)
+
+    resp = await client.get("/api/v1/files?sort=drop_table", headers=headers)
+    assert resp.status_code == 422
+    assert resp.json()["detail"]["code"] == 42206
+
+
+# ---------------------------------------------------------------------------
 # 7. Unreferenced media can be deleted
 # ---------------------------------------------------------------------------
 

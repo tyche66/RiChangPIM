@@ -8,7 +8,7 @@ FastAPI 后端（AI-PIM / RiChangPIM）。本文档聚焦「装后」必备步�
 cd backend
 python -m venv venv
 source venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 ```
 
 ## 2. 环境变量
@@ -37,7 +37,7 @@ alembic upgrade head
 
 `0004_seed_data` 为**数据迁移**，幂等：重复执行不会重复插入角色/权限/映射。
 
-当前 migration head 为 `0014_knowledge_tables`。`0012_product_scene_image_partial_unique`
+当前 migration head 为 `0017_operation_log_username`。`0012_product_scene_image_partial_unique`
 会先将 Alembic 版本列扩展为 `VARCHAR(64)`，以兼容长 revision ID；不要重命名已在运行数据库中记录的
 revision ID。
 
@@ -62,7 +62,7 @@ python -m app.scripts.seed_data --check
 python -m app.scripts.seed_data --no-admin
 ```
 
-种子内容（4 角色 / 多模块权限 / 角色-权限映射）见 `docs/seed-data.md`，与
+种子内容（4 角色 / 多模块权限 / 角色-权限映射）见 `backend/app/scripts/seed_data.py`，与
 `alembic/versions/0004_seed_data.py` 保持一致。
 
 ## 6. Docker 一键部署
@@ -174,6 +174,9 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 后端测试统一从 `backend/` 目录执行：
 
 ```bash
+# 测试环境需安装完整运行依赖和测试工具；requirements-dev 通过 -r
+# requirements.txt 继承全部生产依赖，避免两份清单漂移。
+pip install -r requirements-dev.txt
 PYTHONPATH=. pytest
 ```
 

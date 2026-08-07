@@ -70,6 +70,7 @@ async def login(request: Request, login_data: LoginRequest, db: AsyncSession = D
     _, role_code, perms = await _load_role_and_user(user.id, db)
 
     request.state.user_id = str(user.id)
+    user_id = str(user.id)
 
     # 登录时间要真的落库，用户管理里的「最后登录」才不是空壳。
     # 写失败不能把已经通过校验的登录卡住，所以单独 try 一次并降级为日志。
@@ -78,14 +79,15 @@ async def login(request: Request, login_data: LoginRequest, db: AsyncSession = D
         await db.commit()
     except Exception:  # noqa: BLE001
         await db.rollback()
-        logger.warning("last_login_time 写入失败 user_id=%s", user.id, exc_info=True)
+        # rollback expires ORM attributes; log the captured id instead of touching user.id here.
+        logger.warning("last_login_time 写入失败 user_id=%s", user_id, exc_info=True)
 
     access_token = create_access_token(
-        data={"sub": str(user.id), "role_code": role_code, "perms": perms},
+        data={"sub": user_id, "role_code": role_code, "perms": perms},
         expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
     )
     refresh_token = create_access_token(
-        data={"sub": str(user.id), "type": "refresh"},
+        data={"sub": user_id, "type": "refresh"},
         expires_delta=timedelta(days=7),
     )
     return {

@@ -133,6 +133,17 @@
       </div>
     </div>
 
+    <el-pagination
+      v-model:current-page="currentPage"
+      v-model:page-size="pageSize"
+      :total="total"
+      :page-sizes="[20, 40, 60, 100]"
+      layout="total, sizes, prev, pager, next, jumper"
+      class="media-pagination media-pagination-top"
+      @current-change="fetchData"
+      @size-change="handlePageSizeChange"
+    />
+
     <!-- Gallery Grid -->
     <div
       v-if="viewMode === 'grid'"
@@ -402,6 +413,17 @@
         </el-table-column>
       </el-table>
     </div>
+
+    <el-pagination
+      v-model:current-page="currentPage"
+      v-model:page-size="pageSize"
+      :total="total"
+      :page-sizes="[20, 40, 60, 100]"
+      layout="total, sizes, prev, pager, next, jumper"
+      class="media-pagination"
+      @current-change="fetchData"
+      @size-change="handlePageSizeChange"
+    />
 
     <!-- File Detail Drawer -->
     <el-drawer
@@ -790,6 +812,10 @@ const detailVisible = ref(false)
 const detailItem = ref<ExtendedMediaItem | null>(null)
 const bindings = ref<Bindings>({ coverImages: [], sceneImages: [], manuals: [] })
 const selectedFileIds = ref<string[]>([])
+const currentPage = ref(1)
+const pageSize = ref(20)
+const total = ref(0)
+let requestSerial = 0
 
 const previewVisible = ref(false)
 const previewItem = ref<ExtendedMediaItem | null>(null)
@@ -807,54 +833,33 @@ function typeLabel(type: string): string {
   return map[type] || type.toUpperCase()
 }
 
-// Filtered and sorted items
-const filteredItems = computed(() => {
-  let items = [...rawItems.value]
-
-  // Search filter
-  if (searchQuery.value) {
-    const q = searchQuery.value.toLowerCase()
-    items = items.filter(i => i.name.toLowerCase().includes(q))
-  }
-
-  // Type filter
-  if (typeFilter.value) {
-    items = items.filter(i => i.type === typeFilter.value)
-  }
-
-  // Reference filter
-  if (refFilter.value === 'referenced') {
-    items = items.filter(i => i.refCount > 0)
-  } else if (refFilter.value === 'unreferenced') {
-    items = items.filter(i => i.refCount === 0)
-  }
-
-  // Sort
-  switch (sortBy.value) {
-    case 'newest':
-      items.sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime())
-      break
-    case 'nameAsc':
-      items.sort((a, b) => a.name.localeCompare(b.name))
-      break
-    case 'nameDesc':
-      items.sort((a, b) => b.name.localeCompare(a.name))
-      break
-    case 'size':
-      items.sort((a, b) => b.size - a.size)
-      break
-  }
-
-  return items
-})
+/*
+ * 排序交给后端（/files 的 sort 参数）。
+ * 这里不能再按 sortBy 对 rawItems 重排：rawItems 只是当前这一页，本地排序
+ * 只会把这 20 条摆好看，跨页顺序还是后端那套 —— 选了「文件名 A-Z」翻到第 2 页
+ * 会看到又从中间某个字母开始。所以视图直接用后端给的顺序。
+ */
+const filteredItems = computed(() => rawItems.value)
 
 async function fetchData() {
+  const serial = ++requestSerial
   loading.value = true
   try {
     const typeParam = typeFilter.value || undefined
-    const list = await mediaApi.list({ search: searchQuery.value, type: typeParam })
+    const referenced = refFilter.value === 'referenced' ? true : refFilter.value === 'unreferenced' ? false : undefined
+    const result = await mediaApi.listPage({
+      search: searchQuery.value,
+      type: typeParam,
+      referenced,
+      sort: sortBy.value,
+      page: currentPage.value,
+      size: pageSize.value,
+    })
 
-    rawItems.value = list.map(item => ({ ...item, refCount: item.refCount || 0 }))
+    // Ignore a slower response from a previous filter/page request.
+    if (serial !== requestSerial) return
+    rawItems.value = result.list.map(item => ({ ...item, refCount: item.refCount || 0 }))
+    total.value = result.total
   } catch {
     ElMessage.error('加载数据失败')
   } finally {
@@ -863,8 +868,14 @@ async function fetchData() {
 }
 
 watch([searchQuery, typeFilter, refFilter, sortBy], () => {
+  currentPage.value = 1
   fetchData()
 })
+
+function handlePageSizeChange() {
+  currentPage.value = 1
+  fetchData()
+}
 
 fetchData()
 
@@ -1133,6 +1144,16 @@ async function handleBatchDelete() {
 
 .ml-sort {
   width: 130px;
+}
+
+.media-pagination {
+  justify-content: flex-end;
+  margin: 16px 0 4px;
+}
+
+.media-pagination-top {
+  margin-top: 0;
+  margin-bottom: 16px;
 }
 
 /* Gallery Grid */
@@ -1525,6 +1546,13 @@ async function handleBatchDelete() {
   .ml-gallery {
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
     gap: 10px;
+  }
+
+  .media-pagination {
+    justify-content: center;
+    flex-wrap: wrap;
+    height: auto;
+    row-gap: 8px;
   }
 
   .el-drawer {

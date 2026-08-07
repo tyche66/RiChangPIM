@@ -386,12 +386,17 @@ def _params_for_tool(
 ) -> dict[str, Any]:
     entities = plan.entities
     if tool_name == "product.search":
+        filters = dict(request.scope.filters)
+        if entities.price_max is not None:
+            filters["face_price_max"] = entities.price_max
+        if entities.price_min is not None:
+            filters["face_price_min"] = entities.price_min
         return {
             "keyword": None if entities.keywords else request.message[:80],
             "keywords": entities.keywords,
             "product_nos": entities.product_nos,
             "product_ids": entities.product_ids,
-            "filters": request.scope.filters,
+            "filters": filters,
             "sort_by": (
                 "face_price"
                 if entities.price_sort

@@ -2,7 +2,7 @@
 
 ## 当前发布状态
 
-- 当前版本：v1.9.0（annotated tag `v1.9.0`，2026-07-31，后台界面与产品列表体验成套改版；发布在 `main` 上）。
+- 当前版本：v1.9.1（2026-08-07，产品媒体导入、AI / Knowledge 增强、媒体分页与文档同步；发布在 `main` 上）。
 - 当前阶段：V1.9.x — 后台界面与交互打磨；AI 能力生产就绪的基线自 V1.8.0 起不变（Knowledge Gateway + AI Portal + 统一演示入口）。
   - AI_ADAPTER=openai 为默认（原 V1.2 默认为 none）
   - AI_CHAT_MODEL=agnes-2.5-flash（原 V1.2 默认为 agnes-2.0-flash）

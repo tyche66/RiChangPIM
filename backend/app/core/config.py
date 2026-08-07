@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     # 这个值是 APP_VERSION 没被注入时的兜底：原来写死 "0.1.0"，于是任何忘记传
     # 构建参数的部署（以及全部开发环境）都会在 /api/v1/version、/health、
     # OpenAPI 文档里报 0.1.0，和真实产品版本差了 8 个 MINOR。兜底值必须是真话。
-    VERSION: str = "1.9.0"
+    VERSION: str = "1.9.1"
     APP_VERSION: str | None = None
     BUILD_ID: str = "dev-local"
     GIT_COMMIT: str = "unknown"
@@ -67,6 +67,8 @@ class Settings(BaseSettings):
     AI_EMBEDDING_CACHE_MAX_ITEMS: int = 10000
     AI_EMBEDDING_DIM: int = 2048
     AI_TIMEOUT: float = 30.0
+    AI_EMBEDDING_API_KEY: str | None = None
+    AI_EMBEDDING_API_URL: str | None = None
     AI_TOOL_PLANNING_TIMEOUT: float = 8.0
     KNOWLEDGE_GATEWAY_ENABLED: bool = True
     AI_PENDING_ACTIONS_ENABLED: bool = True
@@ -94,6 +96,27 @@ class Settings(BaseSettings):
     AI_PRICING_BACKEND: str | None = None
 
     SHARE_IMAGE_URL_EXPIRE_HOURS: int = 24
+
+    # 批量导入产品（POST /api/v1/products/import）。带图导入的上传体积比纯表格大
+    # 两个数量级，所以每一项都要能按部署环境调，而不是写死在代码里。
+    #
+    # 上限是照真实供应商样本定的：圣奥那份「4255 行 + 4242 张图」的包，压缩后 259 MB、
+    # 解压后 394 MB。原来的 200MB / 2000 行会把它直接挡在门外，而拆成三份导入正是
+    # 「批量」想省掉的那份工。改这一项必须同时改 nginx 的 client_max_body_size
+    # （docker/nginx/conf.d/default.conf 的 location /api/v1/products/import），
+    # 否则用户在 nginx 那层就吃 413，压根到不了这个检查。
+    PRODUCT_IMPORT_MAX_FILE_BYTES: int = 512 * 1024 * 1024
+    PRODUCT_IMPORT_MAX_ROWS: int = 5000
+    PRODUCT_IMPORT_MAX_IMAGE_BYTES: int = 20 * 1024 * 1024
+    # 每行的图片上限跟 api/v1/products.py 的 MAX_PRODUCT_IMAGES /
+    # MAX_PRODUCT_SCENE_IMAGES 对齐；端点会再取两者的小值，配大了也不会越过接口上限。
+    PRODUCT_IMPORT_MAX_IMAGES_PER_ROW: int = 10
+    PRODUCT_IMPORT_MAX_SCENES_PER_ROW: int = 30
+    # 表格里写图片直链（http/https）时，服务端要替用户去 GET —— 那就是 SSRF 的入口。
+    # 校验（只放公网地址、逐跳复查重定向）在 services/product_import_media.guard_url，
+    # 但 DNS rebinding 仍有残留风险，所以默认关闭，只在来源可信的部署上手动打开。
+    PRODUCT_IMPORT_ALLOW_URL_FETCH: bool = False
+    PRODUCT_IMPORT_URL_TIMEOUT: float = 10.0
 
     def model_post_init(self, __context) -> None:
         if self.AI_API_KEY_FILE:

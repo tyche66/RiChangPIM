@@ -13,7 +13,10 @@ UUID_RE = re.compile(
     r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b"
 )
 PRODUCT_NO_RE = re.compile(r"\b[A-Za-z][A-Za-z0-9./_-]{2,63}\b")
-PRICE_RE = re.compile(r"(?:(\d+(?:\.\d+)?)\s*(?:元|块|rmb|RMB|以内|以下|以下)?)")
+PRICE_RE = re.compile(
+    r"(?:(\d+(?:\.\d+)?)\s*(?:元|块|rmb|RMB)|(?:预算|价格|面价)\s*(?:为|是|不超过|低于|以内)?\s*(\d+(?:\.\d+)?))",
+    re.IGNORECASE,
+)
 SECURITY_TERMS = (
     "sql",
     "select ",
@@ -97,9 +100,20 @@ class RuleBasedPlanner:
         entities.product_nos = _extract_product_nos(msg)
         entities.status_terms = [code for term, code in QUALITY_TERMS.items() if term in msg]
         entities.keywords = _keywords(msg, entities.product_nos)
-        prices = [float(x) for x in PRICE_RE.findall(msg) if float(x) != 99999]
+        prices = [
+            float(value)
+            for match in PRICE_RE.findall(msg)
+            for value in match
+            if value and float(value) != 99999
+        ]
         if prices:
             entities.price_max = max(prices)
+            price_tokens = {
+                str(int(price)) if price.is_integer() else str(price) for price in prices
+            }
+            entities.keywords = [
+                keyword for keyword in entities.keywords if keyword not in price_tokens
+            ]
         if any(x in msg for x in ("最便宜", "最低价", "价格最低")):
             entities.price_sort = "asc"
         if any(x in msg for x in ("最贵", "最高价", "价格最高")):
@@ -211,6 +225,11 @@ def _keywords(message: str, product_nos: list[str]) -> list[str]:
         if w not in {"比较", "哪个", "产品", "适合", "帮我", "一下"}
         and not re.search(r"[\u4e00-\u9fff]", w)
     ]
+    # Also extract alphanumeric tokens from mixed Chinese/English text (e.g., "MT标签" -> "MT")
+    mixed_tokens = re.findall(r"[A-Za-z0-9]{2,}", text)
+    for token in mixed_tokens:
+        if token not in out and token not in {"的", "产品", "有", "哪些"}:
+            out.append(token)
     for term in BUSINESS_TERMS:
         if term in text and term not in out:
             out.append(term)

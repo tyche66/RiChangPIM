@@ -85,6 +85,10 @@ class ProductSearchTool:
             value = params.filters.get(field)
             if value:
                 stmt = stmt.where(getattr(Product, field) == value)
+        if params.filters.get("face_price_min") is not None:
+            stmt = stmt.where(Product.face_price >= params.filters["face_price_min"])
+        if params.filters.get("face_price_max") is not None:
+            stmt = stmt.where(Product.face_price <= params.filters["face_price_max"])
         if params.sort_by == "face_price":
             direction = Product.face_price.desc() if params.sort_order == "desc" else Product.face_price.asc()
             stmt = stmt.order_by(case((Product.face_price == 99999, 1), else_=0), direction)
@@ -152,6 +156,7 @@ def _base_product_stmt():
         selectinload(Product.brand),
         selectinload(Product.category),
         selectinload(Product.supplier),
+        selectinload(Product.tags),
         selectinload(Product.images).joinedload(ProductImage.attachment),
     ).where(Product.is_deleted.is_(False))
 
@@ -163,6 +168,7 @@ def _search_term(keyword: str):
 
 def _search_term_exact(term: str):
     like = f"%{term}%"
+    from app.models.product import Tag
     return or_(
         Product.product_no.ilike(like),
         Product.product_name.ilike(like),
@@ -172,6 +178,9 @@ def _search_term_exact(term: str):
         Product.category.has(Category.category_name.ilike(like)),
         Product.brand.has(Brand.brand_name.ilike(like)),
         Product.supplier.has(Supplier.supplier_name.ilike(like)),
+        Product.tags.any(
+            Tag.tag_name.ilike(like) & Tag.is_deleted.is_(False)
+        ),
     )
 
 
@@ -235,5 +244,10 @@ def _product_card(p: Product, current_user: dict[str, Any]) -> dict[str, Any]:
         "specification_length_mm": _specification_length_mm(p.specification),
         "colors": p.colors,
         "description": p.description,
+        "tags": [
+            tag.tag_name
+            for tag in getattr(p, "tags", [])
+            if not getattr(tag, "is_deleted", False)
+        ],
         "cover_image_url": cover_image_url,
     }

@@ -1,5 +1,7 @@
 # AI-PIM RiChangPIM
 
+[English README](README_EN.md)
+
 RiChangPIM 是当前这套 AI-PIM 项目的工作快照，面向产品信息管理、产品导入、方案/报价、媒体资源、分享页和基础 AI 能力。
 
 这份 README 按常见项目文档结构组织，同时保留当前快照的代码索引、启动方式、数据位置和产品信息落点，便于交接、排障和复现。
@@ -33,13 +35,16 @@ RiChangPIM 是当前这套 AI-PIM 项目的工作快照，面向产品信息管�
 | OCR 服务 | `docker/ocr/` 容器内独立服务 |
 | AI 默认状态 | `AI_ADAPTER=openai`，`AI_CHAT_MODEL=agnes-2.5-flash` |
 | Knowledge Gateway | 默认启用（`KNOWLEDGE_GATEWAY_ENABLED=1`）|
-| 当前版本 | v1.9.0（版本号声明位置见 [CHANGELOG.md](CHANGELOG.md)） |
+| 当前正式版本 | v1.9.1（版本号声明位置见 [CHANGELOG.md](CHANGELOG.md)） |
 | 当前迁移 head | `0017_operation_log_username` |
 | 生产入口 | `http://127.0.0.1:888/`（Docker nginx `888:80`；门户 / 分享页 `/share/{token}` / `/admin/` / `/api/v1/*`） |
 | 管理后台入口 | `http://127.0.0.1:888/admin/`（生产 nginx）或 `http://127.0.0.1:5173/admin/`（演示服务器，公网隧道走它） |
 | 环境体检 | `bash scripts/where-am-i.sh`（**每次开工第一条命令**） |
 | 实机运维口径 | [README-OPS.md](README-OPS.md)、`/home/AI-PIM/从启动到穿透.md` |
 | 整机迁移 / 灾难恢复 | [MIGRATION_BUNDLE.md](MIGRATION_BUNDLE.md)（全量备份迁移包怎么打、怎么恢复） |
+| 云端生产升级 | [docs/云端更新包.md](docs/云端更新包.md) |
+| 数据卷 | [docs/数据卷与持久化存储.md](docs/数据卷与持久化存储.md) |
+| MinIO | [docs/MinIO对象存储.md](docs/MinIO对象存储.md) |
 | 主要种子入口 | `backend/app/scripts/seed_data.py` + `backend/alembic/versions/0004_seed_data.py` |
 | 产品试点数据文件 | `backend/data/sunon_pilot_products.json` |
 
@@ -47,6 +52,8 @@ RiChangPIM 是当前这套 AI-PIM 项目的工作快照，面向产品信息管�
 
 - 产品、分类、品牌、供应商、标签管理
 - 产品导入导出与试点数据导入
+- Excel / XLSM 内嵌图片、ZIP 图片和产品图 / 场景图批量导入
+- 导入模板下载、按行隔离失败、图片 SHA-256 去重和 MinIO 上传
 - 方案、报价、分享页与权限控制
 - 产品图片、场景图、说明书与媒体库管理
 - 质量看板与数据完整性辅助视图
@@ -62,7 +69,9 @@ RiChangPIM 是当前这套 AI-PIM 项目的工作快照，面向产品信息管�
 - `.env.example`：根级环境变量示例
 - `.env`：当前本地开发环境变量
 - `scripts/`：环境体检（`where-am-i.sh`）、前端构建（`build_frontends.sh`）、演示服务器、备份、恢复、健康检查、TLS 生成、发布门禁等脚本
-- `docs/`：需求、架构、数据库、接口、部署、测试等文档
+- `docs/`：当前需求、架构、数据库、接口、部署、测试和存储文档
+- `docs/过时/`：历史设计、规划、审查和旧部署文档，仅供追溯
+- `AI-Docs/`：独立的可插拔 AI 设计、规划和扩展文档
 - `backups/`：数据库备份与恢复演练文件
 - `docker/`：Nginx、Postgres 初始化、OCR 容器等基础设施配置
 
@@ -108,7 +117,7 @@ docker compose -f docker-compose.dev.yml up -d
 cd backend
 python -m venv venv
 source venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements-dev.txt  # 开发/测试；生产镜像使用 requirements.txt
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 # 3) 启动 Portal
@@ -385,7 +394,7 @@ docker compose build nginx && docker compose up -d --no-deps nginx
 - `backend/app/core/permissions.py`
 - `backend/app/core/permission.py`
 - `backend/app/scripts/seed_data.py`
-- `docs/seed-data.md`
+- `backend/app/scripts/seed_data.py`
 
 ## 初始化与种子
 
@@ -488,9 +497,11 @@ npm run build
 - `docs/07-开发规范.md`
 - `docs/08-开发路线图.md`
 - `docs/09-测试计划.md`
-- `docs/seed-data.md`
-- `docs/v1.0.1-交接文档.md`
-- `docs/v1.0.2-交接文档.md`
+- `AI-Docs/README.md`：可插拔 AI 设计与规划总入口
+- `docs/过时/README.md`：历史文档归档说明
+- `MIGRATION_BUNDLE.md`：全量迁移包制作与恢复
+- `README-OPS.md`：当前实机运维 runbook
+- `RELEASE_GATE.md`：发布门禁
 
 ## 运行约定
 

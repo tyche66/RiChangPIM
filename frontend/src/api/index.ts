@@ -1,4 +1,8 @@
-import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios'
+import axios, {
+  type AxiosError,
+  type AxiosProgressEvent,
+  type InternalAxiosRequestConfig,
+} from 'axios'
 import { ElMessage } from 'element-plus'
 import type {
   ApiEnvelope,
@@ -225,8 +229,32 @@ export const productApi = {
   clone: (id: string) => api.post(`/products/${id}/clone`),
   export: (params?: Record<string, unknown>) =>
     api.get('/products/export', { params, responseType: 'blob' }),
-  import: (data: unknown, params?: Record<string, unknown>) =>
-    api.post('/products/import', data, { params }),
+  importTemplate: () =>
+    api.get('/products/import-template', { responseType: 'blob' }) as unknown as Promise<Blob>,
+  /*
+   * 带图导入的请求跟别的接口不是一个量级：上传本身可能几十上百 MB，服务端还要解包、
+   * 逐张算 sha256、逐张传 MinIO。默认的 30s 超时会在后端还在干活时就把连接掀掉
+   * （前端报错、后端继续写库 → 用户以为失败、其实导入了一半）。
+   * 905s 是跟 nginx 的 proxy_read_timeout 900s（docker/nginx/nginx.conf 里
+   * location /api/v1/products/import）对齐，多留 5s 让网关先返回它的 504。
+   * suppressErrorMessage：Import.vue 要按 413 / 超时 / detail.msg 分别给提示，
+   * 不走拦截器那条通用 toast，否则同一个错误弹两遍。
+   */
+  import: (
+    data: unknown,
+    params?: Record<string, unknown>,
+    onProgress?: (percent: number) => void
+  ) =>
+    api.post('/products/import', data, {
+      params,
+      timeout: 905000,
+      suppressErrorMessage: true,
+      onUploadProgress: onProgress
+        ? (event: AxiosProgressEvent) => {
+            if (event.total) onProgress(Math.round((event.loaded * 100) / event.total))
+          }
+        : undefined,
+    }),
   bindProductImages: (id: string, data: { attachment_ids: string[] }) =>
     api.post(`/products/${id}/images`, data),
   unbindProductImage: (id: string, imageId: string) =>

@@ -26,7 +26,30 @@
 
 **不要去改的历史记录**（改了就是篡改发布史）：`BUILD_LOG.md` 的构建记录、`PROJECT_MANAGEMENT.md` 的发布台账、`TODO.md` 的「已发布」条目、`docs/08-开发路线图.md` 的里程碑行。`RELEASE_GATE.md` 已改成版本无关，不需要跟着版本走。
 
-## 已知缺口（本轮未修，属部署/CI 配置）
+## v1.9.1 — 2026-08-07
+
+本版本将当前工作区中尚未发布的产品媒体导入、Knowledge Gateway / AI 能力增强、媒体访问和运维编排改动统一发布，并同步项目文档与迁移交付物。
+
+### 产品与媒体导入
+
+- 产品批量导入支持 XLSX/XLSM 内嵌图片、ZIP 图片和按产品编号前缀自动归属。
+- 支持主图、产品附图和场景图绑定，按 SHA-256 去重并写入 MinIO。
+- 导入按行使用 SAVEPOINT 隔离失败，新增导入模板下载和图片处理结果明细。
+- 导入限制、外链抓取 SSRF 防护、图片格式和超时行为同步到 API 文档。
+
+### AI 与知识能力
+
+- 更新 OpenAI-compatible Adapter、Knowledge Gateway、模型规划、产品工具和推荐链路。
+- 保持 AI 业务数据回查、权限控制和待确认动作边界；AI-Docs 继续作为独立可插拔设计目录。
+
+### 运维与文档
+
+- 同步媒体访问、缩略图、nginx 上传限制和 Compose 配置。
+- 新增双语 README、数据卷文档、MinIO 文档和云端更新包文档。
+- 将历史概念方案、旧部署方案、旧路线图、审查 / 交付报告和未实现热插拔设计归档到 `docs/过时/`。
+- 创建 v1.9.1 全量迁移包和不含业务数据的云端更新包，包内均附 `1.9.1-V-Log.md`。
+
+### 已知缺口（本轮未修，属部署/CI 配置）
 
 - `docker-compose.yml` 把 `APP_VERSION` 默认成 `dev`。用 compose 起服务且没传 `APP_VERSION` 时，后端报的是 `dev`，压不到第 3 处的兜底值——兜底只在环境变量完全没设时生效。
   重建 backend 前必须按 `README-OPS.md`「升级发布 runbook」第 3 步导出 `APP_VERSION` / `BUILD_ID` /
@@ -37,9 +60,134 @@
   `BUILD_ID` / `GIT_COMMIT` / `BUILD_TIME`，「版本」页显示的是真话；但**裸 `npm run build` 仍会退化**
   成 `frontend/package.json` 的值 + `dev-local` + `unknown`。
 
-## 未发布
+### 媒体库分页修复（`GET /files` 排序改为全序 + 服务端排序）
 
-- （暂无）
+媒体库「没有翻页控件、也看不到全部文件」是两个独立原因叠在一起。翻页控件早就写在源码和
+`frontend/dist` 里，但线上跑的 nginx 镜像还是旧的，容器里 `MediaLibrary-ah9VSZWl.js` 一次
+`media-pagination` 都搜不到，且旧 `media` chunk 根本不发 `page` / `size`，后端按默认
+`size=20` 只给 20 条 —— 3104 个文件里看得见 20 个。更要紧的是第二个原因：即使翻页控件在，
+按当时的排序也翻不全。`ORDER BY create_time DESC` 不是全序（3104 行只有 25 个不同的
+`create_time`，其中 2637 行是同一次带图导入写下的同一个时间戳），并列行在 `OFFSET/LIMIT`
+下的先后是不确定的 —— 实测 32 页 × 100 条走完，拿回 3104 行里只有 2628 个不同 id，314 行重复、
+**476 个文件哪一页都翻不到**。
+
+- `backend/app/api/v1/files.py`：新增排序白名单 `_SORT_ORDERS`，四种排序（`newest` /
+  `nameAsc` / `nameDesc` / `size`）全部以 `Attachment.id` 结尾作末位比较键，让整体顺序唯一确定。
+  新增 `sort` 查询参数（默认 `newest`），不在白名单里返回 422 `42206`。修复后同样走 32 页：
+  `total` 3104、取回 3104 行、3104 个不同 id、0 重复 0 遗漏；`sort=nameAsc` 的分页序列与单条
+  `ORDER BY file_name, id` 全量查询逐行一致。
+- `frontend/src/api/media.ts`：`listPage` 透传 `sort`。
+- `frontend/src/views/MediaLibrary.vue`：删掉对 `rawItems` 的本地排序。本地排序只能把当前这
+  一页摆好看，跨页顺序还是后端那套 —— 选「文件名 A-Z」翻到第 2 页会从中间某个字母重新开始。
+  排序整体交给后端。
+- `backend/tests/test_media_and_permissions.py` 新增两条回归用例：造 10 个同一 `create_time`
+  的附件，四种排序各逐页走完，断言「取到的 id 去重后正好是全部」（这条用例在修复前的代码上
+  会以「有文件被重复返回、另有文件翻不到」失败）；以及未知 `sort` 必须 422 `42206`。
+- 文档：`docs/04-接口规范(OpenAPI).md` 原来没有 `GET /api/v1/files` 的条目，新增 §14.5
+  「媒体库文件列表」，写明六个查询参数、42201 / 42206，以及「**排序必须是全序**」——
+  以后加新排序字段也必须在末尾补 `id`。接口计数行「文件管理」由 4 改为 5。
+
+**本轮验证**：`vue-tsc --noEmit` 干净；`vitest run` 23 文件 / 184 通过；`eslint` 全量 11 error /
+54 warning，与既有基线一致，本轮改的两个前端文件 0 条；`ruff check app/api/v1/files.py` 3 条
+（UP028 + 两条 E501），与改动前的基线逐条相同，未新增；媒体套件 23 passed，媒体 + 场景 32 passed；
+后端全量 `5 failed, 577 passed, 2 skipped`，5 条失败均为环境原因（3 条 rag-indexer 需
+`AI_EMBEDDING_DIM=1536`，补上后该文件 16 条全通过；2 条版本用例需要容器里不存在的同级
+`frontend/package.json`）。构建先按要求跑了裸 `npm run build`（`✓ built in 6.51s`），随后按上面
+「已知缺口」用 `scripts/build_frontends.sh` 重跑以恢复 `/admin/` base 和真实版本元数据。
+
+**部署方式的例外**：`docker compose up -d` 目前会失败在
+`stat /run/guest-services/distro-services/richangpim.sock: no such file or directory`
+（Docker Desktop 对本 WSL 发行版的集成 socket 不存在），所以本轮是把新 dist 和改过的
+`files.py` 用 `docker cp` 送进正在运行的容器，再 `nginx -s reload` / `docker restart backend`
+完成的。`docker compose build nginx backend` 已经成功、镜像是新的，socket 问题解决后应按
+runbook 正常 `up -d --no-deps` 重建一次容器。
+
+### 批量导入支持产品图 / 场景图（`POST /products/import` 重写）
+
+导入接口原来只认文字列：表里贴着的图片、和表格一起发来的图片文件夹全都被丢掉，导完还得逐个产品手动上传主图
+—— 「批量」省下的工在这一步又赔回去了。本轮把三种给图方式接上，并把「一行失败带走整批」的老毛病改成按行隔离。
+
+- 新增 `backend/app/services/excel_images.py`：从 xlsx 里解出内嵌图片并算出它落在哪一行哪一列。
+  浮动图片（drawing anchor）、WPS 的「嵌入单元格」（`DISPIMG` + `cellimages.xml`）、
+  Excel 365 的「置于单元格内」（richValue）是三套不同的 OOXML 表示，各走一条路。
+- 新增 `backend/app/services/product_import.py`：表头识别（中英文别名、列名带 `*`、表头不必在第一行，
+  向下扫 16 行）+ 行解析（面价占位值 99999 ↔ `completeness_status=pending`、多值列拆分、超长截断）
+  + `build_import_template()` 生成模板（`产品` / `填写说明` 两页）。
+- 新增 `backend/app/services/product_import_media.py`：图片归属（主图列→封面、产品图列→附图、
+  场景图列→场景图）、zip 包解包、按产品编号前缀自动归属、外链抓取（默认关，带逐跳公网 IP 校验）、
+  sha256 批内去重 + MinIO 上传。
+- 重写 `POST /api/v1/products/import`：先把图片落到对象存储和 `attachment` / `scene_image`，
+  再按行开 SAVEPOINT 建产品并绑图。同一张图（按 sha256）全批只传一次、只建一条 attachment；
+  同一张场景图被多行引用时只建一条 `scene_image` 由多个产品共享。返回体新增
+  `image_count` / `scene_image_count` / `uploaded_count` / `image_sources` / `image_warnings` /
+  `header_row` / `unknown_headers` / `blank_rows`。
+- 新增 `GET /api/v1/products/import-template`（需 `product:import`）：Import.vue 里一直写着
+  「请下载模板文件」，却从来没有下载入口，用户只能照页面上那段中文说明猜列名。
+- 新增配置项 `PRODUCT_IMPORT_*`：单文件 512MB、单次 5000 行、单张图 20MB、每行 10 张产品图 +
+  30 张场景图、外链抓取开关与超时。
+- nginx（`docker/nginx/nginx.conf` 的两个 server + `docker/nginx/conf.d/default.conf`）给
+  `location /api/v1/products/import` 单独放宽：`client_max_body_size 512M`、
+  `proxy_send_timeout` / `proxy_read_timeout` 900s。server 级的 100M 没动，改动范围只落在这个接口。
+- 前端 `Import.vue`：模板下载入口、`accept=".xlsx,.xlsm,.zip"`、七条与后端行为对得上的填写说明、
+  上传进度条 + 「文件已送达，服务端正在处理」的第二阶段提示、图片张数 / 取图方式 / 图片提示三块结果展示。
+  `productApi.import` 超时从 30s 提到 905s（对齐 nginx 的 900s），并按 413 / 超时 / `detail.msg`
+  分别给中文话术；失败明细那一列的 `prop` 从 `productNo` 改成后端真实的 `product_no`（原来整列是空的）。
+- 文档：`docs/04-接口规范(OpenAPI).md` §8.8 按新返回体重写、新增 §8.9 模板下载（导出产品顺延为 §8.10）。
+
+**有意保留的边界**：品牌 / 供应商 / 分类不会被导入自动新建（三者在库里都是 NOT NULL 外键，主数据归各自的
+管理页维护，一个错别字凭空造出个品牌比这行导不进去更难收拾），所以在一个空系统里直接导模板会每行都失败；
+`http(s)` 直链默认不抓（服务端替用户 GET 任意地址就是 SSRF，要开由管理员置
+`PRODUCT_IMPORT_ALLOW_URL_FETCH=true`）；`.xls` 不再宣传（`requirements.txt` 里没有 xlrd）；
+gif / bmp / tiff 需要 Pillow 才能转成 png，装了就转、没装就跳过并在 `image_warnings` 里写明原因。
+
+**本轮验证**：`vitest run` 23 文件 / 184 通过、`vue-tsc --noEmit` 干净；ESLint 保持既有基线 10 errors / 0 warnings（未修改既有测试问题）；
+`backend/tests/unit/test_excel_images.py` + `test_product_import.py` + `test_product_import_media.py`
+本机 148 passed；导入媒体集成测试本机真实 PostgreSQL 测试库 5 passed；`ruff check` 仅保留
+`products.py:657` 和 `products.py:862` 两条既有 E501 基线，未新增错误。
+
+**真实样本实测（2026-08-03）**：圣奥样本表 4255 行、zip 259MB、包内 4242 张 JPG。
+仅监听 `127.0.0.1` 的本机 uvicorn 通过落盘假 MinIO 接收对象，未连接真实 MinIO；鉴权仍走
+`PermissionChecker("product:import")`，使用 `admin/admin123` 获取 token，没有绕过鉴权。HTTP 200，
+墙上时间 27.68s，进程 `VmHWM=995956 kB`（约 972.6 MiB）；返回 `success_count=4011`、
+`fail_count=244`、`image_sources=["zip"]`、`image_count=3998`、`scene_image_count=0`、
+`uploaded_count=3078`、`header_row=1`、`unknown_headers=[]`、`blank_rows=0`、`image_warnings=[]`。
+244 条失败全部是「分类为空（产品必须挂在分类下）」；另有 13 条成功行原始表的三种图片列
+均为空，zip 里也没有以这些产品编号命名的图片，所以这 13 个产品没有图片，不是导入丢失。
+数据库核对为 `product=4011`、`attachment=3078`、`product_image=3998`、`scene_image=0`、
+`product_scene_image=0`；3998 个有图产品各一张 `is_cover=true`，13 个无图产品没有封面；
+假 MinIO 落盘对象 3078 个，与 `uploaded_count` 一致。
+
+**本轮验证**：前端 `vue-tsc --noEmit` 干净、`vitest run` 23 文件 / 184 通过；后端 unit
+148 passed；导入媒体集成测试真实 PostgreSQL 测试库 5 passed。两份 nginx 容器配置使用临时
+包装配置和自签证书分别通过 `nginx -t`。重建 frontend/portal 产物后，dist 中已不存在旧的
+「仅支持 .xlsx / .xls 格式文件」提示。ruff 对本轮文件只剩既有 `products.py:657` 和 `:862`
+两条 E501 基线。
+
+**全量回归结果**：在本地 Docker Desktop 开发栈运行中，使用临时测试 MinIO 端口和
+`ai_pim_test`，全量 `pytest -q -p no:cacheprovider` 为 `582 passed, 1 warning`，耗时
+`124.30s`。期间修正了认证异常降级路径在 `rollback()` 后继续访问过期 ORM 属性的问题，
+并将迁移 schema 测试中遗留的 `0014_knowledge_tables` 断言更新为当前 head
+`0017_operation_log_username`。
+
+**未完成或不代表生产链路的验证**：裸 xlsx 对照上传未执行。真实样本导入仍使用落盘假
+MinIO；全量回归使用的是临时测试 MinIO，不等同于生产对象存储。nginx 做了容器配置语法
+校验，但没有启动生产云端 nginx。前端页面要等下一次 `docker compose build nginx` 才会
+包含新 dist，本轮没有重建 nginx 镜像。
+
+**本地 Docker Desktop 真实 HTTP 复测（2026-08-03）**：上面的限制已在本地开发栈补做。
+此前用户通过 `127.0.0.1:888` 上传 259MB zip 得到 413，原因是运行中的 nginx 容器仍是旧镜像，
+容器内 `default.conf` 只有 server 级 `client_max_body_size 100M`，没有新的导入 location。
+使用当前源码重建并仅重建本地 `backend` / `nginx` 后，容器内实际配置确认了
+`client_max_body_size 512M`、`proxy_send_timeout 900s`、`proxy_read_timeout 900s`。
+同一个 `271,838,487` 字节 zip 通过用户实际访问的 `http://127.0.0.1:888`，携带真实本地
+管理员 Bearer token，返回 HTTP 200，上传耗时 13.65s；首次导入因本地开发库缺少样本分类，
+538 行成功、3717 行按行失败。补齐样本 101 个非空分类后，以 `skipIfExists=true` 重试，
+3473 行成功、782 行按预期跳过，图片来源为 `zip`，图片计数 3463，上传对象 2637。
+前后两次合计覆盖 4011 个产品、3998 张产品图；没有再次出现 413。随后在干净的
+`ai_pim_test` 上用真实 uvicorn 和临时 MinIO 做裸 xlsx 对照，HTTP 200，`4011` 行成功、
+`244` 行因分类为空失败，`image_count=0`、`uploaded_count=0`；所有填写图片名的行都产生了
+“上传的文件里没有图片”的 `image_warnings`，文字导入没有被图片缺失整批阻断。
+
 
 ## v1.9.0 — 2026-07-31
 

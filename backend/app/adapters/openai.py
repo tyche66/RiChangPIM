@@ -64,6 +64,9 @@ class OpenAIConfig:
     embedding_model: str = "text-embedding-3-small"
     timeout: float = 30.0
     max_retries: int = 2
+    # Optional separate embedding endpoint (e.g., OpenRouter)
+    embedding_api_key: str | None = None
+    embedding_api_url: str | None = None
 
     def __post_init__(self):
         if not self.api_key:
@@ -74,6 +77,12 @@ class OpenAIConfig:
 
     def embedding_path(self) -> str:
         return "/embeddings"
+
+    def effective_embedding_api_key(self) -> str:
+        return self.embedding_api_key or self.api_key
+
+    def effective_embedding_api_url(self) -> str:
+        return self.embedding_api_url or self.api_url
 
 
 # ---------------------------------------------------------------------------
@@ -138,6 +147,17 @@ class OpenAIAdapter(AIServiceAdapter):
                 "Content-Type": "application/json",
             },
         )
+        # Separate client for embeddings if different endpoint
+        self._embedding_client = None
+        if cfg.embedding_api_url and cfg.embedding_api_url != cfg.api_url:
+            self._embedding_client = httpx.AsyncClient(
+                base_url=cfg.embedding_api_url.rstrip("/"),
+                timeout=httpx.Timeout(cfg.timeout),
+                headers={
+                    "Authorization": f"Bearer {cfg.effective_embedding_api_key()}",
+                    "Content-Type": "application/json",
+                },
+            )
 
     # ---------- context manager ----------
     async def __aenter__(self) -> OpenAIAdapter:
@@ -148,6 +168,8 @@ class OpenAIAdapter(AIServiceAdapter):
 
     async def aclose(self) -> None:
         await self._client.aclose()
+        if self._embedding_client:
+            await self._embedding_client.aclose()
 
     # ---------- chat ----------
     async def chat(
@@ -286,11 +308,13 @@ class OpenAIAdapter(AIServiceAdapter):
         expected_dim = get_vector_dim()
         out: list[list[float]] = []
         BATCH = 96
+        client = self._embedding_client or self._client
         for i in range(0, len(texts), BATCH):
             chunk = texts[i : i + BATCH]
             resp = await self._post(
                 self.cfg.embedding_path(),
                 {"model": self.cfg.embedding_model, "input": chunk},
+                client=client,
             )
             for item in sorted(resp.get("data") or [], key=lambda d: d.get("index", 0)):
                 vec = item.get("embedding")
@@ -361,12 +385,13 @@ class OpenAIAdapter(AIServiceAdapter):
         msgs.append({"role": "user", "content": message})
         return msgs
 
-    async def _post(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
+    async def _post(self, path: str, payload: dict[str, Any], client: httpx.AsyncClient | None = None) -> dict[str, Any]:
         attempts = 0
         last_msg: str | None = None
+        http_client = client or self._client
         while attempts <= self.cfg.max_retries:
             try:
-                r = await self._client.post(path, json=payload)
+                r = await http_client.post(path, json=payload)
                 if r.status_code >= 500:
                     raise httpx.HTTPStatusError(
                         f"{r.status_code}", request=r.request, response=r

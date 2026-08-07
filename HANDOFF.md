@@ -1,7 +1,7 @@
 # RiChangPIM 交接文档
 
 > 交接时间：2026-07-31
-> 版本基线：`v1.9.0`（已提交并推送 `main`，annotated tag `v1.9.0` 已推送）
+> 版本基线：`v1.9.1`（产品媒体导入、AI / Knowledge 增强、媒体分页与文档同步；发布详情见 `CHANGELOG.md`）
 > 下一棒方向：**管理后台（`frontend/`）界面美化 + 小部分功能调整**
 > 本文只服务「快速上手」——项目怎么跑、代码在哪、规矩是什么、当前基线是什么。具体任务由用户直接指派，见 §8。
 
@@ -215,6 +215,5 @@ docker compose -f docker-compose.dev.yml up -d
 
 6. 完整实机流程见 `/home/AI-PIM/从启动到穿透.md`（在仓库外，上一级目录）和 [README-OPS.md](README-OPS.md)。
    `docs/06-部署方案.md` 是方案文档，与实机有偏差，头部已标注。
-
 
 

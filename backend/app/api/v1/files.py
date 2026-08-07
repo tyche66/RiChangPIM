@@ -31,6 +31,21 @@ router = APIRouter()
 
 ALLOWED_FILE_TYPES = frozenset({"image", "video", "pdf", "doc", "other"})
 
+# 媒体库列表的排序白名单。键就是前端下拉框的值（MediaLibrary.vue 的 sortBy）。
+#
+# 每一项都必须以 id 结尾：create_time 在库里远不是唯一的（一次带图导入会把几千行
+# 写成同一个时间戳，实测 3104 行只有 25 个不同的 create_time），只按它排的话
+# OFFSET/LIMIT 每次翻页拿到的顺序都可能不一样 —— 同一个文件在两页里都出现，
+# 另一个文件哪一页都进不去。实测 32 页 × 100 条共 3104 行里只有 2628 个不同 id，
+# 476 个文件翻不到。id 是主键，作为末位比较键就能让整体顺序唯一确定。
+_SORT_ORDERS = {
+    "newest": lambda: (Attachment.create_time.desc(), Attachment.id.desc()),
+    "nameAsc": lambda: (Attachment.file_name.asc(), Attachment.id.asc()),
+    "nameDesc": lambda: (Attachment.file_name.desc(), Attachment.id.desc()),
+    "size": lambda: (Attachment.file_size.desc(), Attachment.id.desc()),
+}
+_DEFAULT_SORT = "newest"
+
 _ALLOWED = {
     "image/jpeg": ("image", 50 * 1024 * 1024),
     "image/png": ("image", 50 * 1024 * 1024),
@@ -99,6 +114,7 @@ async def list_files(
     keyword: str | None = None,
     file_type: str | None = None,
     referenced: bool | None = None,
+    sort: str = Query(_DEFAULT_SORT),
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
@@ -116,6 +132,12 @@ async def list_files(
                 detail={"code": 42201, "msg": f"不支持的文件类型筛选: {file_type}"},
             )
         query = query.where(Attachment.file_type == file_type)
+
+    if sort not in _SORT_ORDERS:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": 42206, "msg": f"不支持的排序方式: {sort}，可选 {list(_SORT_ORDERS)}"},
+        )
 
     if referenced is not None:
         has_product_image = (
@@ -141,7 +163,7 @@ async def list_files(
     total_result = await db.execute(select(func.count()).select_from(query.subquery()))
     total = total_result.scalar()
 
-    query = query.order_by(Attachment.create_time.desc())
+    query = query.order_by(*_SORT_ORDERS[sort]())
     query = query.offset((page - 1) * size).limit(size)
     result = await db.execute(query)
     attachments = result.scalars().all()

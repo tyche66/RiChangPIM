@@ -7,7 +7,7 @@
   - Knowledge Gateway 默认启用（KNOWLEDGE_GATEWAY_ENABLED=1）
   - Portal 演示服务器支持同源 /api 转发、/admin/ 反向代理
   - 演示脚本支持端口冲突检测、死进程清理、健康检查端点
-- 当前阶段: V1.9.x — 后台界面与交互打磨（建立在 V1.8.x 的 AI 能力生产就绪之上）；当前版本 v1.9.0，见 CHANGELOG.md。
+- 当前阶段: V1.9.x — 产品媒体导入、AI 能力与文档同步；当前版本 v1.9.1，见 CHANGELOG.md。
 - 发布门禁: RELEASE_GATE.md。
 
 ## V1.2 内部试点运营加固

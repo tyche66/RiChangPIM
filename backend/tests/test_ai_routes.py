@@ -414,13 +414,14 @@ class TestHealthProbes:
         with patch("app.main._check_db", return_value=True), \
              patch("app.main._check_redis", return_value=True), \
              patch("app.main._check_minio", return_value=True), \
-             patch("app.main._check_ai_ready", return_value=False):
+             patch("app.main._check_ai_ready", return_value=False), \
+             patch("app.main.settings.AI_ADAPTER", "openai"):
             result = await health_ready()
         assert result["status"] == "ready"
         assert result["components"]["db"] == "ok"
         assert result["components"]["redis"] == "ok"
         assert result["components"]["minio"] == "ok"
-        assert result["components"]["ai"] == "none"
+        assert result["components"]["ai"] == "configured"
 
     @pytest.mark.anyio
     async def test_ready_degraded_when_db_down(self):

@@ -112,14 +112,6 @@ class KnowledgeDocumentUpserter:
         document = await self._get_existing_document(payload.source_type, payload.source_id)
         now = datetime.now(UTC)
 
-        if document and not document.is_deleted and document.content_hash == payload.content_hash:
-            document.is_active = payload.is_active
-            document.visibility = payload.visibility
-            document.required_permission = payload.required_permission
-            document.last_indexed_at = payload.last_indexed_at or now
-            await self.db.flush()
-            return document
-
         if document is None:
             document = KnowledgeDocument(
                 source_type=payload.source_type,

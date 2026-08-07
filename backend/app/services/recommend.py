@@ -1,3 +1,4 @@
+import inspect
 import json
 import re
 from typing import Any
@@ -8,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.base import AIServiceAdapter
 from app.core.serializers import filter_sensitive_fields
-from app.models.product import Product, ProductTag
+from app.models.product import Product, ProductTag, Tag
 from app.schemas.ai import AIStatus, RecommendFilter
 
 SYSTEM_PROMPT = (
@@ -17,6 +18,7 @@ SYSTEM_PROMPT = (
     '"tag_ids": ["UUID", ...], "keywords": ["kw", ...], '
     '"stock_status": null|"in_stock"|"out_of_stock"|"preorder", '
     '"rationale": "<一句话>"}。严禁返回额外字段。'
+    '需求中提到的标签/系列名称（如某个具体标签或系列）应视为对应标签的 tag_ids。'
 )
 
 
@@ -85,6 +87,32 @@ class RecommendService:
             rationale = ""
 
         filter_raw = {k: v for k, v in raw.items() if k != "rationale"}
+
+        # All tag name -> UUID mapping (preprocess)
+        tag_result = await self.db.execute(select(Tag).where(Tag.is_deleted.is_(False)))
+        tag_scalars = tag_result.scalars()
+        if inspect.isawaitable(tag_scalars):
+            tag_scalars = await tag_scalars
+        tag_rows = tag_scalars.all()
+        if inspect.isawaitable(tag_rows):
+            tag_rows = await tag_rows
+        tag_map = {
+            tag_name: tag.id
+            for tag in tag_rows
+            if isinstance(tag_name := getattr(tag, "tag_name", None), str) and tag_name
+        }
+        tag_ids_to_inject = []
+        for tag_name, tag_uuid in tag_map.items():
+            if tag_name and tag_name in requirement:
+                tag_ids_to_inject.append(str(tag_uuid))
+        if tag_ids_to_inject:
+            existing_tag_ids = filter_raw.get("tag_ids", [])
+            if not isinstance(existing_tag_ids, list):
+                existing_tag_ids = []
+            # Combine without duplicates, preserving existing UUID strings
+            combined = list(dict.fromkeys(existing_tag_ids + tag_ids_to_inject))
+            filter_raw["tag_ids"] = combined
+
         try:
             filters_obj = RecommendFilter(**filter_raw)
         except ValidationError:

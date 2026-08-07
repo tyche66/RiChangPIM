@@ -493,7 +493,12 @@
             :key="row.id"
             class="product-tile"
             :class="{ 'is-selected': proposalMode && selectedIds.has(row.id) }"
+            role="button"
+            tabindex="0"
+            :aria-label="`查看产品 ${row.productName}`"
             @click="handleGridTileClick(row)"
+            @keydown.enter="handleGridTileClick(row)"
+            @keydown.space.prevent="handleGridTileClick(row)"
           >
             <div class="product-tile-image">
               <el-image

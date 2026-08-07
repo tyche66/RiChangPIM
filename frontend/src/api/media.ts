@@ -52,20 +52,47 @@ interface FileItem {
 
 class MediaService {
   async list(params: { search?: string; type?: string }): Promise<MediaItem[]> {
+    const result = await this.listPage({ ...params, page: 1, size: 100 })
+    return result.list
+  }
+
+  async listPage(params: {
+    search?: string
+    type?: string
+    referenced?: boolean
+    sort?: string
+    page?: number
+    size?: number
+  }): Promise<{ list: MediaItem[]; total: number; page: number; size: number }> {
     const queryParams: Record<string, string> = {}
     if (params.search) queryParams.keyword = params.search
     if (params.type && params.type !== 'all') queryParams.file_type = params.type
+    if (params.referenced !== undefined) queryParams.referenced = String(params.referenced)
+    if (params.sort) queryParams.sort = params.sort
+    queryParams.page = String(params.page || 1)
+    queryParams.size = String(params.size || 20)
 
     try {
-      const resp: any = await api.get('/files', { params: queryParams })
-      const data = resp?.data || resp
-      if (data?.list) {
-        return data.list.map((f: FileItem) => this._toMediaItem(f))
+      const resp: any = await api.get('/files', {
+        params: queryParams,
+        headers: { 'Cache-Control': 'no-cache' },
+      })
+      // Axios is unwrapped once by the shared interceptor, but tolerate both
+      // `{ data: { list, total } }` and `{ list, total }` responses so a
+      // proxied/older backend cannot silently reduce the library to one page.
+      const payload = resp?.data?.data || resp?.data || resp
+      if (payload?.list) {
+        return {
+          list: payload.list.map((f: FileItem) => this._toMediaItem(f)),
+          total: Number(payload.total ?? payload.list.length),
+          page: Number(payload.page || params.page || 1),
+          size: Number(payload.size || params.size || 20),
+        }
       }
     } catch (err) {
       console.error('[MediaAPI] Failed to load media list:', err)
     }
-    return []
+    return { list: [], total: 0, page: params.page || 1, size: params.size || 20 }
   }
 
   async upload(file: File): Promise<MediaItem> {
