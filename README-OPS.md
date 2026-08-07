@@ -249,7 +249,7 @@ docker compose config --quiet
 
 发版时打的那种一体包（源码 + git bundle + 库 + 卷 + env，约 240 MB）见
 **[MIGRATION_BUNDLE.md](MIGRATION_BUNDLE.md)**：怎么打、怎么恢复、怎么校验、保密要求都在那里。
-包放在仓库外的 `/home/AI-PIM/`，当前最新一份是 `RiChangPIM_v1.9.0_20260731_215300.tar.gz`。
+包放在仓库外的 `/home/AI-PIM/`，当前最新一份是 `RiChangPIM_v1.9.1_20260807_111932.tar.gz`。
 本节下面讲的是日常备份。
 
 ### ⚠️ 先读这条：`db_backup.sh` / `backup.sh` 在本机连不到生产库
