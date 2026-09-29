@@ -254,4 +254,33 @@ watch(dialogVisible, async (val) => {
     width: 100%;
   }
 }
+
+/* 深色模式覆盖 */
+:global(.dark-mode) .share-result-dialog :deep(.el-dialog) {
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+:global(.dark-mode) .share-result-dialog :deep(.el-dialog__header) {
+  background: linear-gradient(135deg, rgba(244, 244, 244, 0.06), rgba(244, 244, 244, 0.02));
+  border-bottom-color: rgba(244, 244, 244, 0.06);
+}
+
+:global(.dark-mode) .share-result-dialog :deep(.el-dialog__title) {
+  color: #f4f4f4;
+}
+
+:global(.dark-mode) .qr-canvas {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+:global(.dark-mode) .capsule-btn-primary {
+  background: rgba(244, 244, 244, 0.85);
+  border-color: rgba(244, 244, 244, 0.85);
+  color: rgb(25, 39, 68);
+}
+
+:global(.dark-mode) .capsule-btn-primary:hover {
+  background: rgba(244, 244, 244, 0.92);
+  border-color: rgba(244, 244, 244, 0.92);
+}
 </style>

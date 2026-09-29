@@ -258,4 +258,9 @@ function removeUpload(id: string) {
 .upload-progress {
   margin-top: 4px;
 }
+
+/* 深色模式覆盖 */
+:global(.dark-mode) .upload-item {
+  background: rgba(25, 39, 68, 0.72);
+}
 </style>

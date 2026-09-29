@@ -1840,4 +1840,27 @@ onMounted(fetchData)
   gap: 4px;
   flex-shrink: 0;
 }
+
+/* 深色模式覆盖 */
+:global(.dark-mode) .selected-media-more {
+  background: rgba(244, 244, 244, 0.72);
+  color: rgb(25, 39, 68);
+}
+
+:global(.dark-mode) .si-toolbar {
+  background: rgba(25, 39, 68, 0.72);
+}
+
+:global(.dark-mode) .gallery-card {
+  background: #192744;
+  border-color: rgba(244, 244, 244, 0.08);
+}
+
+:global(.dark-mode) .gallery-card:hover {
+  border-color: rgba(244, 244, 244, 0.2);
+}
+
+:global(.dark-mode) .si-list {
+  background: rgba(25, 39, 68, 0.72);
+}
 </style>

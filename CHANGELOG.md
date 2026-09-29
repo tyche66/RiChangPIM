@@ -26,6 +26,50 @@
 
 **不要去改的历史记录**（改了就是篡改发布史）：`BUILD_LOG.md` 的构建记录、`PROJECT_MANAGEMENT.md` 的发布台账、`TODO.md` 的「已发布」条目、`docs/08-开发路线图.md` 的里程碑行。`RELEASE_GATE.md` 已改成版本无关，不需要跟着版本走。
 
+## v1.9.2 — 2026-09-29
+
+本版本修复 AI 门户查询结果区的三类缺陷（卡片网格退化、推荐卡片不出图、答案 Markdown 原文直出），后台新增深色模式，并补一个非 Docker 的本机一键启动脚本。
+
+### 门户（portal）：查询结果区修复
+
+查询结果区此前有三处互相独立的缺陷：结果一多整堆卡片退化成普通网格、未查询时推荐卡片不显示图片、答案里的 Markdown 被当纯文本原样输出。
+
+- `HeroDeck.vue` 重写：固定 5 个卡位（中心 + 左右各两环）做叠卡，`SLOT_ORDER` 按张数选卡位（1→中心；2→左右内环；3→中心+内环；4→两对内外环；≥5→全部），删掉原先「`products.length <= 9` 时才扇形、超过就落 `hero-deck--grid` 三列平铺」的分支，`:class` 恒为 `hero-deck--fan`。结果超过 5 条时用 `windowStart` 做循环窗口；滚轮用**函数 ref 手动挂 non-passive 监听**并 `preventDefault()`（模板 `@wheel` 在某些场景不可靠，passive 下 `preventDefault` 无效还会打警告），220ms 手势合并窗口防止触控板惯性连跳；键盘 `↑↓←→/PageUp/PageDown`（卡堆 `tabindex=0`）与窄屏「上一组/下一组」按钮共用同一 `step()`。卡片 key 为 `variant-index-业务ID`，轮换时数据索引与卡位一对一；`watch(() => props.products)` 在换一次查询时归零窗口（同时盯 length 和数组引用，同数量的重查也能复位）。
+- `ProductCard.vue`：`failedUrl` 记录**哪一条地址**失败而非布尔值，`onError` 判重避免重复触发，换地址时 watch + `:key` 重置；媒体区固定 `aspect-ratio` + 图标文字占位块，加载前后卡片高度一致；新增 `data-image-state="ok|error|missing"` 便于排障。状态显式分流为 loading / empty / recommend / placeholder，不再互相顶替。
+- `AnswerBody.vue` 改为 Markdown 渲染容器 + 角标事件委托。
+- `Conversation.vue`：`deckMode` 收敛为五种互斥状态并补文档注释。
+- 新增 `utils/image.ts`：图片 URL 统一解析。按优先级做字段兼容（`cover_image_url` → 13 个别名字段 → `images[].file_url` → `scene_images`），递归取第一个可用值；协议白名单（http/https/blob、`//` 协议相对、`data:image/*` 放行，`javascript:` 等判死）。修的是「有产品图但没设 `is_cover`」的产品 `cover_image_url` 为 `null`、前端没有回退字段、直接渲染占位块（表现为卡片不显示图片）的问题。`Product.cover_image`（`backend/app/models/product.py:138`）只在某张图显式 `is_cover=True` 时才返回，而 `is_cover` 仅由媒体导入流程写入，所以产品完全有图也可能取不到主图。**后端 `is_cover` 语义本轮未改**——那会影响详情页/分享页/报价等多个接口，超出本次范围；产品完全没有图片时（`images` 为空）仍是数据问题，只能显示统一占位块。
+- 新增 `utils/markdown.ts`：无第三方依赖的 Markdown → 安全 HTML 渲染器，自写块级（标题/分隔线/代码块/引用/有序无序列表含嵌套/表格含对齐/段落软换行）与行内（粗体/斜体/删除线/行内代码/链接）解析。**安全模型**是不在输入上预转义，而是在输出时对每段文本 `escapeHtml`，最终 HTML 里出现的标签全部由本文件生成；链接走协议白名单；答案里的 `<img>` / `<script>` 被当纯文本转义，无注入面。
+- `citations.ts` 新增 `answerSource()` / `citationInfoOf()`，并把角标折成私有区占位符（markdown 语法字符里没有这两个码位，解析不会动它），由 `markdown.ts` 在行内阶段还原为 `<button class="citation" data-source>`。复制答案、答案容器样式、`.citation` / `.citation--unresolved` 样式全部保留。
+- `main.css`：叠卡卡位/固定高度/overflow、`.md-*` 排版（行高 1.85、标题/段落/列表间距、`.md-table-scroll` 横向滚动、`.md-pre` 代码块与等宽字体）、占位与骨架卡。同时删除 `.product-grid` 死规则。
+- `AppHeader.vue`：新增 `showSubLabel` 属性，查询工作台（chat）把左上角让位给右上角的「进入后台 / 退出」两个文字入口，登录页和分享页保持默认 `true` 不动「门户」字样。
+- 新增 `tests/e2e/deck-markdown.spec.ts`：15 条验收用例。
+
+### 后台（frontend）：深色模式
+
+- 新增 `components/ThemeToggle.vue`：切换 `document.documentElement` 的 `dark-mode` class，写入 `localStorage`，未设置时跟随 `prefers-color-scheme`。
+- `layouts/MainLayout.vue` 头部新增 `.header-actions` 容器，把主题切换和原来的账户 chip 并列。
+- `styles/design-system.css` 与各视图补深色模式覆盖（`--bg-mist` / `--glass-bg` / `--text-primary` / `--brand-*` 等变量与玻璃拟态组件）。
+
+### 运维脚本
+
+- 新增 `scripts/start_local_stack.sh`：非 Docker 的本机一键启动/停止/重启/查询，拓扑为 nginx `:888`（门户 `/`、后台 `/admin/`、`/api` 反代 `127.0.0.1:8000`）+ backend `:8000` + 本机原生 PG18 `:5433` + redis `:6379` + minio `:9100`。脚本里的 MinIO 与数据库口令是它为本机栈自设的默认值，**不是生产凭据**（生产 MinIO 凭据只存在于 `.env`，未进仓库；生产实跑的是 `minioadmin` / `minioadmin123`）。
+- 新增 `scripts/reembed_missing.py`：为缺失 embedding 的知识块补算。
+- `scripts/windows_demo_ports.ps1`：`3001` 的默认目标端口由 `5173` 改为 `888`，公网入口直接落生产 nginx，不再经过演示服务器。
+
+### 文档
+
+- 新增 `docs/9-17新增数据仪表盘需求实现计划.md`。
+- `README.md`「管理后台入口」一栏同步为生产 nginx，去掉已废弃的演示服务器端口。
+
+**本轮验证**：`scripts/build_frontends.sh` 构建通过（`vue-tsc --noEmit` 0 error；admin `✓ built in 6.43s`、portal `✓ built in 1.19s`）；按本文件顶部清单重建 nginx 镜像与容器后，`:888` 六个入口（`/` `/chat` `/admin` `/admin/` `/share/` `/api/v1/health`）全部 200，容器内 8 个 portal 资产与宿主机构建产物 **md5 逐一一致**，真实浏览器渲染无白屏、无控制台报错；`scripts/secret_scan.sh` 0 hits。门户 e2e（含新增 15 条）在桌面 + 移动两个项目下全绿。
+
+**已知缺口（本轮未修）**
+
+- 后端 `/api/v1/health` 在本机报 `"version":"dev"`：`docker-compose.yml` 把 `APP_VERSION` 默认成 `dev`，压不到第 3 处的兜底值。要让版本页说真话，需按 `README-OPS.md`「升级发布 runbook」导出 `APP_VERSION` / `BUILD_ID` / `GIT_COMMIT` / `BUILD_TIME` 后重建 backend。
+- 本轮未跑后端全量 `pytest` 与后台 `playwright test`（前端已跑 `vue-tsc --noEmit` + 构建 + 门户 e2e）。合并前应补跑 `版本控制规范和Git.md` §7 发布门禁。
+- 门户窄屏（≤1024px）仍是横向 scroll-snap 卡片带而非扇形，为满足「移动端避免卡片溢出屏幕」的既有设计决策。
+
 ## v1.9.1 — 2026-08-07
 
 本版本将当前工作区中尚未发布的产品媒体导入、Knowledge Gateway / AI 能力增强、媒体访问和运维编排改动统一发布，并同步项目文档与迁移交付物。

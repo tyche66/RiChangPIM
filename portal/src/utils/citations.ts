@@ -106,3 +106,29 @@ export function citationIndexBySource(citations: CitationRef[]): Record<string, 
   }
   return map
 }
+
+/**
+ * 引用角标在 Markdown 解析期间用的私有区占位符。
+ * Markdown 语法字符里没有这两个码位，所以块级/行内解析都不会动它们，
+ * utils/markdown 会在行内阶段把它们还原成可点击的角标按钮。
+ */
+const CITATION_OPEN = '\uE000'
+const CITATION_CLOSE = '\uE001'
+
+/** 把分段后的答案还原成「带引用占位符的 Markdown 源文本」。 */
+export function answerSource(segments: AnswerSegment[]): string {
+  return segments
+    .map((segment) =>
+      segment.kind === 'text' ? segment.text : `${CITATION_OPEN}${segment.index}${CITATION_CLOSE}`,
+    )
+    .join('')
+}
+
+/** Markdown 渲染需要的引用信息（角标序号 → 来源）。 */
+export function citationInfoOf(
+  segments: AnswerSegment[],
+): Array<{ index: number; sourceId: string | null; token: string }> {
+  return segments
+    .filter((segment): segment is Extract<AnswerSegment, { kind: 'citation' }> => segment.kind === 'citation')
+    .map((segment) => ({ index: segment.index, sourceId: segment.sourceId, token: segment.token }))
+}

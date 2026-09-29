@@ -634,4 +634,27 @@ async function unbind(sceneImageId: string) {
   color: var(--text-secondary);
   line-height: 1.5;
 }
+
+/* 深色模式覆盖 */
+:global(.dark-mode) .image-card {
+  border-color: rgba(244, 244, 244, 0.08);
+  background: #192744;
+}
+
+:global(.dark-mode) .image-card:hover {
+  border-color: rgba(244, 244, 244, 0.2);
+}
+
+:global(.dark-mode) .scene-thumb-img :deep(img) {
+  background: #192744;
+}
+
+:global(.dark-mode) .selector-card {
+  background: #192744;
+  border-color: rgba(244, 244, 244, 0.08);
+}
+
+:global(.dark-mode) .selector-card:hover {
+  border-color: var(--el-color-primary-light-3);
+}
 </style>

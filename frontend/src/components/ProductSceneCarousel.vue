@@ -340,4 +340,38 @@ onUnmounted(() => {
     right: 8px;
   }
 }
+
+/* 深色模式覆盖 */
+:global(.dark-mode) .scene-card {
+  background: rgba(25, 39, 68, 0.72);
+  border-color: rgba(244, 244, 244, 0.08);
+}
+
+:global(.dark-mode) .scene-label {
+  color: #f4f4f4;
+}
+
+:global(.dark-mode) .scene-sublabel {
+  color: rgba(244, 244, 244, 0.5);
+}
+
+:global(.dark-mode) .scene-placeholder {
+  background: rgba(25, 39, 68, 0.5);
+}
+
+:global(.dark-mode) .scene-title {
+  color: #f4f4f4;
+}
+
+:global(.dark-mode) .scene-desc {
+  color: rgba(244, 244, 244, 0.6);
+}
+
+:global(.dark-mode) .dot {
+  background: rgba(244, 244, 244, 0.3);
+}
+
+:global(.dark-mode) .dot.active {
+  background: rgb(244, 244, 244);
+}
 </style>

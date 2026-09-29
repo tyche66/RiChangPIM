@@ -411,4 +411,27 @@ onMounted(fetchSuppliers)
     max-width: 95vw !important;
   }
 }
+
+/* 深色模式覆盖 */
+:global(.dark-mode) .suppliers-page {
+  background: #192744;
+}
+
+:global(.dark-mode) .suppliers-page :deep(.el-card) {
+  background: rgba(25, 39, 68, 0.68);
+  border-color: rgba(244, 244, 244, 0.1);
+  box-shadow: 0 4px 32px rgba(0, 0, 0, 0.2);
+}
+
+:global(.dark-mode) .toolbar h2 {
+  color: rgb(244, 244, 244);
+}
+
+:global(.dark-mode) .action-link {
+  color: rgba(244, 244, 244, 0.78);
+}
+
+:global(.dark-mode) .action-link:hover {
+  color: rgba(244, 244, 244, 0.98);
+}
 </style>

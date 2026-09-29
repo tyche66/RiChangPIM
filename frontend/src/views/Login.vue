@@ -361,4 +361,29 @@ const handleLogin = async () => {
     margin-bottom: 24px;
   }
 }
+
+/* 深色模式覆盖 */
+:global(.dark-mode) .login-page {
+  background:
+    radial-gradient(circle at 85% 12%, rgba(244, 244, 244, 0.06), transparent 26rem),
+    #192744;
+}
+
+:global(.dark-mode) .login-shell {
+  background: rgba(25, 39, 68, 0.5);
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.3);
+}
+
+:global(.dark-mode) .form-kicker {
+  color: rgba(244, 244, 244, 0.45);
+}
+
+:global(.dark-mode) .form-heading h2 {
+  color: rgba(244, 244, 244, 0.9);
+}
+
+:global(.dark-mode) .form-heading p,
+:global(.dark-mode) .security-note {
+  color: rgba(244, 244, 244, 0.52);
+}
 </style>

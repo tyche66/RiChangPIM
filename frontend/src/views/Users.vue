@@ -629,4 +629,15 @@ onMounted(() => {
     max-width: 95vw !important;
   }
 }
+
+/* 深色模式覆盖 */
+:global(.dark-mode) .users-page {
+  background: #192744;
+}
+
+:global(.dark-mode) .users-page :deep(.el-card) {
+  background: rgba(25, 39, 68, 0.68);
+  border-color: rgba(244, 244, 244, 0.1);
+  box-shadow: 0 4px 32px rgba(0, 0, 0, 0.2);
+}
 </style>

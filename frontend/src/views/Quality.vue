@@ -527,4 +527,23 @@ onMounted(async () => {
     min-width: 88px;
   }
 }
+
+/* 深色模式覆盖 */
+:global(.dark-mode) .stat-pill {
+  background: rgba(25, 39, 68, 0.72);
+  border-color: rgba(244, 244, 244, 0.08);
+}
+
+:global(.dark-mode) .stat-num {
+  color: rgba(244, 244, 244, 0.85);
+}
+
+:global(.dark-mode) .stat-label {
+  color: rgba(244, 244, 244, 0.6);
+}
+
+:global(.dark-mode) .state-empty {
+  border-color: rgba(244, 244, 244, 0.18);
+  color: rgba(244, 244, 244, 0.6);
+}
 </style>

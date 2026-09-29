@@ -774,4 +774,44 @@ onMounted(loadManuals)
     width: 100% !important;
   }
 }
+
+/* 深色模式覆盖 */
+:global(.dark-mode) .manuals-page {
+  --brand-deep: rgba(244, 244, 244, 0.92);
+  --brand-primary: rgba(244, 244, 244, 0.85);
+  --brand-light: rgba(244, 244, 244, 0.08);
+  --brand-lighter: rgba(244, 244, 244, 0.04);
+  --text-primary: #f4f4f4;
+  --text-secondary: rgba(244, 244, 244, 0.6);
+  --bg-mist: #192744;
+  --glass-bg: rgba(25, 39, 68, 0.72);
+  --glass-border: rgba(25, 39, 68, 0.5);
+  --shadow-soft: 0 4px 24px rgba(0, 0, 0, 0.2);
+}
+
+:global(.dark-mode) .hero-card {
+  background: linear-gradient(135deg, rgba(25, 39, 68, 0.92), rgba(15, 118, 110, 0.9));
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+:global(.dark-mode) .glass-card :deep(.el-card__header) {
+  border-bottom-color: rgba(244, 244, 244, 0.06);
+}
+
+:global(.dark-mode) .capsule-input :deep(.el-input__wrapper) {
+  background: rgba(25, 39, 68, 0.72);
+  box-shadow: 0 0 0 1px rgba(244, 244, 244, 0.1) inset;
+}
+
+:global(.dark-mode) .capsule-input :deep(.el-input__wrapper):focus-within {
+  box-shadow: 0 0 0 1px rgba(244, 244, 244, 0.25) inset;
+}
+
+:global(.dark-mode) .capsule-input :deep(.el-input__wrapper):hover {
+  box-shadow: 0 0 0 1px rgba(244, 244, 244, 0.25) inset;
+}
+
+:global(.dark-mode) .glass-item {
+  border-color: rgba(244, 244, 244, 0.06);
+}
 </style>

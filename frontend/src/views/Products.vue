@@ -2357,4 +2357,97 @@ watch([viewMode, proposalMode], () => {
     flex-shrink: 0;
   }
 }
+
+/* 深色模式覆盖 */
+:global(.dark-mode) .products-page {
+  --brand-deep: rgba(244, 244, 244, 0.92);
+  --brand-primary: rgba(244, 244, 244, 0.85);
+  --brand-light: rgba(244, 244, 244, 0.08);
+  --brand-lighter: rgba(244, 244, 244, 0.04);
+  --text-primary: #f4f4f4;
+  --text-secondary: rgba(244, 244, 244, 0.6);
+  --bg-mist: #192744;
+  --glass-bg: rgba(25, 39, 68, 0.72);
+  --glass-border: rgba(25, 39, 68, 0.5);
+  --shadow-soft: 0 4px 24px rgba(0, 0, 0, 0.2);
+  --shadow-hover: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+:global(.dark-mode) .glass-card :deep(.el-card__header) {
+  border-bottom-color: rgba(244, 244, 244, 0.06);
+}
+
+:global(.dark-mode) .view-mode-toggle :deep(.el-radio-button__inner) {
+  background: rgba(25, 39, 68, 0.72);
+  box-shadow: 0 0 0 1px rgba(244, 244, 244, 0.08) inset;
+}
+
+:global(.dark-mode) .product-tile {
+  background: rgba(25, 39, 68, 0.72);
+  border-color: rgba(244, 244, 244, 0.08);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+:global(.dark-mode) .product-tile:hover {
+  border-color: rgba(244, 244, 244, 0.28);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.25);
+}
+
+:global(.dark-mode) .product-tile-image {
+  background: linear-gradient(180deg, rgba(244, 244, 244, 0.03), rgba(244, 244, 244, 0.01));
+}
+
+:global(.dark-mode) .product-tile-name {
+  color: rgba(244, 244, 244, 0.92);
+}
+
+:global(.dark-mode) .product-tile-meta {
+  color: rgba(244, 244, 244, 0.42);
+}
+
+:global(.dark-mode) .product-tile-price {
+  color: rgba(244, 244, 244, 0.7);
+}
+
+:global(.dark-mode) .detail-section {
+  background: rgba(25, 39, 68, 0.72);
+  border-color: rgba(244, 244, 244, 0.06);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
+}
+
+:global(.dark-mode) .detail-section-header {
+  border-bottom-color: rgba(244, 244, 244, 0.06);
+}
+
+:global(.dark-mode) .detail-section-title {
+  color: rgba(244, 244, 244, 0.92);
+}
+
+:global(.dark-mode) .detail-section-subtitle {
+  color: rgba(244, 244, 244, 0.52);
+}
+
+:global(.dark-mode) .capsule-number :deep(.el-input__wrapper) {
+  background: rgba(25, 39, 68, 0.72);
+  box-shadow: 0 0 0 1px rgba(244, 244, 244, 0.1) inset;
+}
+
+:global(.dark-mode) .glass-dialog :deep(.el-dialog) {
+  background: rgba(25, 39, 68, 0.92);
+  border-color: rgba(244, 244, 244, 0.1);
+}
+
+:global(.dark-mode) .batch-hint {
+  background: rgba(244, 244, 244, 0.06);
+  border-color: rgba(244, 244, 244, 0.12);
+}
+
+:global(.dark-mode) .batch-hint-text {
+  color: rgba(244, 244, 244, 0.7);
+}
+
+:global(.dark-mode) .thumb-img :deep(img) {
+  background: #192744;
+}
+
 </style>

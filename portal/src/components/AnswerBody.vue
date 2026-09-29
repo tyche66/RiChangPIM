@@ -1,10 +1,18 @@
 <script setup lang="ts">
 /**
- * 答案正文。原始 `[chunk:uuid]` 标记已在 utils/citations 折叠成脚注角标，
- * 点角标可以打开对应来源，引用关系不丢。
+ * 答案正文。两件事：
+ * 1. Markdown 可视化渲染——标题、粗斜体、列表、表格、引用、分隔线、链接、
+ *    行内代码与代码块全部由 utils/markdown 渲染成真实元素，不再直接吐
+ *    `##` / `---` / `**文字**` / 原始表格分隔符。markdown.ts 对输入先做
+ *    HTML 转义、再只输出白名单标签，答案里的 HTML 没有注入面。
+ * 2. 引用角标——`[chunk:uuid]` 已被 utils/citations 折叠成私有区占位符，
+ *    markdown.ts 在这里还原成 `<button class="citation">`，点击通过事件
+ *    委托派发给来源弹层，引用关系不丢。
  */
 import { computed } from 'vue'
 import type { AnswerSegment } from '@/utils/citations'
+import { answerSource, citationInfoOf } from '@/utils/citations'
+import { renderMarkdown } from '@/utils/markdown'
 
 const props = withDefaults(
   defineProps<{ segments: AnswerSegment[]; placeholder?: string }>(),
@@ -12,49 +20,22 @@ const props = withDefaults(
 )
 const emit = defineEmits<{ open: [sourceId: string] }>()
 
-type Piece = {
-  key: string
-  isCitation: boolean
-  text: string
-  index: number
-  sourceId: string
-  token: string
-}
+const html = computed(() => renderMarkdown(answerSource(props.segments), citationInfoOf(props.segments)))
 
-const pieces = computed<Piece[]>(() =>
-  props.segments.map((segment, position) => {
-    if (segment.kind === 'text') {
-      return { key: `t${position}`, isCitation: false, text: segment.text, index: 0, sourceId: '', token: '' }
-    }
-    return {
-      key: `c${position}`,
-      isCitation: true,
-      text: String(segment.index),
-      index: segment.index,
-      sourceId: segment.sourceId || '',
-      token: segment.token,
-    }
-  }),
-)
+/** 事件委托：角标是 v-html 生成的按钮，统一在容器上接一次点击。 */
+function onClick(event: MouseEvent) {
+  const target = event.target
+  if (!(target instanceof Element)) return
+  const button = target.closest('button.citation')
+  if (!(button instanceof HTMLButtonElement)) return
+  const sourceId = button.dataset.source
+  if (sourceId) emit('open', sourceId)
+}
 </script>
 
 <template>
-  <div class="answer-body">
-    <template v-for="piece in pieces" :key="piece.key">
-      <span v-if="!piece.isCitation">{{ piece.text }}</span>
-      <button
-        v-else-if="piece.sourceId"
-        type="button"
-        class="citation"
-        :aria-label="`查看第 ${piece.index} 条引用来源`"
-        @click="emit('open', piece.sourceId)"
-      >
-        {{ piece.index }}
-      </button>
-      <span v-else class="citation citation--unresolved" :title="`引用标记 ${piece.token} 未匹配到来源`">
-        {{ piece.index }}
-      </span>
-    </template>
-    <span v-if="!pieces.length && placeholder" class="answer-body__placeholder">{{ placeholder }}</span>
+  <div class="answer-body" @click="onClick">
+    <div v-if="html" class="answer-body__markdown" v-html="html" />
+    <span v-else-if="placeholder" class="answer-body__placeholder">{{ placeholder }}</span>
   </div>
 </template>

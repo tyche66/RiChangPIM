@@ -1,7 +1,7 @@
 param(
   [string]$WslIp = '198.18.0.1',
   [int]$FrontendListenPort = 3001,
-  [int]$FrontendTargetPort = 5173,
+  [int]$FrontendTargetPort = 888,
   [int]$BackendListenPort = 8000,
   [int]$BackendTargetPort = 8000,
   [int]$AiListenPort = 888,
@@ -44,6 +44,6 @@ Write-Host '==> portproxy configured:'
 
 Write-Host ''
 Write-Host '==> Funnel commands:'
-Write-Host "tailscale funnel $FrontendListenPort   # recommended public AI Portal / demo entry"
+Write-Host "tailscale funnel $FrontendListenPort   # public entry -> WSL 888 (nginx)"
 Write-Host "tailscale funnel $BackendListenPort"
-Write-Host "tailscale funnel $AiListenPort         # optional direct Docker nginx entry"
+Write-Host "tailscale funnel $AiListenPort         # optional direct nginx entry (same as 3001)"

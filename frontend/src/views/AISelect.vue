@@ -310,4 +310,9 @@ onBeforeUnmount(() => {
     border-radius: 22px;
   }
 }
+
+/* 深色模式覆盖 */
+:global(.dark-mode) .portal-stage {
+  background: #1a2540;
+}
 </style>

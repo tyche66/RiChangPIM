@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     # 这个值是 APP_VERSION 没被注入时的兜底：原来写死 "0.1.0"，于是任何忘记传
     # 构建参数的部署（以及全部开发环境）都会在 /api/v1/version、/health、
     # OpenAPI 文档里报 0.1.0，和真实产品版本差了 8 个 MINOR。兜底值必须是真话。
-    VERSION: str = "1.9.1"
+    VERSION: str = "1.9.2"
     APP_VERSION: str | None = None
     BUILD_ID: str = "dev-local"
     GIT_COMMIT: str = "unknown"

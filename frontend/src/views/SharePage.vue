@@ -704,4 +704,36 @@ onMounted(() => {
   color: #999;
   font-family: monospace;
 }
+
+/* 深色模式覆盖 */
+:global(.dark-mode) .share-page {
+  background: linear-gradient(135deg, #192744 0%, #0f1a2e 100%);
+}
+
+:global(.dark-mode) .brand-logo {
+  color: rgb(244, 244, 244);
+}
+
+:global(.dark-mode) .brand-subtitle {
+  color: rgba(244, 244, 244, 0.6);
+}
+
+:global(.dark-mode) .share-card {
+  background: rgba(25, 39, 68, 0.72);
+  border-color: rgba(244, 244, 244, 0.1);
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.2);
+}
+
+:global(.dark-mode) .share-card :deep(.el-card__header) {
+  background: rgba(244, 244, 244, 0.04);
+  border-bottom-color: rgba(244, 244, 244, 0.08);
+}
+
+:global(.dark-mode) .card-title {
+  color: rgb(244, 244, 244);
+}
+
+:global(.dark-mode) .product-name-text {
+  color: rgb(244, 244, 244);
+}
 </style>

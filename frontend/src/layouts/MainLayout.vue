@@ -124,19 +124,22 @@
               <h1>{{ pageTitle }}</h1>
             </div>
           </div>
-          <button
-            class="user-chip"
-            type="button"
-            aria-label="账户操作"
-            title="账户操作"
-            @click="accountDialogVisible = true"
-          >
-            <span class="avatar">{{ userInitial }}</span>
-            <span class="user-copy">
-              <small class="user-label">当前用户</small>
-              <strong>{{ displayName }}</strong>
-            </span>
-          </button>
+          <div class="header-actions">
+            <ThemeToggle />
+            <button
+              class="user-chip"
+              type="button"
+              aria-label="账户操作"
+              title="账户操作"
+              @click="accountDialogVisible = true"
+            >
+              <span class="avatar">{{ userInitial }}</span>
+              <span class="user-copy">
+                <small class="user-label">当前用户</small>
+                <strong>{{ displayName }}</strong>
+              </span>
+            </button>
+          </div>
         </div>
       </el-header>
       <el-main>
@@ -196,6 +199,7 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Cpu, Document, DocumentCopy, InfoFilled, Menu, Setting } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
+import ThemeToggle from '@/components/ThemeToggle.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -424,6 +428,12 @@ const handleSwitchUser = async () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .header-heading,
@@ -660,5 +670,59 @@ const handleSwitchUser = async () => {
   .el-main {
     padding-top: 10px;
   }
+}
+
+/* 深色模式覆盖 */
+:global(.dark-mode) .el-header {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(25, 39, 68, 0.72);
+  box-shadow: 0 14px 45px rgba(0, 0, 0, 0.2);
+}
+
+:global(.dark-mode) .eyebrow {
+  color: rgba(244, 244, 244, 0.48);
+}
+
+:global(.dark-mode) .header-heading h1 {
+  color: rgba(244, 244, 244, 0.9);
+}
+
+:global(.dark-mode) .menu-toggle,
+:global(.dark-mode) .user-chip {
+  color: rgba(244, 244, 244, 0.8);
+}
+
+:global(.dark-mode) .menu-toggle {
+  background: rgba(244, 244, 244, 0.08);
+}
+
+:global(.dark-mode) .user-chip {
+  background: rgba(244, 244, 244, 0.12);
+}
+
+:global(.dark-mode) .user-copy strong {
+  color: rgba(244, 244, 244, 0.88);
+}
+
+:global(.dark-mode) .user-copy small {
+  color: rgba(244, 244, 244, 0.48);
+}
+
+:global(.dark-mode) .account-copy strong {
+  color: rgba(244, 244, 244, 0.92);
+}
+
+:global(.dark-mode) .account-copy small {
+  color: rgba(244, 244, 244, 0.5);
+}
+
+:global(.dark-mode) .account-hint {
+  color: rgba(244, 244, 244, 0.56);
+}
+
+:global(.dark-mode) .account-btn--strong {
+  border-color: rgb(244, 244, 244);
+  background: rgb(244, 244, 244);
+  color: rgb(25, 39, 68);
 }
 </style>

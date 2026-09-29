@@ -535,4 +535,36 @@ async function handlePickerSelect(payload: MediaItem | MediaItem[]) {
   color: var(--text-secondary);
   line-height: 1.5;
 }
+
+/* 深色模式覆盖 */
+:global(.dark-mode) .glass-dialog :deep(.el-dialog) {
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+:global(.dark-mode) .glass-dialog :deep(.el-dialog__header) {
+  background: linear-gradient(135deg, rgba(244, 244, 244, 0.06), rgba(244, 244, 244, 0.02));
+  border-bottom-color: rgba(244, 244, 244, 0.06);
+}
+
+:global(.dark-mode) .image-card {
+  background: #192744;
+  border-color: rgba(244, 244, 244, 0.08);
+}
+
+:global(.dark-mode) .image-card:hover {
+  border-color: rgba(244, 244, 244, 0.2);
+}
+
+:global(.dark-mode) .product-thumb-img :deep(img) {
+  background: #192744;
+}
+
+:global(.dark-mode) .add-zone {
+  background: rgba(25, 39, 68, 0.72);
+  border-color: rgba(244, 244, 244, 0.08);
+}
+
+:global(.dark-mode) .add-zone:hover {
+  border-color: rgba(244, 244, 244, 0.28);
+}
 </style>

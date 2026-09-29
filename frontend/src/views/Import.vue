@@ -576,4 +576,36 @@ onMounted(() => {
     font-size: 18px;
   }
 }
+
+/* 深色模式覆盖 */
+:global(.dark-mode) .import-page {
+  background: #192744;
+}
+
+:global(.dark-mode) .import-page :deep(.el-card) {
+  background: rgba(25, 39, 68, 0.68);
+  border-color: rgba(244, 244, 244, 0.1);
+  box-shadow: 0 4px 32px rgba(0, 0, 0, 0.2);
+}
+
+:global(.dark-mode) .toolbar h2 {
+  color: rgb(244, 244, 244);
+}
+
+:global(.dark-mode) .progress-hint {
+  color: #f4f4f4;
+}
+
+:global(.dark-mode) .upload-dropzone :deep(.el-upload-dragger) {
+  border-color: rgba(244, 244, 244, 0.2);
+}
+
+:global(.dark-mode) .upload-dropzone :deep(.el-upload-dragger:hover) {
+  border-color: rgb(244, 244, 244);
+  background: rgba(244, 244, 244, 0.03);
+}
+
+:global(.dark-mode) .failures-table h4 {
+  color: #f4f4f4;
+}
 </style>

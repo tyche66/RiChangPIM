@@ -115,6 +115,52 @@
   --el-fill-color-light: rgba(var(--pim-brand), 0.04);
 }
 
+/* 深色模式 */
+.dark-mode {
+  --pim-brand: 244, 244, 244;
+  --pim-primary: rgb(var(--pim-brand));
+  --pim-primary-90: rgba(var(--pim-brand), 0.9);
+  --pim-primary-80: rgba(var(--pim-brand), 0.8);
+  --pim-primary-60: rgba(var(--pim-brand), 0.6);
+  --pim-primary-12: rgba(var(--pim-brand), 0.12);
+  --pim-primary-06: rgba(var(--pim-brand), 0.06);
+  --pim-text: #f4f4f4;
+  --pim-muted: rgba(var(--pim-brand), 0.6);
+  --pim-canvas: #192744;
+  --pim-glass: rgba(25, 39, 68, 0.68);
+  --pim-glass-strong: rgba(25, 39, 68, 0.84);
+  --pim-border: rgba(25, 39, 68, 0.72);
+  --pim-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  --pim-text-strong: rgba(var(--pim-brand), 0.92);
+  --pim-text-soft: rgba(var(--pim-brand), 0.54);
+  --pim-text-faint: rgba(var(--pim-brand), 0.38);
+  --pim-line: rgba(var(--pim-brand), 0.08);
+  --pim-line-strong: rgba(var(--pim-brand), 0.14);
+  --pim-copper: 230, 139, 81;
+  --pim-accent: rgb(var(--pim-copper));
+  --pim-accent-mid: rgb(181, 109, 61);
+  --pim-accent-deep: rgb(155, 97, 62);
+  --pim-brand-lift: rgb(184, 189, 198);
+  
+  --el-color-primary: rgb(var(--pim-brand));
+  --el-color-primary-light-3: rgba(var(--pim-brand), 0.72);
+  --el-color-primary-light-5: rgba(var(--pim-brand), 0.5);
+  --el-color-primary-light-7: rgba(var(--pim-brand), 0.22);
+  --el-color-primary-light-8: rgba(var(--pim-brand), 0.12);
+  --el-color-primary-light-9: rgba(var(--pim-brand), 0.06);
+  --el-text-color-primary: #f4f4f4;
+  --el-text-color-regular: rgba(var(--pim-brand), 0.72);
+  --el-border-color: rgba(var(--pim-brand), 0.1);
+  --el-fill-color-light: rgba(var(--pim-brand), 0.04);
+}
+
+.dark-mode body {
+  background:
+    radial-gradient(circle at 8% 12%, rgba(25, 39, 68, 0.95), transparent 28rem),
+    radial-gradient(circle at 92% 8%, rgba(var(--pim-brand), 0.08), transparent 26rem),
+    var(--pim-canvas);
+}
+
 html {
   background: var(--pim-canvas);
 }

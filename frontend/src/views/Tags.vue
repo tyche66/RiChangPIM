@@ -472,4 +472,58 @@ onMounted(fetchTags)
     max-width: 95vw !important;
   }
 }
+
+/* 深色模式覆盖 */
+:global(.dark-mode) .tags-page {
+  background: #192744;
+}
+
+:global(.dark-mode) .tags-page :deep(.el-card) {
+  background: rgba(25, 39, 68, 0.68);
+  border-color: rgba(244, 244, 244, 0.1);
+  box-shadow: 0 4px 32px rgba(0, 0, 0, 0.2);
+}
+
+:global(.dark-mode) .toolbar-title h2 {
+  color: rgb(244, 244, 244);
+}
+
+:global(.dark-mode) .toolbar-title p {
+  color: rgba(244, 244, 244, 0.52);
+}
+
+:global(.dark-mode) .tag-group {
+  background: rgba(25, 39, 68, 0.72);
+  border-color: rgba(244, 244, 244, 0.06);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
+}
+
+:global(.dark-mode) .tag-group-title {
+  color: rgba(244, 244, 244, 0.92);
+}
+
+:global(.dark-mode) .tag-group-meta {
+  color: rgba(244, 244, 244, 0.52);
+}
+
+:global(.dark-mode) .tag-chip {
+  background: rgba(244, 244, 244, 0.03);
+  border-color: rgba(244, 244, 244, 0.05);
+}
+
+:global(.dark-mode) .tag-chip-name {
+  color: rgba(244, 244, 244, 0.92);
+}
+
+:global(.dark-mode) .tag-chip-type {
+  color: rgba(244, 244, 244, 0.56);
+}
+
+:global(.dark-mode) .action-link {
+  color: rgba(244, 244, 244, 0.78);
+}
+
+:global(.dark-mode) .action-link:hover {
+  color: rgba(244, 244, 244, 0.98);
+}
 </style>

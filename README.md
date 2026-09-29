@@ -35,10 +35,10 @@ RiChangPIM 是当前这套 AI-PIM 项目的工作快照，面向产品信息管�
 | OCR 服务 | `docker/ocr/` 容器内独立服务 |
 | AI 默认状态 | `AI_ADAPTER=openai`，`AI_CHAT_MODEL=agnes-2.5-flash` |
 | Knowledge Gateway | 默认启用（`KNOWLEDGE_GATEWAY_ENABLED=1`）|
-| 当前正式版本 | v1.9.1（版本号声明位置见 [CHANGELOG.md](CHANGELOG.md)） |
+| 当前正式版本 | v1.9.2（版本号声明位置见 [CHANGELOG.md](CHANGELOG.md)） |
 | 当前迁移 head | `0017_operation_log_username` |
 | 生产入口 | `http://127.0.0.1:888/`（Docker nginx `888:80`；门户 / 分享页 `/share/{token}` / `/admin/` / `/api/v1/*`） |
-| 管理后台入口 | `http://127.0.0.1:888/admin/`（生产 nginx）或 `http://127.0.0.1:5173/admin/`（演示服务器，公网隧道走它） |
+| 管理后台入口 | `http://127.0.0.1:888/admin/`（生产 nginx；`:888/admin` 会 301 到带尾斜杠的） |
 | 环境体检 | `bash scripts/where-am-i.sh`（**每次开工第一条命令**） |
 | 实机运维口径 | [README-OPS.md](README-OPS.md)、`/home/AI-PIM/从启动到穿透.md` |
 | 整机迁移 / 灾难恢复 | [MIGRATION_BUNDLE.md](MIGRATION_BUNDLE.md)（全量备份迁移包怎么打、怎么恢复） |

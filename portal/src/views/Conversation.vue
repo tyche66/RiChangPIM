@@ -11,9 +11,12 @@
  *    对使用者没有意义的内容统一折进「技术详情」，默认收起。
  * 2. 后端枚举、字段名和占位值一律经 utils/format 翻译，不直接渲染。
  * 3. 正文里的 [chunk:uuid] 由 utils/citations 折成脚注角标，引用关系不丢。
- * 4. 卡片堆默认放推荐产品，AI 返回产品后整堆替换；取不到推荐（门户
- *    viewer 没有 product:view）就退化成空白占位卡，**不编造数据**。
+ * 4. 卡片堆始终是叠卡（最多 5 张），结果超过 5 张时在卡堆内用滚轮循环
+ *    翻页，页面主体不跟滚；未查询时放推荐产品，取不到推荐（门户 viewer
+ *    没有 product:view）就退化成空白占位卡，**不编造数据**。
  * 5. 查询后不自动滚动，改用卡片下方的「向下查看回答」提示，滚动由用户决定。
+ * 6. 答案正文是 AI 生成的 Markdown，由 utils/markdown 渲染成可视元素；
+ *    该模块对输入先做 HTML 转义再只输出白名单标签，XSS 没有注入面。
  */
 import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -51,7 +54,7 @@ const RESULT_STATUS_LABELS: Record<string, string> = {
   cancelled: '已取消',
   failed: '失败',
 }
-/** 首屏推荐卡数量。扇形卡位是 9 个，5 张刚好铺满可视宽度不被裁掉。 */
+/** 首屏推荐卡数量。叠卡同屏最多 5 张，推荐位就按 5 张铺。 */
 const RECOMMEND_SIZE = 5
 
 const auth = useAuthStore()
@@ -108,22 +111,46 @@ const canViewProducts = computed(
   () => auth.roleCode === 'admin' || auth.permissions.includes('product:view'),
 )
 
-const deckMode = computed<'result' | 'recommend' | 'placeholder'>(() => {
+/**
+ * 卡堆的展示状态，五种状态互斥，不允许互相顶替：
+ * 1. result     —— AI 返回了产品，卡堆显示真实产品图；
+ * 2. loading    —— 查询进行中且还没有产品，显示骨架卡；
+ * 3. empty      —— 查过了但没产品，显示明确的空状态（不是空白卡）；
+ * 4. recommend  —— 未查询，显示首屏推荐产品；
+ * 5. placeholder—— 未查询且拿不到推荐（门户 viewer 没有 product:view），
+ *                  退化成空白占位卡，**不编造数据**。
+ */
+const deckMode = computed<'result' | 'recommend' | 'loading' | 'empty' | 'placeholder'>(() => {
   if (products.value.length) return 'result'
+  if (busy.value) return 'loading'
+  if (lastQuery.value) return 'empty'
   if (recommended.value.length) return 'recommend'
   return 'placeholder'
 })
 const deckProducts = computed(() =>
   deckMode.value === 'recommend' ? recommended.value : products.value,
 )
-const deckLabel = computed(() => (deckMode.value === 'result' ? '产品结果' : '推荐产品'))
+const deckLabel = computed(() => {
+  if (deckMode.value === 'result') return '产品结果'
+  if (deckMode.value === 'recommend') return '推荐产品'
+  if (deckMode.value === 'loading') return '产品检索中'
+  if (deckMode.value === 'empty') return '产品结果'
+  return '推荐产品位'
+})
 /** 卡片堆的说明文字必须让人分清「AI 返回」「推荐」「没有数据」三种情况。 */
 const deckCaption = computed(() => {
-  if (deckMode.value === 'result') return `查询返回 ${products.value.length} 个产品`
+  if (deckMode.value === 'result') {
+    const base = `查询返回 ${products.value.length} 个产品`
+    return products.value.length > RECOMMEND_SIZE ? `${base} · 卡堆内滚轮可循环翻看` : base
+  }
+  if (deckMode.value === 'loading') return '正在检索产品'
+  if (deckMode.value === 'empty') {
+    if (error.value) return '查询没有返回产品，可以换个说法再试一次'
+    return '本次查询没有返回产品'
+  }
   if (deckMode.value === 'recommend') {
     return `推荐产品 ${recommended.value.length} 个 · 查询后替换为 AI 返回的结果`
   }
-  if (busy.value) return '正在检索产品'
   if (!canViewProducts.value) return '当前账号没有产品浏览权限，查询后这里显示 AI 返回的产品'
   return '暂时没有可展示的产品，查询后这里显示 AI 返回的结果'
 })
@@ -364,9 +391,16 @@ onMounted(() => {
 </script>
 
 <template>
-  <AppHeader v-if="!embedded">
-    <button v-if="started" type="button" class="button button--secondary button--small" @click="reset">清空结果</button>
-    <button type="button" class="button button--ghost button--small" @click="signOut">退出</button>
+  <!--
+    顶栏右侧只放文字入口：不要按钮容器（无背景 / 边框 / 圆角 / 阴影 / 胶囊），
+    颜色由 .site-header__link 统一控制。「进入后台」指向后台那个独立 SPA
+    （nginx 把它挂在 /admin/，门户路由里没有这条路径），所以用原生 <a href>，
+    与产品卡跳 /admin/products/:id 的做法一致；「退出」仍走门户自己的登录态清理。
+  -->
+  <AppHeader v-if="!embedded" :show-sub-label="false">
+    <button v-if="started" type="button" class="site-header__link" @click="reset">清空结果</button>
+    <a class="site-header__link" href="/admin/products">进入后台</a>
+    <button type="button" class="site-header__link" @click="signOut">退出</button>
   </AppHeader>
 
   <main class="chat-shell" :class="{ 'chat-shell--embedded': embedded }">

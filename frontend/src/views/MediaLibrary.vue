@@ -1560,4 +1560,35 @@ async function handleBatchDelete() {
     max-width: 100vw;
   }
 }
+
+/* 深色模式覆盖 */
+:global(.dark-mode) .ml-toolbar {
+  background: rgba(25, 39, 68, 0.72);
+}
+
+:global(.dark-mode) .gallery-card {
+  background: #192744;
+  border-color: rgba(244, 244, 244, 0.08);
+}
+
+:global(.dark-mode) .gallery-card:hover {
+  border-color: var(--el-color-primary-light-3);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
+:global(.dark-mode) .ml-list {
+  background: rgba(25, 39, 68, 0.72);
+}
+
+:global(.dark-mode) .ml-preview-img-wrap {
+  background: #192744;
+}
+
+:global(.dark-mode) .ml-empty-thumb {
+  background: #192744;
+}
+
+:global(.dark-mode) .ml-gallery-card {
+  background: #192744;
+}
 </style>

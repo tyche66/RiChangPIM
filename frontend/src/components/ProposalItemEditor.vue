@@ -430,4 +430,29 @@ const onCoverError = (e: Event) => {
     margin-right: 0;
   }
 }
+
+/* 深色模式覆盖 */
+:global(.dark-mode) .proposal-item-editor {
+  --brand-deep: rgba(244, 244, 244, 0.92);
+  --brand-primary: rgba(244, 244, 244, 0.85);
+  --brand-light: rgba(244, 244, 244, 0.08);
+  --brand-lighter: rgba(244, 244, 244, 0.04);
+  --text-primary: #f4f4f4;
+  --text-secondary: rgba(244, 244, 244, 0.6);
+}
+
+:global(.dark-mode) .item-card {
+  border-color: rgba(244, 244, 244, 0.08) !important;
+}
+
+:global(.dark-mode) .capsule-btn-primary {
+  background: rgba(244, 244, 244, 0.85);
+  border-color: rgba(244, 244, 244, 0.85);
+  color: rgb(25, 39, 68);
+}
+
+:global(.dark-mode) .capsule-btn-primary:hover {
+  background: rgba(244, 244, 244, 0.92);
+  border-color: rgba(244, 244, 244, 0.92);
+}
 </style>

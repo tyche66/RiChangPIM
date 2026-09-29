@@ -502,4 +502,32 @@ onMounted(fetchRoles)
     width: calc(50% - 10px);
   }
 }
+
+/* 深色模式覆盖 */
+:global(.dark-mode) .roles-page {
+  background: #192744;
+}
+
+:global(.dark-mode) .roles-page :deep(.el-card) {
+  background: rgba(25, 39, 68, 0.68);
+  border-color: rgba(244, 244, 244, 0.1);
+  box-shadow: 0 4px 32px rgba(0, 0, 0, 0.2);
+}
+
+:global(.dark-mode) .perm-section {
+  background: rgba(25, 39, 68, 0.5);
+  border-color: rgba(244, 244, 244, 0.06);
+}
+
+:global(.dark-mode) .perm-header {
+  border-bottom-color: rgba(244, 244, 244, 0.08);
+}
+
+:global(.dark-mode) .perm-title {
+  color: rgb(244, 244, 244);
+}
+
+:global(.dark-mode) .perm-group-title {
+  color: #f4f4f4;
+}
 </style>

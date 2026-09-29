@@ -914,4 +914,38 @@ onMounted(fetchProposal)
     padding: 16px;
   }
 }
+
+/* 深色模式覆盖 */
+:global(.dark-mode) .proposal-detail {
+  --brand-deep: rgba(244, 244, 244, 0.92);
+  --brand-primary: rgba(244, 244, 244, 0.85);
+  --brand-light: rgba(244, 244, 244, 0.08);
+  --brand-lighter: rgba(244, 244, 244, 0.04);
+  --text-primary: #f4f4f4;
+  --text-secondary: rgba(244, 244, 244, 0.6);
+  --bg-mist: #192744;
+  --glass-bg: rgba(25, 39, 68, 0.72);
+  --glass-border: rgba(25, 39, 68, 0.5);
+  --shadow-soft: 0 4px 24px rgba(0, 0, 0, 0.2);
+}
+
+:global(.dark-mode) .glass-card :deep(.el-card__header) {
+  border-bottom-color: rgba(244, 244, 244, 0.06);
+}
+
+:global(.dark-mode) .capsule-btn-primary {
+  background: rgba(244, 244, 244, 0.85);
+  border-color: rgba(244, 244, 244, 0.85);
+  color: rgb(25, 39, 68);
+}
+
+:global(.dark-mode) .capsule-btn-primary:hover {
+  background: rgba(244, 244, 244, 0.92);
+  border-color: rgba(244, 244, 244, 0.92);
+}
+
+:global(.dark-mode) .glass-dialog :deep(.el-dialog) {
+  background: rgba(25, 39, 68, 0.92);
+  border-color: rgba(244, 244, 244, 0.1);
+}
 </style>

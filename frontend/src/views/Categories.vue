@@ -597,4 +597,39 @@ onMounted(() => {
     max-width: 95vw !important;
   }
 }
+
+/* 深色模式覆盖 */
+:global(.dark-mode) .categories-page {
+  background: #192744;
+}
+
+:global(.dark-mode) .categories-page :deep(.el-card) {
+  background: rgba(25, 39, 68, 0.68);
+  border-color: rgba(244, 244, 244, 0.1);
+  box-shadow: 0 4px 32px rgba(0, 0, 0, 0.2);
+}
+
+:global(.dark-mode) .toolbar-title h2 {
+  color: rgb(244, 244, 244);
+}
+
+:global(.dark-mode) .toolbar-title p {
+  color: rgba(244, 244, 244, 0.52);
+}
+
+:global(.dark-mode) .category-card {
+  background: rgba(25, 39, 68, 0.72);
+  border-color: rgba(244, 244, 244, 0.06);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
+}
+
+:global(.dark-mode) .grand-chip {
+  background: rgba(244, 244, 244, 0.08);
+  border-color: rgba(244, 244, 244, 0.06);
+  color: rgba(244, 244, 244, 0.82);
+}
+
+:global(.dark-mode) .grand-sort {
+  color: rgba(244, 244, 244, 0.45);
+}
 </style>

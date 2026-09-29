@@ -232,4 +232,27 @@ onMounted(fetchShares)
     font-size: 18px;
   }
 }
+
+/* 深色模式覆盖 */
+:global(.dark-mode) .share-management-page {
+  background: #192744;
+}
+
+:global(.dark-mode) .share-management-page :deep(.el-card) {
+  background: rgba(25, 39, 68, 0.68);
+  border-color: rgba(244, 244, 244, 0.1);
+  box-shadow: 0 4px 32px rgba(0, 0, 0, 0.2);
+}
+
+:global(.dark-mode) .card-header :deep(span) {
+  color: rgb(244, 244, 244);
+}
+
+:global(.dark-mode) .action-link {
+  color: rgb(244, 244, 244);
+}
+
+:global(.dark-mode) .action-link:hover {
+  color: rgb(244, 244, 244);
+}
 </style>
