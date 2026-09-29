@@ -38,8 +38,12 @@ fi
 # 版本锚点是 frontend/package.json（见 版本控制规范和Git.md §1.1），这里只读它，
 # 不去改它——发版时手改那 7 处的清单在 CHANGELOG.md 顶部。
 APP_VERSION="${APP_VERSION:-$(node -p "require('./frontend/package.json').version")}"
-BUILD_ID="${BUILD_ID:-local-$(date -u +%Y%m%dT%H%M%SZ)}"
-BUILD_TIME="${BUILD_TIME:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
+# 构建时间一律用北京时间（UTC+8），不用 UTC。版本信息校对页的「构建时间」是给人看的，
+# 而 git log、docker 事件、用户报障描述全都按本地时间说；这里输出 UTC 会让版本页比真实
+# 操作时间慢 8 小时，对不上任何一边的记录。用 TZ=Asia/Shanghai 显式指定，不依赖机器时区。
+# %z 会带上真实偏移，换时区也不会变成「写着 +08:00 实际不是」的假话。
+BUILD_ID="${BUILD_ID:-local-$(TZ=Asia/Shanghai date +%Y%m%dT%H%M%S%z)}"
+BUILD_TIME="${BUILD_TIME:-$(TZ=Asia/Shanghai date +%Y-%m-%dT%H:%M:%S%z)}"
 if [ -z "${GIT_COMMIT:-}" ]; then
   GIT_COMMIT="$(git rev-parse --short HEAD)"
   # 工作区有未提交改动时必须标 -dirty：版本页显示的 commit 要能对上真实产物。

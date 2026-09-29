@@ -49,8 +49,10 @@ jobs:
           # Git commit (short)
           GIT_COMMIT=$(git rev-parse --short HEAD)
 
-          # Build time (ISO 8601 UTC)
-          BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          # Build time (ISO 8601, Beijing time UTC+8)
+          # 用 TZ=Asia/Shanghai 显式指定，不依赖 runner 的机器时区（GitHub runner 默认 UTC）。
+          # %z 带真实偏移，版本信息校对页上的时间才能和 git log / docker 事件对得上。
+          BUILD_TIME=$(TZ=Asia/Shanghai date +"%Y-%m-%dT%H:%M:%S%z")
 
           echo "app_version=${APP_VERSION}" >> $GITHUB_OUTPUT
           echo "build_id=${BUILD_ID}" >> $GITHUB_OUTPUT
