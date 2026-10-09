@@ -32,7 +32,8 @@ import ProductDetail from '@/views/ProductDetail.vue'
 
 const mockGet = productApi.get as ReturnType<typeof vi.fn>
 const mockManualDelete = manualApi.delete as ReturnType<typeof vi.fn>
-const confirmSpy = vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue(undefined as never)
+// 拦截删除确认弹窗（spy 本身即测试所需，句柄无需引用）
+vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue(undefined as never)
 
 function httpError(status: number) {
   return new AxiosError(

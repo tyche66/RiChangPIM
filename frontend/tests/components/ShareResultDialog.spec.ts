@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { compileScript } from '@vue/language-core'
+import fs from 'fs'
+import path from 'path'
 import ShareResultDialog from '@/components/ShareResultDialog.vue'
 
 describe('ShareResultDialog.vue', () => {
@@ -14,8 +15,6 @@ describe('ShareResultDialog.vue', () => {
 
   it('template contains share-url-input class', () => {
     // Read the source file to verify template content
-    const fs = require('fs')
-    const path = require('path')
     const filePath = path.resolve(__dirname, '../../src/components/ShareResultDialog.vue')
     const source = fs.readFileSync(filePath, 'utf-8')
     expect(source).toContain('share-url-input')
@@ -31,8 +30,6 @@ describe('ShareResultDialog.vue', () => {
   })
 
   it('template contains QR code generation', () => {
-    const fs = require('fs')
-    const path = require('path')
     const filePath = path.resolve(__dirname, '../../src/components/ShareResultDialog.vue')
     const source = fs.readFileSync(filePath, 'utf-8')
     expect(source).toContain('toCanvas')
@@ -40,8 +37,6 @@ describe('ShareResultDialog.vue', () => {
   })
 
   it('template contains absolute URL resolution logic', () => {
-    const fs = require('fs')
-    const path = require('path')
     const filePath = path.resolve(__dirname, '../../src/components/ShareResultDialog.vue')
     const source = fs.readFileSync(filePath, 'utf-8')
     expect(source).toContain('VITE_PUBLIC_FRONTEND_URL')

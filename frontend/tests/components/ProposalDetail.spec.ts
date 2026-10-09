@@ -3,8 +3,6 @@ import { mount, flushPromises } from '@vue/test-utils'
 import {
   ElCard,
   ElButton,
-  ElTable,
-  ElTableColumn,
   ElTag,
   ElEmpty,
   ElAlert,
