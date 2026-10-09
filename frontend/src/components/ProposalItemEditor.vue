@@ -216,12 +216,12 @@ const onCoverError = (e: Event) => {
 
 <style scoped>
 .proposal-item-editor {
-  --brand-deep: rgba(30, 50, 90, 0.92);
-  --brand-primary: rgba(30, 50, 90, 0.85);
-  --brand-light: rgba(30, 50, 90, 0.08);
-  --brand-lighter: rgba(30, 50, 90, 0.04);
-  --text-primary: #5E6470;
-  --text-secondary: rgba(30, 50, 90, 0.6);
+  --brand-deep: var(--pim-text-strong);
+  --brand-primary: var(--pim-text-strong);
+  --brand-light: rgba(var(--pim-brand), 0.08);
+  --brand-lighter: rgba(var(--pim-brand), 0.04);
+  --text-primary: var(--pim-text-primary);
+  --text-secondary: var(--pim-text-secondary);
   --radius-sm: 12px;
   --transition-fast: 200ms cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -269,7 +269,7 @@ const onCoverError = (e: Event) => {
 .item-card {
   border-radius: var(--radius-sm) !important;
   box-shadow: none !important;
-  border: 1px solid rgba(30, 50, 90, 0.08) !important;
+  border: 1px solid rgba(var(--pim-brand), 0.08) !important;
 }
 
 .item-card :deep(.el-card__body) {
@@ -362,14 +362,14 @@ const onCoverError = (e: Event) => {
 /* Capsule styling */
 .capsule-input :deep(.el-input__wrapper) {
   border-radius: 20px;
-  box-shadow: 0 0 0 1px rgba(30, 50, 90, 0.1) inset;
+  box-shadow: 0 0 0 1px rgba(var(--pim-brand), 0.1) inset;
   padding: 4px 16px;
 }
 
 .capsule-select :deep(.el-select__wrapper),
 .capsule-select :deep(.el-input__wrapper) {
   border-radius: 20px;
-  box-shadow: 0 0 0 1px rgba(30, 50, 90, 0.1) inset;
+  box-shadow: 0 0 0 1px rgba(var(--pim-brand), 0.1) inset;
   padding: 4px 16px;
 }
 
@@ -429,30 +429,5 @@ const onCoverError = (e: Event) => {
   .item-face-price {
     margin-right: 0;
   }
-}
-
-/* 深色模式覆盖 */
-:global(.dark-mode) .proposal-item-editor {
-  --brand-deep: rgba(244, 244, 244, 0.92);
-  --brand-primary: rgba(244, 244, 244, 0.85);
-  --brand-light: rgba(244, 244, 244, 0.08);
-  --brand-lighter: rgba(244, 244, 244, 0.04);
-  --text-primary: #f4f4f4;
-  --text-secondary: rgba(244, 244, 244, 0.6);
-}
-
-:global(.dark-mode) .item-card {
-  border-color: rgba(244, 244, 244, 0.08) !important;
-}
-
-:global(.dark-mode) .capsule-btn-primary {
-  background: rgba(244, 244, 244, 0.85);
-  border-color: rgba(244, 244, 244, 0.85);
-  color: rgb(25, 39, 68);
-}
-
-:global(.dark-mode) .capsule-btn-primary:hover {
-  background: rgba(244, 244, 244, 0.92);
-  border-color: rgba(244, 244, 244, 0.92);
 }
 </style>

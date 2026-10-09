@@ -12,6 +12,12 @@
  *   松绿 #5a7a6b 负责聚焦/选中/正向状态，峡湾蓝 #7ba0b8 只做极轻的点缀。
  * 三档文字色都按 WCAG AA（≥4.5:1）取值，投影一律炭灰调制，
  * 不用纯黑、不用高饱和色、不用渐变。
+ *
+ * 深色主题由同文件末尾的 .dark-mode 块按「语义角色」重新赋值（不是反相）：
+ * 页面 #171e22 / 卡片 #283439 / 一级容器 #202a2e，文字 #edf1ee / #b9c8c2，
+ * 松绿 #a4c8b4、峡湾蓝 #a9c8dc、木质 #d5bca4。类名挂在 <html> 上，由
+ * utils/theme.ts 依据 localStorage('theme') 与系统偏好维护，后台切换主题时
+ * 经 storage 事件同步（iframe 嵌入的聊天工作台同样生效）。
  */
 
 *,
@@ -48,6 +54,16 @@
   --border: #d4cdc5; /* 分隔线 / 卡片描边：羊毛灰 */
   --border-strong: #b0a493; /* 可交互控件描边：略深的羊毛灰（比令牌深一档，保证控件边界可辨）*/
 
+  /* 反白文字：实底（ink / pine）之上的文字色 */
+  --on-ink: #ffffff;
+  --on-pine: #ffffff;
+
+  /* 半透明容器：顶栏、卡堆指示、弹层遮罩 */
+  --header-bg: rgb(245 240 235 / 88%);
+  --nav-bg: rgb(255 255 255 / 88%);
+  --scrim-dialog: rgb(61 61 61 / 38%);
+  --scrim-scene: rgb(61 61 61 / 46%);
+
   /* 圆角 */
   --radius-pill: 999px;
   --radius-sm: 8px;
@@ -68,6 +84,56 @@
   --col-max: 880px;
   --composer-max: 820px;
   --page-gutter: 24px;
+}
+
+/* ===== 深色主题 =====
+ * 与浅色同一套语义 Token，按角色重新取值（不是反相）：
+ *   页面 #171e22 / 卡片 #283439 / 卡内弱填充与顶栏 #202a2e
+ *   文字 #edf1ee 主、#b9c8c2 次；描边 #3e5052
+ *   松绿 #a4c8b4（聚焦/选中）、峡湾蓝 #a9c8dc、木质 #d5bca4（暖点缀）
+ * 正文对比度均 ≥4.5:1；禁用态同时降透明度，不只靠颜色。
+ * 实底按钮（--ink 底 / --pine 底）上的文字切换到深墨色，保证 ≥4.5:1。
+ */
+.dark-mode {
+  color-scheme: dark;
+
+  --bg: #171e22;
+  --surface: #283439;
+  --surface-soft: #202a2e;
+  --surface-strong: #2f3d42;
+  --ink: #edf1ee;
+  --ink-muted: #b9c8c2;
+  --ink-subtle: #9db0a9;
+  --wood: #d5bca4;
+  --wood-deep: #c8a985;
+  --pine: #a4c8b4;
+  --fjord: #a9c8dc;
+  --fjord-soft: rgb(169 200 220 / 16%);
+  --accent-deep: #dde5e0;
+  --warn-ink: #d9a45b;
+  --warn-bg: rgb(217 164 91 / 12%);
+  --warn-border: rgb(217 164 91 / 36%);
+  --danger-ink: #e0918a;
+  --danger-bg: rgb(224 145 138 / 10%);
+  --danger-border: rgb(224 145 138 / 30%);
+  --ok-ink: #7fb98f;
+  --ok-bg: rgb(127 185 143 / 10%);
+  --ok-border: rgb(127 185 143 / 28%);
+  --border: #3e5052;
+  --border-strong: #55686a;
+
+  --on-ink: #171e22;
+  --on-pine: #171e22;
+
+  --header-bg: rgb(23 30 34 / 88%);
+  --nav-bg: rgb(42 54 59 / 92%);
+  --scrim-dialog: rgb(0 0 0 / 55%);
+  --scrim-scene: rgb(0 0 0 / 62%);
+
+  --shadow-hover: 0 6px 18px rgb(0 0 0 / 28%);
+  --shadow-pop: 0 16px 40px rgb(0 0 0 / 45%);
+  --shadow-deck: 0 10px 22px rgb(0 0 0 / 30%);
+  --shadow-deck-hover: 0 14px 28px rgb(0 0 0 / 40%);
 }
 
 /* ===== 基础排版 ===== */
@@ -132,7 +198,7 @@ table { border-collapse: collapse; }
   position: sticky;
   top: 0;
   z-index: 40;
-  background: rgb(245 240 235 / 88%);
+  background: var(--header-bg);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   border-bottom: 1px solid var(--border);
@@ -211,6 +277,29 @@ table { border-collapse: collapse; }
 .site-header__link:hover { color: var(--ink); }
 /* active 只做细微明暗反馈，不做形变 */
 .site-header__link:active { color: var(--ink-subtle); }
+
+/* 主题开关：与文字入口同一直栏界的图标钮，不抢焦点 */
+.site-header__theme {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--ink-muted);
+  cursor: pointer;
+  transition: background-color .18s ease, color .18s ease;
+}
+.site-header__theme:hover { background: var(--surface-strong); color: var(--ink); }
+.site-header__theme:active { color: var(--ink-subtle); }
+.site-header__theme:focus-visible {
+  outline: 2px solid var(--pine);
+  outline-offset: 2px;
+}
+.site-header__theme svg { width: 17px; height: 17px; display: block; }
 
 /* ===== 页面主体 ===== */
 .chat-shell {
@@ -374,7 +463,7 @@ table { border-collapse: collapse; }
 .button--primary {
   background: var(--ink);
   border-color: var(--ink);
-  color: #fff;
+  color: var(--on-ink);
 }
 .button--primary:hover:not(:disabled) { background: var(--accent-deep); border-color: var(--accent-deep); }
 .button--secondary { color: var(--ink-muted); border-color: var(--border); }
@@ -402,7 +491,7 @@ table { border-collapse: collapse; }
 .chip[aria-pressed="true"] {
   background: var(--pine);
   border-color: var(--pine);
-  color: #fff;
+  color: var(--on-pine);
 }
 
 .icon-button {
@@ -422,7 +511,7 @@ table { border-collapse: collapse; }
 .icon-button--send {
   background: var(--ink);
   border-color: var(--ink);
-  color: #fff;
+  color: var(--on-ink);
 }
 .icon-button--send:hover:not(:disabled) { background: var(--accent-deep); }
 .icon-button--quiet {
@@ -837,7 +926,7 @@ button.citation:hover { background: var(--pine); border-color: var(--pine); colo
   padding: 3px 8px;
   border-radius: var(--radius-pill);
   border: 1px solid var(--border);
-  background: rgb(255 255 255 / 88%);
+  background: var(--nav-bg);
   backdrop-filter: blur(6px);
   color: var(--ink-muted);
   font-size: 11.5px;
@@ -1058,7 +1147,7 @@ button.citation:hover { background: var(--pine); border-color: var(--pine); colo
   margin-top: 2px;
   border-radius: var(--radius-sm);
   background: var(--ink);
-  color: #fff;
+  color: var(--on-ink);
   font-size: 11px;
   font-weight: 700;
 }
@@ -1097,7 +1186,7 @@ button.citation:hover { background: var(--pine); border-color: var(--pine); colo
   box-shadow: var(--shadow-pop);
   overflow: auto;
 }
-.source-dialog::backdrop { background: rgb(61 61 61 / 38%); }
+.source-dialog::backdrop { background: var(--scrim-dialog); }
 .source-dialog__header {
   position: sticky;
   top: 0;
@@ -1398,7 +1487,7 @@ button.citation:hover { background: var(--pine); border-color: var(--pine); colo
   color: var(--ink);
   box-shadow: var(--shadow-pop);
 }
-.scene-dialog::backdrop { background: rgb(61 61 61 / 46%); }
+.scene-dialog::backdrop { background: var(--scrim-scene); }
 .scene-dialog__header {
   display: flex;
   align-items: center;

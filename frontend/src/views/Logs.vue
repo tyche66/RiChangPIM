@@ -568,16 +568,16 @@ onMounted(() => {
 <style scoped>
 .logs-page {
   min-height: 100vh;
-  background: #f0f0f0;
+  background: var(--pim-page);
   padding: 24px;
   box-sizing: border-box;
 }
 
 .logs-page :deep(.el-card) {
-  background: rgba(255, 255, 255, 0.68);
+  background: var(--pim-glass);
   border-radius: 28px;
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  box-shadow: 0 4px 32px rgba(30, 50, 90, 0.06);
+  border: 1px solid var(--pim-surface-border);
+  box-shadow: 0 4px 32px rgba(var(--pim-brand), 0.06);
 }
 
 .logs-page :deep(.el-card__body) {
@@ -593,7 +593,7 @@ onMounted(() => {
 .card-header :deep(span) {
   font-size: 20px;
   font-weight: 600;
-  color: rgb(30, 50, 90);
+  color: rgb(var(--pim-brand));
   letter-spacing: 0.3px;
 }
 
@@ -610,7 +610,7 @@ onMounted(() => {
 }
 
 .section-title {
-  color: #5E6470;
+  color: var(--pim-text-primary);
   font-weight: 600;
   font-size: 16px;
   margin: 16px 0 12px;
@@ -656,24 +656,5 @@ onMounted(() => {
   .audit-pagination {
     justify-content: center;
   }
-}
-
-/* 深色模式覆盖 */
-:global(.dark-mode) .logs-page {
-  background: #192744;
-}
-
-:global(.dark-mode) .logs-page :deep(.el-card) {
-  background: rgba(25, 39, 68, 0.68);
-  border-color: rgba(244, 244, 244, 0.1);
-  box-shadow: 0 4px 32px rgba(0, 0, 0, 0.2);
-}
-
-:global(.dark-mode) .card-header :deep(span) {
-  color: rgb(244, 244, 244);
-}
-
-:global(.dark-mode) .section-title {
-  color: #f4f4f4;
 }
 </style>

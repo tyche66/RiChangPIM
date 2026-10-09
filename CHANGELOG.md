@@ -28,7 +28,7 @@
 
 ## v1.9.2 — 2026-09-29
 
-本版本修复 AI 门户查询结果区的三类缺陷（卡片网格退化、推荐卡片不出图、答案 Markdown 原文直出），后台新增深色模式，并补一个非 Docker 的本机一键启动脚本。
+本版本修复 AI 门户查询结果区的三类缺陷（卡片网格退化、推荐卡片不出图、答案 Markdown 原文直出），把后台与门户的深色模式从「逐页堆 `:global(.dark-mode)` 覆盖」重做为按语义 Token 的实现，并补一个非 Docker 的本机一键启动脚本。
 
 ### 门户（portal）：查询结果区修复
 
@@ -45,11 +45,44 @@
 - `AppHeader.vue`：新增 `showSubLabel` 属性，查询工作台（chat）把左上角让位给右上角的「进入后台 / 退出」两个文字入口，登录页和分享页保持默认 `true` 不动「门户」字样。
 - 新增 `tests/e2e/deck-markdown.spec.ts`：15 条验收用例。
 
-### 后台（frontend）：深色模式
+### 后台与门户：深色模式重构
 
-- 新增 `components/ThemeToggle.vue`：切换 `document.documentElement` 的 `dark-mode` class，写入 `localStorage`，未设置时跟随 `prefers-color-scheme`。
-- `layouts/MainLayout.vue` 头部新增 `.header-actions` 容器，把主题切换和原来的账户 chip 并列。
-- `styles/design-system.css` 与各视图补深色模式覆盖（`--bg-mist` / `--glass-bg` / `--text-primary` / `--brand-*` 等变量与玻璃拟态组件）。
+#### 根因
+
+1. **颜色没有按语义角色分层**：视图里到处是硬编码（`rgba(30, 50, 90, α)`、`#fff`、`#5E6470`、`#f0f0f0`，合计约 600 处），深色模式只能靠每个视图再写一遍反色值。
+2. **页面级「本地别名块」遮蔽全局变量**：`Products` / `ProductDetail` / `Manuals` / `Proposals` / `ProposalDetail` / `Quotations` / `ProposalItemEditor` 在 `.xxx-page` 上自定义了 `--glass-bg: rgba(255,255,255,.72)` 等别名，`:root` 的 Token 改了也会被它们盖掉。
+3. **Element Plus 只换了 `--el-color-primary`**：下拉面板、弹窗、日期选择器、表格、消息提示的背景走 `--el-bg-color-overlay` / `--el-fill-color-blank` 等一整套变量，没换就还是白底。
+4. **「实底 + 反白」控件没有独立的文字色 Token**：深色下主色变浅后出现白底白字（分页选中、视图切换选中、头像、实底按钮）。
+
+#### 主题 Token（后台 design-system.css）
+
+浅色值原样搬进 `:root`（视觉零变化，已用计算样式逐项比对旧部署验证 0 差异），深色挂在 `html.dark-mode`：
+
+- 表面：`--pim-page #171e22` / `--pim-header` `--pim-sidebar` `--pim-surface-soft #202a2e` / `--pim-surface #283439` / `--pim-overlay` `--pim-field` / `--pim-media-bg`
+- 文字：`--pim-text-primary #edf1ee` / `--pim-text-secondary #b9c8c2` / `--pim-text-soft` / `--pim-text-faint` / `--pim-text-disabled`
+- 描边：`--pim-border` `--pim-surface-border` `--pim-line` `--pim-line-strong` `--pim-control-border #3e5052` 起
+- 强调：`--pim-accent-solid #a4c8b4` + `--pim-on-accent #171e22`（松绿实底配深墨字），木色 `--pim-accent #d5bca4`，峡湾蓝 `--pim-fjord #a9c8dc` 与 `--pim-focus-ring`
+- 状态：`--pim-success` / `--pim-warning` / `--pim-danger` / `--pim-info` 各自带 `-bg` / `-border` 档
+- `--pim-brand` triplet 约定只经 `rgba(var(--pim-brand), α)` 使用：浅色是海军蓝淡色，深色自动变成近白淡色，约 200 处 tint（文字/描边/浅填充）一份代码两种主题
+
+Element Plus 深色变量（`--el-bg-color` / `--el-bg-color-overlay` / `--el-fill-color-*` / `--el-text-color-*` / `--el-border-color*` / `--el-tag-*` / `--el-mask-color` / `--el-overlay-color-lighter` 等）在 `.dark-mode` 内成套赋值，下拉、弹窗、抽屉、日期面板、消息提示、加载遮罩随之全部变深；`effect="dark"` 的实底标签文字换成 `--pim-on-accent`（原反白只有 2.2:1）。
+
+#### 门户（portal）深色模式
+
+`portal/src/styles/main.css` 原本就是全 Token 化，新增 `.dark-mode` 语义块（页面 `#171e22` / 卡片 `#283439` / 一级容器 `#202a2e` / 文字 `#edf1ee`·`#b9c8c2` / 松绿 `#a4c8b4` / 峡湾蓝 `#a9c8dc` / 木质 `#d5bca4`）；实底按钮与选中胶囊的文字切到 `--on-ink` / `--on-pine`。新增 `utils/theme.ts`：与后台同源共用 `localStorage['theme']`，监听系统偏好变化与 `storage` 事件——后台切主题时，被 iframe 嵌入 AI 选品页的门户文档同步换肤。`AppHeader.vue` 右侧新增主题开关，并按主题切换彩色/白色两版 Logo。
+
+#### 主题状态
+
+- 新增 `frontend/src/composables/useTheme.ts`：`light / dark / system` 三态，`initTheme()` 在 `main.ts` 挂载 Vue **之前**落 `<html>` 类，登录页、分享页等没有 ThemeToggle 的界面首帧就是正确主题，不再先闪一帧浅色；`system` 下注册 `matchMedia` 监听，系统主题变化实时响应。
+- `ThemeToggle.vue` 改用该单例；持久化键仍为 `localStorage['theme']`。
+
+#### 迁移方式（29 个视图/组件/布局）
+
+脚本化替换 + 人工语义修正：删除全部 `:global(.dark-mode)` 覆盖规则；`rgba(30,50,90,α)` → `rgba(var(--pim-brand),α)`；`#5E6470`/`#f0f0f0`/状态色/图片控件色按语义映射；本地别名块改指向全局 Token；「实底+反白」控件（分页选中、视图切换、头像、场景图角标、账户强按钮）改用 `--pim-accent-solid` + `--pim-on-accent`；产品缩略图/灯箱控制钮走 `--pim-media-bg` / `--pim-media-control-*`，图片本身不反色。分享结果弹窗的二维码保留浅底深码，外面加一圈白 tile 承托（扫描兼容性优先）。
+
+#### 验收
+
+Playwright 无头浏览器实测（桌面 1440×900 + 移动 390×844）：后台 18 个页面 + 产品详情 + 登录页 + 新增产品弹窗 + 品牌下拉 + 账户弹窗 + 分页 + 门户登录/chat/分享页，浅色与深色双主题截图；计算样式 WCAG 对比度审计 0 项低于 AA（正文 ≥4.5:1，大字 ≥3:1）；控制台无报错；重开页面无主题闪烁（`initTheme` 挂载前落类）；浅色模式与旧部署逐项计算样式比对 0 差异。已知限制：本机 AI 密钥不可用，chat 真实回答的 Markdown 用同构 DOM 注入验证（`.md-*` 全部通过）；`#93a69f` 及更弱文字在 `#2f3d42` 抬升面上为 4.4:1，仅出现在极少数组合。
 
 ### 运维脚本
 

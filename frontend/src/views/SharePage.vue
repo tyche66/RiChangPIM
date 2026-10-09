@@ -403,7 +403,7 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  background: linear-gradient(135deg, #f0f0f0 0%, #e8ecf1 100%);
+  background: var(--pim-page);
   padding: 24px 16px 40px;
 }
 
@@ -416,14 +416,14 @@ onMounted(() => {
 .brand-logo {
   font-size: 28px;
   font-weight: 700;
-  color: rgb(30, 50, 90);
+  color: rgb(var(--pim-brand));
   letter-spacing: 4px;
   margin-bottom: 4px;
 }
 
 .brand-subtitle {
   font-size: 13px;
-  color: #5E6470;
+  color: var(--pim-text-primary);
   letter-spacing: 2px;
   font-weight: 400;
 }
@@ -431,18 +431,18 @@ onMounted(() => {
 .share-card {
   width: 100%;
   max-width: 800px;
-  background: rgba(255, 255, 255, 0.72);
+  background: var(--pim-surface);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border-radius: 32px;
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  box-shadow: 0 8px 40px rgba(30, 50, 90, 0.08);
+  border: 1px solid var(--pim-surface-border);
+  box-shadow: 0 8px 40px rgba(var(--pim-brand), 0.08);
   overflow: hidden;
 }
 
 .share-card :deep(.el-card__header) {
-  background: rgba(30, 50, 90, 0.04);
-  border-bottom: 1px solid rgba(30, 50, 90, 0.08);
+  background: rgba(var(--pim-brand), 0.04);
+  border-bottom: 1px solid rgba(var(--pim-brand), 0.08);
   padding: 20px 24px;
 }
 
@@ -455,7 +455,7 @@ onMounted(() => {
 .card-title {
   font-size: 20px;
   font-weight: 600;
-  color: rgb(30, 50, 90);
+  color: rgb(var(--pim-brand));
   letter-spacing: 0.5px;
 }
 
@@ -504,10 +504,10 @@ onMounted(() => {
 .section-heading {
   font-size: 16px;
   font-weight: 600;
-  color: rgb(30, 50, 90);
+  color: rgb(var(--pim-brand));
   margin: 0 0 12px 0;
   padding-bottom: 8px;
-  border-bottom: 2px solid rgba(30, 50, 90, 0.08);
+  border-bottom: 2px solid rgba(var(--pim-brand), 0.08);
 }
 
 .info-descriptions {
@@ -522,31 +522,31 @@ onMounted(() => {
 .mono-text {
   font-family: monospace;
   font-size: 12px;
-  color: #5E6470;
+  color: var(--pim-text-primary);
 }
 
 .price-text {
   font-weight: 600;
-  color: rgb(30, 50, 90);
+  color: rgb(var(--pim-brand));
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
 .row-subtotal {
   font-family: monospace;
-  color: rgb(30, 50, 90);
+  color: rgb(var(--pim-brand));
   font-weight: 600;
 }
 
 .subtotal-text {
   font-family: monospace;
-  color: rgb(30, 50, 90);
+  color: rgb(var(--pim-brand));
   font-weight: 600;
 }
 
 .total-amount {
   font-size: 20px;
   font-weight: 700;
-  color: rgb(30, 50, 90);
+  color: rgb(var(--pim-brand));
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
@@ -575,13 +575,13 @@ onMounted(() => {
 }
 
 .footer-text {
-  color: #5E6470;
+  color: var(--pim-text-primary);
   font-size: 13px;
   margin: 0 0 4px 0;
 }
 
 .footer-brand {
-  color: #5E6470;
+  color: var(--pim-text-primary);
   font-size: 12px;
   margin: 0;
   opacity: 0.7;
@@ -661,7 +661,7 @@ onMounted(() => {
   border-radius: 8px;
   overflow: hidden;
   flex-shrink: 0;
-  background: #f0f2f5;
+  background: var(--pim-media-bg);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -677,7 +677,7 @@ onMounted(() => {
 .thumb-placeholder {
   font-size: 12px;
   font-weight: 600;
-  color: #999;
+  color: var(--pim-text-faint);
   line-height: 1.2;
   text-align: center;
   word-break: keep-all;
@@ -691,7 +691,7 @@ onMounted(() => {
 
 .product-name-text {
   font-size: 14px;
-  color: rgb(30, 50, 90);
+  color: rgb(var(--pim-brand));
   line-height: 1.4;
   font-weight: 600;
   white-space: nowrap;
@@ -701,39 +701,7 @@ onMounted(() => {
 
 .product-no-text {
   font-size: 11px;
-  color: #999;
+  color: var(--pim-text-faint);
   font-family: monospace;
-}
-
-/* 深色模式覆盖 */
-:global(.dark-mode) .share-page {
-  background: linear-gradient(135deg, #192744 0%, #0f1a2e 100%);
-}
-
-:global(.dark-mode) .brand-logo {
-  color: rgb(244, 244, 244);
-}
-
-:global(.dark-mode) .brand-subtitle {
-  color: rgba(244, 244, 244, 0.6);
-}
-
-:global(.dark-mode) .share-card {
-  background: rgba(25, 39, 68, 0.72);
-  border-color: rgba(244, 244, 244, 0.1);
-  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.2);
-}
-
-:global(.dark-mode) .share-card :deep(.el-card__header) {
-  background: rgba(244, 244, 244, 0.04);
-  border-bottom-color: rgba(244, 244, 244, 0.08);
-}
-
-:global(.dark-mode) .card-title {
-  color: rgb(244, 244, 244);
-}
-
-:global(.dark-mode) .product-name-text {
-  color: rgb(244, 244, 244);
 }
 </style>

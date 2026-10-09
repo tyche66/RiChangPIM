@@ -161,10 +161,10 @@ onMounted(checkVersion)
  * 原先的 ui-monospace 链在 Windows 上会掉成 Courier New，跟正文字体对不上。
  */
 .version-page { display: grid; gap: 20px; max-width: 1180px; margin: 0 auto; }
-.version-hero { display: flex; align-items: end; justify-content: space-between; padding: 30px 34px; border-radius: 28px; color: white; background: linear-gradient(125deg, var(--pim-primary) 0%, var(--pim-brand-lift) 60%, var(--pim-accent-mid) 140%); box-shadow: 0 24px 60px rgba(var(--pim-brand), .18); }
+.version-hero { display: flex; align-items: end; justify-content: space-between; padding: 30px 34px; border-radius: 28px; color: var(--pim-hero-ink); background: var(--pim-hero-gradient); box-shadow: 0 24px 60px rgba(var(--pim-brand), .18); }
 .eyebrow { font-size: 11px; letter-spacing: .18em; opacity: .65; }
 h2 { margin: 8px 0; font-size: 34px; } p { margin: 0; opacity: .78; }
-.check-button { border: 0; background: var(--pim-accent); }
+.check-button { border: 0; background: var(--pim-accent); color: var(--pim-accent-ink); }
 .status-card, .build-card { border: 1px solid rgba(var(--pim-brand), .1); border-radius: 24px; }
 .status-line { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
 .status-line > div { display: grid; gap: 5px; }.status-line strong { font-size: 22px; }.status-line small { color: var(--pim-text-soft); }

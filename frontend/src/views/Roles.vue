@@ -391,16 +391,16 @@ onMounted(fetchRoles)
 <style scoped>
 .roles-page {
   min-height: 100vh;
-  background: #f0f0f0;
+  background: var(--pim-page);
   padding: 24px;
   box-sizing: border-box;
 }
 
 .roles-page :deep(.el-card) {
-  background: rgba(255, 255, 255, 0.68);
+  background: var(--pim-glass);
   border-radius: 28px;
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  box-shadow: 0 4px 32px rgba(30, 50, 90, 0.06);
+  border: 1px solid var(--pim-surface-border);
+  box-shadow: 0 4px 32px rgba(var(--pim-brand), 0.06);
 }
 
 .roles-page :deep(.el-card__body) {
@@ -433,12 +433,12 @@ onMounted(fetchRoles)
 
 .perm-section {
   margin-top: 16px;
-  background: rgba(255, 255, 255, 0.5);
+  background: var(--pim-surface-soft);
   border-radius: 16px;
   padding: 20px;
   max-height: 400px;
   overflow-y: auto;
-  border: 1px solid rgba(30, 50, 90, 0.06);
+  border: 1px solid rgba(var(--pim-brand), 0.06);
 }
 
 .perm-header {
@@ -447,13 +447,13 @@ onMounted(fetchRoles)
   align-items: center;
   margin-bottom: 12px;
   padding-bottom: 12px;
-  border-bottom: 1px solid rgba(30, 50, 90, 0.08);
+  border-bottom: 1px solid rgba(var(--pim-brand), 0.08);
 }
 
 .perm-title {
   font-weight: 600;
   font-size: 14px;
-  color: rgb(30, 50, 90);
+  color: rgb(var(--pim-brand));
 }
 
 .perm-group {
@@ -464,7 +464,7 @@ onMounted(fetchRoles)
   font-weight: 600;
   margin-bottom: 6px;
   text-transform: capitalize;
-  color: #5E6470;
+  color: var(--pim-text-primary);
 }
 
 .perm-group-items {
@@ -501,33 +501,5 @@ onMounted(fetchRoles)
   .perm-group-items :deep(.el-checkbox) {
     width: calc(50% - 10px);
   }
-}
-
-/* 深色模式覆盖 */
-:global(.dark-mode) .roles-page {
-  background: #192744;
-}
-
-:global(.dark-mode) .roles-page :deep(.el-card) {
-  background: rgba(25, 39, 68, 0.68);
-  border-color: rgba(244, 244, 244, 0.1);
-  box-shadow: 0 4px 32px rgba(0, 0, 0, 0.2);
-}
-
-:global(.dark-mode) .perm-section {
-  background: rgba(25, 39, 68, 0.5);
-  border-color: rgba(244, 244, 244, 0.06);
-}
-
-:global(.dark-mode) .perm-header {
-  border-bottom-color: rgba(244, 244, 244, 0.08);
-}
-
-:global(.dark-mode) .perm-title {
-  color: rgb(244, 244, 244);
-}
-
-:global(.dark-mode) .perm-group-title {
-  color: #f4f4f4;
 }
 </style>

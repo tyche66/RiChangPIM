@@ -258,16 +258,16 @@ onMounted(fetchBrands)
 <style scoped>
 .brands-page {
   min-height: 100vh;
-  background: #f0f0f0;
+  background: var(--pim-page);
   padding: 24px;
   box-sizing: border-box;
 }
 
 .brands-page :deep(.el-card) {
-  background: rgba(255, 255, 255, 0.68);
+  background: var(--pim-glass);
   border-radius: 28px;
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  box-shadow: 0 4px 32px rgba(30, 50, 90, 0.06);
+  border: 1px solid var(--pim-surface-border);
+  box-shadow: 0 4px 32px rgba(var(--pim-brand), 0.06);
 }
 
 .brands-page :deep(.el-card__body) {
@@ -287,7 +287,7 @@ onMounted(fetchBrands)
   margin: 0;
   font-size: 20px;
   font-weight: 600;
-  color: rgb(30, 50, 90);
+  color: rgb(var(--pim-brand));
   letter-spacing: 0.3px;
 }
 
@@ -300,21 +300,21 @@ onMounted(fetchBrands)
   min-height: 0;
   border: 0;
   background: transparent;
-  color: rgba(30, 50, 90, 0.78);
+  color: rgba(var(--pim-brand), 0.78);
   font-weight: 500;
 }
 
 .action-link:hover {
-  color: rgba(30, 50, 90, 0.98);
+  color: rgba(var(--pim-brand), 0.98);
   background: transparent;
 }
 
 .action-link.danger {
-  color: #f56c6c;
+  color: var(--pim-danger-bright);
 }
 
 .action-link.danger:hover {
-  color: #d94b4b;
+  color: var(--pim-danger-deep);
 }
 
 .table-responsive :deep(.el-table__cell:last-child .cell) {
@@ -347,7 +347,7 @@ onMounted(fetchBrands)
 }
 
 .link {
-  color: rgb(30, 50, 90);
+  color: rgb(var(--pim-brand));
   text-decoration: none;
   font-weight: 500;
 }
@@ -379,32 +379,5 @@ onMounted(fetchBrands)
     width: 95vw !important;
     max-width: 95vw !important;
   }
-}
-
-/* 深色模式覆盖 */
-:global(.dark-mode) .brands-page {
-  background: #192744;
-}
-
-:global(.dark-mode) .brands-page :deep(.el-card) {
-  background: rgba(25, 39, 68, 0.68);
-  border-color: rgba(244, 244, 244, 0.1);
-  box-shadow: 0 4px 32px rgba(0, 0, 0, 0.2);
-}
-
-:global(.dark-mode) .toolbar h2 {
-  color: rgb(244, 244, 244);
-}
-
-:global(.dark-mode) .action-link {
-  color: rgba(244, 244, 244, 0.78);
-}
-
-:global(.dark-mode) .action-link:hover {
-  color: rgba(244, 244, 244, 0.98);
-}
-
-:global(.dark-mode) .link {
-  color: rgb(244, 244, 244);
 }
 </style>

@@ -166,7 +166,7 @@ onUnmounted(() => {
 
 .scene-container {
   position: relative;
-  background: #fff;
+  background: var(--pim-media-bg);
   border-radius: 16px;
   padding: 20px;
   width: 90vw;
@@ -204,7 +204,7 @@ onUnmounted(() => {
 .scene-name {
   font-size: 14px;
   font-weight: 600;
-  color: rgb(30, 50, 90);
+  color: rgb(var(--pim-brand));
   margin-bottom: 12px;
   text-align: center;
   max-width: 100%;
@@ -224,7 +224,7 @@ onUnmounted(() => {
   width: 100%;
   overflow: hidden;
   border-radius: 8px;
-  background: #f5f5f5;
+  background: var(--pim-media-bg);
   touch-action: pan-y;
 }
 
@@ -246,8 +246,8 @@ onUnmounted(() => {
   height: 44px;
   border-radius: 50%;
   border: none;
-  background: rgba(255, 255, 255, 0.9);
-  color: #333;
+  background: var(--pim-media-control-bg);
+  color: var(--pim-media-control-ink);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -258,7 +258,7 @@ onUnmounted(() => {
 }
 
 .nav-btn:hover {
-  background: #fff;
+  background: var(--pim-media-control-bg-solid);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
 }
 
@@ -272,7 +272,7 @@ onUnmounted(() => {
 
 .scene-counter {
   font-size: 14px;
-  color: #888;
+  color: var(--pim-text-faint);
   margin-top: 12px;
   font-weight: 500;
 }
@@ -287,13 +287,13 @@ onUnmounted(() => {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #d0d0d0;
+  background: var(--pim-line-strong);
   cursor: pointer;
   transition: background 0.2s, transform 0.2s;
 }
 
 .dot.active {
-  background: rgb(30, 50, 90);
+  background: rgb(var(--pim-brand));
   transform: scale(1.3);
 }
 
@@ -339,39 +339,5 @@ onUnmounted(() => {
   .nav-next {
     right: 8px;
   }
-}
-
-/* 深色模式覆盖 */
-:global(.dark-mode) .scene-card {
-  background: rgba(25, 39, 68, 0.72);
-  border-color: rgba(244, 244, 244, 0.08);
-}
-
-:global(.dark-mode) .scene-label {
-  color: #f4f4f4;
-}
-
-:global(.dark-mode) .scene-sublabel {
-  color: rgba(244, 244, 244, 0.5);
-}
-
-:global(.dark-mode) .scene-placeholder {
-  background: rgba(25, 39, 68, 0.5);
-}
-
-:global(.dark-mode) .scene-title {
-  color: #f4f4f4;
-}
-
-:global(.dark-mode) .scene-desc {
-  color: rgba(244, 244, 244, 0.6);
-}
-
-:global(.dark-mode) .dot {
-  background: rgba(244, 244, 244, 0.3);
-}
-
-:global(.dark-mode) .dot.active {
-  background: rgb(244, 244, 244);
 }
 </style>

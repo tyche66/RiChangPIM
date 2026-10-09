@@ -1530,20 +1530,22 @@ watch([viewMode, proposalMode], () => {
 <style scoped>
 /* ===== CSS Variables ===== */
 .products-page {
-  --brand-deep: rgba(30, 50, 90, 0.92);
-  --brand-primary: rgba(30, 50, 90, 0.85);
-  --brand-light: rgba(30, 50, 90, 0.08);
-  --brand-lighter: rgba(30, 50, 90, 0.04);
-  --text-primary: #5E6470;
-  --text-secondary: rgba(30, 50, 90, 0.6);
-  --bg-mist: #f0f0f0;
-  --glass-bg: rgba(255, 255, 255, 0.72);
-  --glass-border: rgba(255, 255, 255, 0.5);
-  --radius-lg: 28px;
-  --radius-md: 18px;
+  /* 以下别名全部指向 design-system.css 的全局语义 Token：
+     浅色保持原值，深色随 .dark-mode 自动切换，本文件不再需要深色覆盖块 */
+  --brand-deep: var(--pim-text-strong);
+  --brand-primary: var(--pim-text-strong);
+  --brand-light: rgba(var(--pim-brand), 0.08);
+  --brand-lighter: rgba(var(--pim-brand), 0.04);
+  --text-primary: var(--pim-text-primary);
+  --text-secondary: var(--pim-text-secondary);
+  --bg-mist: var(--pim-page);
+  --glass-bg: var(--pim-surface);
+  --glass-border: var(--pim-card-border);
+  --radius-lg: var(--pim-radius);
+  --radius-md: var(--pim-radius-sm);
   --radius-sm: 12px;
-  --shadow-soft: 0 4px 24px rgba(30, 50, 90, 0.06);
-  --shadow-hover: 0 8px 32px rgba(30, 50, 90, 0.1);
+  --shadow-soft: 0 4px 24px rgba(var(--pim-brand), 0.06);
+  --shadow-hover: 0 8px 32px rgba(var(--pim-brand), 0.1);
   --transition-fast: 200ms cubic-bezier(0.4, 0, 0.2, 1);
   padding: 16px;
   min-height: 100vh;
@@ -1551,7 +1553,7 @@ watch([viewMode, proposalMode], () => {
 }
 
 /* ===== Glass Card ===== */
-/* 这里不要再加 backdrop-filter：卡片背后是 .products-page 的纯色 #f0f0f0，
+/* 这里不要再加 backdrop-filter：卡片背后是 .products-page 的纯色 var(--pim-page)，
    模糊纯色画面上毫无变化，但滚动时每帧都要重算整卡可见区域 —— 列表页滚轮卡顿
    的主因之一。毛玻璃只留给压在内容上的浮层（弹窗、遮罩）。 */
 .glass-card {
@@ -1564,7 +1566,7 @@ watch([viewMode, proposalMode], () => {
 
 .glass-card :deep(.el-card__header) {
   background: transparent;
-  border-bottom: 1px solid rgba(30, 50, 90, 0.06);
+  border-bottom: 1px solid rgba(var(--pim-brand), 0.06);
   padding: 20px 24px;
 }
 
@@ -1611,8 +1613,8 @@ watch([viewMode, proposalMode], () => {
   min-height: 36px;
   padding: 0 12px;
   border: 0;
-  background: rgba(255, 255, 255, 0.72);
-  box-shadow: 0 0 0 1px rgba(30, 50, 90, 0.08) inset;
+  background: var(--pim-field);
+  box-shadow: 0 0 0 1px rgba(var(--pim-brand), 0.08) inset;
 }
 
 .view-mode-toggle :deep(.el-radio-button__inner .el-icon) {
@@ -1623,8 +1625,8 @@ watch([viewMode, proposalMode], () => {
 }
 
 .view-mode-toggle :deep(.el-radio-button__orig-radio:checked + .el-radio-button__inner) {
-  background: rgba(30, 50, 90, 0.92);
-  color: #fff;
+  background: var(--pim-accent-solid);
+  color: var(--pim-on-accent);
   box-shadow: none;
 }
 
@@ -1633,7 +1635,7 @@ watch([viewMode, proposalMode], () => {
 .capsule-select :deep(.el-select__wrapper),
 .capsule-select :deep(.el-input__wrapper) {
   border-radius: 20px;
-  box-shadow: 0 0 0 1px rgba(30, 50, 90, 0.1) inset;
+  box-shadow: 0 0 0 1px rgba(var(--pim-brand), 0.1) inset;
   padding: 4px 16px;
   transition: var(--transition-fast);
 }
@@ -1641,13 +1643,13 @@ watch([viewMode, proposalMode], () => {
 .capsule-input :deep(.el-input__wrapper):hover,
 .capsule-select :deep(.el-select__wrapper):hover,
 .capsule-select :deep(.el-input__wrapper):hover {
-  box-shadow: 0 0 0 1px rgba(30, 50, 90, 0.25) inset;
+  box-shadow: 0 0 0 1px rgba(var(--pim-brand), 0.25) inset;
 }
 
 .capsule-input :deep(.el-input__wrapper.is-focus),
 .capsule-select :deep(.el-select__wrapper.is-focus),
 .capsule-select :deep(.el-input__wrapper.is-focus) {
-  box-shadow: 0 0 0 2px rgba(30, 50, 90, 0.3) inset;
+  box-shadow: 0 0 0 2px rgba(var(--pim-brand), 0.3) inset;
 }
 
 .filter-input {
@@ -1731,7 +1733,7 @@ watch([viewMode, proposalMode], () => {
 
 .more-trigger:hover {
   color: var(--brand-deep);
-  background: rgba(30, 50, 90, 0.06);
+  background: rgba(var(--pim-brand), 0.06);
 }
 
 .flat-action-menu {
@@ -1746,17 +1748,17 @@ watch([viewMode, proposalMode], () => {
 }
 
 .flat-action-menu :deep(.el-dropdown-menu__item:hover) {
-  background: rgba(30, 50, 90, 0.06);
+  background: rgba(var(--pim-brand), 0.06);
   color: var(--brand-deep);
 }
 
 .dropdown-item-danger {
-  color: #f56c6c;
+  color: var(--pim-danger-bright);
 }
 
 .dropdown-item-danger:hover {
-  background: #fef0f0;
-  color: #f56c6c;
+  background: var(--pim-danger-bg);
+  color: var(--pim-danger-bright);
 }
 
 /* ===== Price Range ===== */
@@ -1902,26 +1904,26 @@ watch([viewMode, proposalMode], () => {
   flex-direction: column;
   overflow: hidden;
   border-radius: 16px;
-  background: #fff;
-  border: 1px solid rgba(30, 50, 90, 0.06);
-  box-shadow: 0 4px 16px rgba(30, 50, 90, 0.05);
+  background: var(--pim-surface);
+  border: 1px solid rgba(var(--pim-brand), 0.06);
+  box-shadow: 0 4px 16px rgba(var(--pim-brand), 0.05);
   cursor: pointer;
   transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
 }
 
 .product-tile:hover {
   transform: translateY(-2px);
-  box-shadow: 0 10px 28px rgba(30, 50, 90, 0.08);
+  box-shadow: 0 10px 28px rgba(var(--pim-brand), 0.08);
 }
 
 .product-tile.is-selected {
-  border-color: rgba(30, 50, 90, 0.28);
-  box-shadow: 0 0 0 2px rgba(30, 50, 90, 0.08), 0 10px 28px rgba(30, 50, 90, 0.08);
+  border-color: rgba(var(--pim-brand), 0.28);
+  box-shadow: 0 0 0 2px rgba(var(--pim-brand), 0.08), 0 10px 28px rgba(var(--pim-brand), 0.08);
 }
 
 .product-tile-image {
   aspect-ratio: 1 / 1;
-  background: linear-gradient(180deg, rgba(30, 50, 90, 0.03), rgba(30, 50, 90, 0.01));
+  background: linear-gradient(180deg, rgba(var(--pim-brand), 0.03), rgba(var(--pim-brand), 0.01));
   overflow: hidden;
 }
 
@@ -1942,11 +1944,11 @@ watch([viewMode, proposalMode], () => {
   height: 100%;
   display: grid;
   place-items: center;
-  color: rgba(30, 50, 90, 0.42);
+  color: rgba(var(--pim-brand), 0.42);
   font-size: 24px;
   font-weight: 700;
   letter-spacing: 0.08em;
-  background: linear-gradient(135deg, rgba(30, 50, 90, 0.04), rgba(30, 50, 90, 0.02));
+  background: linear-gradient(135deg, rgba(var(--pim-brand), 0.04), rgba(var(--pim-brand), 0.02));
 }
 
 .product-tile-body {
@@ -2028,7 +2030,7 @@ watch([viewMode, proposalMode], () => {
 
 .thumb-img :deep(img) {
   border-radius: 8px;
-  background: #fff;
+  background: var(--pim-media-bg);
 }
 
 .thumb-placeholder {
@@ -2061,19 +2063,19 @@ watch([viewMode, proposalMode], () => {
 }
 
 .status-text.tone-ok {
-  color: #4f6b57;
+  color: var(--pim-success);
 }
 
 .status-text.tone-warn {
-  color: #8a6a3c;
+  color: var(--pim-warning-ink);
 }
 
 .status-text.tone-danger {
-  color: #8f5b57;
+  color: var(--pim-danger-ink);
 }
 
 .status-text.tone-muted {
-  color: rgba(30, 50, 90, 0.7);
+  color: rgba(var(--pim-brand), 0.7);
 }
 
 /* ===== Pagination ===== */
@@ -2099,8 +2101,8 @@ watch([viewMode, proposalMode], () => {
 
 .pagination-wrap :deep(.el-pager li.active),
 .pagination-wrap :deep(.el-pager li.active:hover) {
-  background: var(--brand-primary);
-  color: #fff;
+  background: var(--pim-accent-solid);
+  color: var(--pim-on-accent);
 }
 
 .pagination-wrap :deep(.el-pager li:hover:not(.active)),
@@ -2113,14 +2115,14 @@ watch([viewMode, proposalMode], () => {
 .glass-dialog :deep(.el-dialog) {
   border-radius: var(--radius-lg) !important;
   overflow: hidden;
-  box-shadow: 0 20px 60px rgba(30, 50, 90, 0.15);
+  box-shadow: 0 20px 60px rgba(var(--pim-brand), 0.15);
 }
 
 .glass-dialog :deep(.el-dialog__header) {
-  background: linear-gradient(135deg, rgba(30, 50, 90, 0.06), rgba(30, 50, 90, 0.02));
+  background: linear-gradient(135deg, rgba(var(--pim-brand), 0.06), rgba(var(--pim-brand), 0.02));
   padding: 20px 24px 16px;
   margin-right: 0;
-  border-bottom: 1px solid rgba(30, 50, 90, 0.06);
+  border-bottom: 1px solid rgba(var(--pim-brand), 0.06);
 }
 
 .glass-dialog :deep(.el-dialog__title) {
@@ -2157,7 +2159,7 @@ watch([viewMode, proposalMode], () => {
   align-items: center;
   justify-content: space-between;
   padding: 12px 16px;
-  background: rgba(30, 50, 90, 0.06);
+  background: rgba(var(--pim-brand), 0.06);
   border-radius: var(--radius-md);
   margin-bottom: 16px;
 }
@@ -2191,9 +2193,9 @@ watch([viewMode, proposalMode], () => {
     align-items: center;
     gap: 10px;
     padding: 12px;
-    border: 1px solid rgba(30, 50, 90, 0.12);
+    border: 1px solid rgba(var(--pim-brand), 0.12);
     border-radius: 14px;
-    background: rgba(255, 255, 255, 0.86);
+    background: var(--pim-surface-strong);
     color: var(--text-primary);
     text-align: left;
   }
@@ -2356,98 +2358,6 @@ watch([viewMode, proposalMode], () => {
   .toolbar-actions {
     flex-shrink: 0;
   }
-}
-
-/* 深色模式覆盖 */
-:global(.dark-mode) .products-page {
-  --brand-deep: rgba(244, 244, 244, 0.92);
-  --brand-primary: rgba(244, 244, 244, 0.85);
-  --brand-light: rgba(244, 244, 244, 0.08);
-  --brand-lighter: rgba(244, 244, 244, 0.04);
-  --text-primary: #f4f4f4;
-  --text-secondary: rgba(244, 244, 244, 0.6);
-  --bg-mist: #192744;
-  --glass-bg: rgba(25, 39, 68, 0.72);
-  --glass-border: rgba(25, 39, 68, 0.5);
-  --shadow-soft: 0 4px 24px rgba(0, 0, 0, 0.2);
-  --shadow-hover: 0 8px 32px rgba(0, 0, 0, 0.3);
-}
-
-:global(.dark-mode) .glass-card :deep(.el-card__header) {
-  border-bottom-color: rgba(244, 244, 244, 0.06);
-}
-
-:global(.dark-mode) .view-mode-toggle :deep(.el-radio-button__inner) {
-  background: rgba(25, 39, 68, 0.72);
-  box-shadow: 0 0 0 1px rgba(244, 244, 244, 0.08) inset;
-}
-
-:global(.dark-mode) .product-tile {
-  background: rgba(25, 39, 68, 0.72);
-  border-color: rgba(244, 244, 244, 0.08);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-}
-
-:global(.dark-mode) .product-tile:hover {
-  border-color: rgba(244, 244, 244, 0.28);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.25);
-}
-
-:global(.dark-mode) .product-tile-image {
-  background: linear-gradient(180deg, rgba(244, 244, 244, 0.03), rgba(244, 244, 244, 0.01));
-}
-
-:global(.dark-mode) .product-tile-name {
-  color: rgba(244, 244, 244, 0.92);
-}
-
-:global(.dark-mode) .product-tile-meta {
-  color: rgba(244, 244, 244, 0.42);
-}
-
-:global(.dark-mode) .product-tile-price {
-  color: rgba(244, 244, 244, 0.7);
-}
-
-:global(.dark-mode) .detail-section {
-  background: rgba(25, 39, 68, 0.72);
-  border-color: rgba(244, 244, 244, 0.06);
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
-}
-
-:global(.dark-mode) .detail-section-header {
-  border-bottom-color: rgba(244, 244, 244, 0.06);
-}
-
-:global(.dark-mode) .detail-section-title {
-  color: rgba(244, 244, 244, 0.92);
-}
-
-:global(.dark-mode) .detail-section-subtitle {
-  color: rgba(244, 244, 244, 0.52);
-}
-
-:global(.dark-mode) .capsule-number :deep(.el-input__wrapper) {
-  background: rgba(25, 39, 68, 0.72);
-  box-shadow: 0 0 0 1px rgba(244, 244, 244, 0.1) inset;
-}
-
-:global(.dark-mode) .glass-dialog :deep(.el-dialog) {
-  background: rgba(25, 39, 68, 0.92);
-  border-color: rgba(244, 244, 244, 0.1);
-}
-
-:global(.dark-mode) .batch-hint {
-  background: rgba(244, 244, 244, 0.06);
-  border-color: rgba(244, 244, 244, 0.12);
-}
-
-:global(.dark-mode) .batch-hint-text {
-  color: rgba(244, 244, 244, 0.7);
-}
-
-:global(.dark-mode) .thumb-img :deep(img) {
-  background: #192744;
 }
 
 </style>

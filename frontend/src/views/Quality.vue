@@ -465,39 +465,39 @@ onMounted(async () => {
   min-width: 110px;
   padding: 14px 16px;
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.7);
-  border: 1px solid rgba(30, 50, 90, 0.08);
+  background: var(--pim-glass);
+  border: 1px solid rgba(var(--pim-brand), 0.08);
   text-align: center;
 }
 
 .stat-pill.warn {
-  background: #fffbeb;
-  border-color: #f5d97b;
+  background: var(--pim-warning-bg);
+  border-color: var(--pim-warning-border);
 }
 
 .stat-pill.err {
-  background: #fef0f0;
-  border-color: #f5a0a0;
+  background: var(--pim-danger-bg);
+  border-color: var(--pim-danger-border);
 }
 
 .stat-num {
   font-size: 22px;
   font-weight: 600;
-  color: rgba(30, 50, 90, 0.85);
+  color: rgba(var(--pim-brand), 0.85);
 }
 
 .stat-pill.warn .stat-num {
-  color: #b8860b;
+  color: var(--pim-warning);
 }
 
 .stat-pill.err .stat-num {
-  color: #c0392b;
+  color: var(--pim-danger);
 }
 
 .stat-label {
   margin-top: 4px;
   font-size: 12px;
-  color: rgba(30, 50, 90, 0.6);
+  color: rgba(var(--pim-brand), 0.6);
 }
 
 .quality-filters {
@@ -512,9 +512,9 @@ onMounted(async () => {
   margin: 24px 0;
   padding: 18px;
   text-align: center;
-  border: 1px dashed rgba(30, 50, 90, 0.18);
+  border: 1px dashed rgba(var(--pim-brand), 0.18);
   border-radius: 12px;
-  color: rgba(30, 50, 90, 0.6);
+  color: rgba(var(--pim-brand), 0.6);
 }
 
 .quality-pagination {
@@ -526,24 +526,5 @@ onMounted(async () => {
   .stat-pill {
     min-width: 88px;
   }
-}
-
-/* 深色模式覆盖 */
-:global(.dark-mode) .stat-pill {
-  background: rgba(25, 39, 68, 0.72);
-  border-color: rgba(244, 244, 244, 0.08);
-}
-
-:global(.dark-mode) .stat-num {
-  color: rgba(244, 244, 244, 0.85);
-}
-
-:global(.dark-mode) .stat-label {
-  color: rgba(244, 244, 244, 0.6);
-}
-
-:global(.dark-mode) .state-empty {
-  border-color: rgba(244, 244, 244, 0.18);
-  color: rgba(244, 244, 244, 0.6);
 }
 </style>

@@ -12,7 +12,7 @@
  *    反而轮不到，上面那句「装了鸿蒙就用鸿蒙」就只剩 HarmonyOS Sans SC 能兜。
  * 2. 纯中文的文案（空态、提示语）不再触发这 4 个用不上的档的下载判断。
  * 区间宁可放宽不要收窄：多写的区间里没有字形时，浏览器按字符继续往后回退；
- * 写窄了才会把子集里本来有的字形（± ™ ℃ € 之类）挡在外面。
+ * 写窄了才会把子集中本来有的字形（± ™ ℃ € 之类）挡在外面。
  */
 @font-face {
   font-family: 'HarmonyOS Sans';
@@ -54,7 +54,36 @@
     U+2190-21FF;
 }
 
+/* =========================================================================
+ * 主题 Token（唯一定义处）
+ *
+ * 浅色 = 现有视觉原样搬进 :root；深色 = 一套重新配色的语义值，全部挂在
+ * .dark-mode（<html> 上的类）下。组件样式只允许引用 Token，不写死颜色：
+ * 这样切换主题时全局生效，不需要逐页、逐组件堆覆盖规则。
+ *
+ * 命名按「语义角色」而不是「色相」：
+ *   page          页面最底层底色
+ *   surface       卡片 / 面板
+ *   surface-soft  卡内的弱填充（嵌套块、输入框）
+ *   surface-strong抬升面（chip、浮层内层）
+ *   header/sidebar一级容器（顶栏 / 侧边栏）
+ *   overlay       弹窗、下拉、抽屉等压内容的浮层
+ *   field         表单控件底
+ *   text-*        文字层级（primary/secondary/soft/faint/disabled/strong）
+ *   line/border   分隔线与描边
+ *   accent-*      强调色（木/铜色系）与 accent-solid + on-accent（实底按钮）
+ *   pine/fjord    松绿（聚焦/选中/成功）、峡湾蓝（极轻点缀）
+ *   *-bg/border   状态色（hover/active 之外的 success/warning/danger/info）
+ *
+ * --pim-brand 是「基色 triplet」，约定只通过 rgba(var(--pim-brand), α) 使用：
+ * 浅色下它是深海军蓝（深色底纹压在浅底上），深色下它是近白墨色（浅色底纹
+ * 压在深底上）——同一段 rgba() 代码在两种主题下自动得到正确方向的淡色，
+ * 这是全站约 200 处 tint（文字、描边、浅填充）只需一份代码的原因。
+ * 反过来，凡是「实底 + 反白文字」的场合一律用 --pim-accent-solid +
+ * --pim-on-accent，不要用 brand 的 tint，否则深色下会变成白底白字。
+ * ========================================================================= */
 :root {
+  color-scheme: light;
   font-family: var(--pim-font-sans);
   color: #5e6470;
   background: #f0f0f0;
@@ -71,21 +100,57 @@
   --pim-primary-60: rgba(var(--pim-brand), 0.6);
   --pim-primary-12: rgba(var(--pim-brand), 0.12);
   --pim-primary-06: rgba(var(--pim-brand), 0.06);
-  --pim-text: #5e6470;
-  --pim-muted: rgba(var(--pim-brand), 0.6);
-  --pim-canvas: #f0f0f0;
+
+  /* 表面层级 */
+  --pim-page: #f0f0f0;
+  --pim-page-gradient:
+    radial-gradient(circle at 8% 12%, rgba(255, 255, 255, 0.95), transparent 28rem),
+    radial-gradient(circle at 92% 8%, rgba(var(--pim-brand), 0.08), transparent 26rem),
+    var(--pim-page);
+  --pim-surface: rgba(255, 255, 255, 0.72);
+  --pim-surface-soft: rgba(255, 255, 255, 0.5);
+  --pim-surface-strong: rgba(255, 255, 255, 0.86);
+  --pim-card-border: rgba(255, 255, 255, 0.5);
+  --pim-header: rgba(255, 255, 255, 0.62);
+  --pim-sidebar: rgb(30, 50, 90);
+  --pim-overlay: rgba(255, 255, 255, 0.94);
+  --pim-field: rgba(255, 255, 255, 0.72);
+  --pim-media-bg: #ffffff;
+  /* 图片查看器上的圆形控制钮（压在图片上的浮层元素） */
+  --pim-media-control-bg: rgba(255, 255, 255, 0.9);
+  --pim-media-control-bg-solid: #ffffff;
+  --pim-media-control-ink: #333333;
+  --pim-shell-fill: rgba(255, 255, 255, 0.18);
   --pim-glass: rgba(255, 255, 255, 0.68);
   --pim-glass-strong: rgba(255, 255, 255, 0.84);
-  --pim-border: rgba(255, 255, 255, 0.72);
-  --pim-radius: 28px;
-  --pim-radius-sm: 18px;
-  --pim-shadow: 0 20px 60px rgba(var(--pim-brand), 0.09);
-  /* 表格排版：靠字重 + 颜色分主次，不靠加粗边框 */
+  --pim-scrim: rgba(30, 50, 90, 0.24);
+
+  /* 文字层级（正文 ≥4.5:1，弱化档用于 Meta 信息） */
+  --pim-text: #5e6470;
+  --pim-text-primary: #5e6470;
+  --pim-text-secondary: rgba(var(--pim-brand), 0.6);
   --pim-text-strong: rgba(var(--pim-brand), 0.92);
   --pim-text-soft: rgba(var(--pim-brand), 0.54);
   --pim-text-faint: rgba(var(--pim-brand), 0.38);
+  --pim-text-disabled: rgba(var(--pim-brand), 0.3);
+
+  /* 描边与分隔线 */
+  --pim-border: rgba(255, 255, 255, 0.72);
+  --pim-surface-border: rgba(255, 255, 255, 0.6);
   --pim-line: rgba(var(--pim-brand), 0.08);
   --pim-line-strong: rgba(var(--pim-brand), 0.14);
+  --pim-control-border: rgba(var(--pim-brand), 0.1);
+
+  /* 圆角与投影：一律浅色品牌蓝调制，不用纯黑 */
+  --pim-radius: 28px;
+  --pim-radius-sm: 18px;
+  --pim-shadow: 0 20px 60px rgba(var(--pim-brand), 0.09);
+  --pim-shadow-sm: 0 4px 24px rgba(var(--pim-brand), 0.06);
+  --pim-shadow-md: 0 8px 32px rgba(var(--pim-brand), 0.1);
+
+  /* 表格排版：靠字重 + 颜色分主次，不靠加粗边框 */
+  --pim-muted: rgba(var(--pim-brand), 0.6);
+
   /*
    * 铜色副色：品牌蓝之外唯一的强调色，目前只有「版本 / 构建指纹」这类元信息在用。
    * 跟 brand/primary 一个套法（triplet + rgb() 双形态），需要调透明度时能直接 rgba()。
@@ -94,8 +159,50 @@
   --pim-accent: rgb(var(--pim-copper));
   --pim-accent-mid: rgb(181, 109, 61);
   --pim-accent-deep: rgb(155, 97, 62);
+  /* 实底强调面与其上的文字色：hover/选中/主按钮填充用它俩，禁止 brand tint 代替 */
+  --pim-accent-solid: rgb(var(--pim-brand));
+  --pim-on-accent: #ffffff;
+  /* accent 底上的文字（铜底 navy 字这类既有搭配） */
+  --pim-accent-ink: rgb(var(--pim-brand));
   /* 品牌蓝的提亮档，用在渐变中段（纯 --pim-primary 到铜色之间缺一个过渡点） */
   --pim-brand-lift: rgb(41, 76, 125);
+
+  /* 北欧色板的其余角色：松绿（聚焦/选中/成功）、峡湾蓝（轻点缀）、木质（暖提示） */
+  --pim-pine: #5a7a6b;
+  --pim-pine-soft: rgba(90, 122, 107, 0.12);
+  --pim-fjord: #7ba0b8;
+  --pim-fjord-soft: rgba(123, 160, 184, 0.18);
+  --pim-wood: #a89279;
+  --pim-focus-ring: #5a7a6b;
+
+  /* 品牌大面板（登录页左版、侧边栏）与 Hero 渐变：深色主题整体换汤，不反相 */
+  --pim-brand-panel: rgb(30, 50, 90);
+  --pim-brand-panel-ink: #ffffff;
+  --pim-hero-gradient: linear-gradient(
+    125deg,
+    rgb(30, 50, 90) 0%,
+    var(--pim-brand-lift) 60%,
+    var(--pim-accent-mid) 140%
+  );
+  --pim-hero-ink: #ffffff;
+
+  /* 状态色：ink 为文字色，bg/border 为同色系的淡底与描边（不靠颜色单独表意，
+     各处同时会配图标/文案，见 .notice/.status-pill） */
+  --pim-success: #4f6b57;
+  --pim-success-bg: rgba(90, 122, 107, 0.1);
+  --pim-success-border: rgba(90, 122, 107, 0.3);
+  --pim-warning: #b8860b;
+  --pim-warning-ink: #8a6a3c;
+  --pim-warning-bg: #fffbeb;
+  --pim-warning-border: #f5d97b;
+  --pim-warning-soft: rgba(230, 162, 60, 0.12);
+  --pim-danger: #c0392b;
+  --pim-danger-bright: #f56c6c;
+  --pim-danger-deep: #d94b4b;
+  --pim-danger-ink: #8f5b57;
+  --pim-danger-bg: #fef0f0;
+  --pim-danger-border: #f5a0a0;
+
   /*
    * 这里故意不覆盖 --el-font-family：Element Plus 只在 :root 声明了它，整个包里
    * 没有任何一处 var(--el-font-family) 真的在读（dist/index.css 的显式 font-family
@@ -115,63 +222,207 @@
   --el-fill-color-light: rgba(var(--pim-brand), 0.04);
 }
 
-/* 深色模式 */
+/* =========================================================================
+ * 深色主题
+ *
+ * 配色（北欧暖灰绿的深色转译，全部按语义角色重新取值，不是浅色反相）：
+ *   页面 #171e22 / 一级容器 #202a2e / 卡片浮层 #283439 / 输入 #1d262a
+ *   文字 #edf1ee（主）#b9c8c2（次）  描边 #3e5052
+ *   松绿 #a4c8b4（聚焦/选中/主交互） 峡湾蓝 #a9c8dc  木质 #d5bca4（暖点缀）
+ * 正文对比度均 ≥4.5:1（见 docs/《主题与对比度》），禁用态用降透明度 + 文
+ * 案双重表达，不只靠颜色。
+ * ========================================================================= */
 .dark-mode {
-  --pim-brand: 244, 244, 244;
-  --pim-primary: rgb(var(--pim-brand));
-  --pim-primary-90: rgba(var(--pim-brand), 0.9);
-  --pim-primary-80: rgba(var(--pim-brand), 0.8);
-  --pim-primary-60: rgba(var(--pim-brand), 0.6);
-  --pim-primary-12: rgba(var(--pim-brand), 0.12);
-  --pim-primary-06: rgba(var(--pim-brand), 0.06);
-  --pim-text: #f4f4f4;
-  --pim-muted: rgba(var(--pim-brand), 0.6);
-  --pim-canvas: #192744;
-  --pim-glass: rgba(25, 39, 68, 0.68);
-  --pim-glass-strong: rgba(25, 39, 68, 0.84);
-  --pim-border: rgba(25, 39, 68, 0.72);
-  --pim-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-  --pim-text-strong: rgba(var(--pim-brand), 0.92);
-  --pim-text-soft: rgba(var(--pim-brand), 0.54);
-  --pim-text-faint: rgba(var(--pim-brand), 0.38);
-  --pim-line: rgba(var(--pim-brand), 0.08);
-  --pim-line-strong: rgba(var(--pim-brand), 0.14);
-  --pim-copper: 230, 139, 81;
-  --pim-accent: rgb(var(--pim-copper));
-  --pim-accent-mid: rgb(181, 109, 61);
-  --pim-accent-deep: rgb(155, 97, 62);
-  --pim-brand-lift: rgb(184, 189, 198);
-  
-  --el-color-primary: rgb(var(--pim-brand));
-  --el-color-primary-light-3: rgba(var(--pim-brand), 0.72);
-  --el-color-primary-light-5: rgba(var(--pim-brand), 0.5);
-  --el-color-primary-light-7: rgba(var(--pim-brand), 0.22);
-  --el-color-primary-light-8: rgba(var(--pim-brand), 0.12);
-  --el-color-primary-light-9: rgba(var(--pim-brand), 0.06);
-  --el-text-color-primary: #f4f4f4;
-  --el-text-color-regular: rgba(var(--pim-brand), 0.72);
-  --el-border-color: rgba(var(--pim-brand), 0.1);
-  --el-fill-color-light: rgba(var(--pim-brand), 0.04);
-}
+  color-scheme: dark;
+  --pim-brand: 237, 241, 238;
 
-.dark-mode body {
-  background:
-    radial-gradient(circle at 8% 12%, rgba(25, 39, 68, 0.95), transparent 28rem),
-    radial-gradient(circle at 92% 8%, rgba(var(--pim-brand), 0.08), transparent 26rem),
-    var(--pim-canvas);
+  /* 表面层级：page → 侧栏/顶栏 → 卡片 → 输入，逐层抬亮约 4~6% */
+  --pim-page: #171e22;
+  --pim-page-gradient:
+    radial-gradient(circle at 8% 12%, rgba(237, 241, 238, 0.05), transparent 28rem),
+    var(--pim-page);
+  --pim-surface: #283439;
+  --pim-surface-soft: #202a2e;
+  --pim-surface-strong: #2f3d42;
+  --pim-card-border: #3e5052;
+  --pim-header: #202a2e;
+  --pim-sidebar: #202a2e;
+  --pim-overlay: #2a363b;
+  --pim-field: #1d262a;
+  --pim-media-bg: #222c30;
+  --pim-media-control-bg: rgba(42, 54, 59, 0.92);
+  --pim-media-control-bg-solid: #2a363b;
+  --pim-media-control-ink: #edf1ee;
+  --pim-shell-fill: rgba(237, 241, 238, 0.05);
+  --pim-glass: #283439;
+  --pim-glass-strong: #2a363b;
+  --pim-scrim: rgba(0, 0, 0, 0.55);
+
+  /* 文字层级：#edf1ee 主 / #b9c8c2 次 / 更弱的 Meta 与禁用逐档降 */
+  --pim-text: #edf1ee;
+  --pim-text-primary: #edf1ee;
+  --pim-text-secondary: #b9c8c2;
+  --pim-text-strong: #f3f6f4;
+  --pim-text-soft: #9db0a9;
+  --pim-text-faint: #93a69f;
+  --pim-text-disabled: #64756f;
+
+  /* 描边与分隔线 */
+  --pim-border: #3e5052;
+  --pim-surface-border: #3e5052;
+  --pim-line: #35464a;
+  --pim-line-strong: #4a5e60;
+  --pim-control-border: #46585b;
+
+  --pim-radius: 28px;
+  --pim-radius-sm: 18px;
+  --pim-shadow: 0 20px 60px rgba(0, 0, 0, 0.34);
+  --pim-shadow-sm: 0 4px 24px rgba(0, 0, 0, 0.26);
+  --pim-shadow-md: 0 8px 32px rgba(0, 0, 0, 0.32);
+  --pim-muted: rgba(237, 241, 238, 0.62);
+
+  /* 强调色系：木质暖色做点缀，松绿做主交互实底（配深墨文字） */
+  --pim-accent: #d5bca4;
+  --pim-accent-mid: #c9a984;
+  --pim-accent-deep: #c69a6e;
+  --pim-accent-solid: #a4c8b4;
+  --pim-on-accent: #171e22;
+  --pim-accent-ink: #171e22;
+  --pim-brand-lift: #33505c;
+
+  --pim-pine: #a4c8b4;
+  --pim-pine-soft: rgba(164, 200, 180, 0.14);
+  --pim-fjord: #a9c8dc;
+  --pim-fjord-soft: rgba(169, 200, 220, 0.16);
+  --pim-wood: #d5bca4;
+  --pim-focus-ring: #a9c8dc;
+
+  --pim-brand-panel: #202a2e;
+  --pim-brand-panel-ink: #edf1ee;
+  --pim-hero-gradient: linear-gradient(
+    125deg,
+    #26343a 0%,
+    #2c3d43 55%,
+    #3a4a46 130%
+  );
+  --pim-hero-ink: #edf1ee;
+
+  /* 状态色：同色系深色转译，文字色对卡片 #283439 均 ≥4.5:1 */
+  --pim-success: #7fb98f;
+  --pim-success-bg: rgba(127, 185, 143, 0.12);
+  --pim-success-border: rgba(127, 185, 143, 0.32);
+  --pim-warning: #d9a45b;
+  --pim-warning-ink: #d9a45b;
+  --pim-warning-bg: rgba(217, 164, 91, 0.12);
+  --pim-warning-border: rgba(217, 164, 91, 0.36);
+  --pim-warning-soft: rgba(217, 164, 91, 0.14);
+  --pim-danger: #e0918a;
+  --pim-danger-bright: #e0918a;
+  --pim-danger-deep: #d98a84;
+  --pim-danger-ink: #dd9a94;
+  --pim-danger-bg: rgba(224, 145, 138, 0.12);
+  --pim-danger-border: rgba(224, 145, 138, 0.34);
+
+  /* Element Plus 深色变量：下拉/弹窗/表格/浮层统一走这套底 */
+  --el-color-primary: #a4c8b4;
+  --el-color-primary-light-3: rgba(164, 200, 180, 0.72);
+  --el-color-primary-light-5: rgba(164, 200, 180, 0.5);
+  --el-color-primary-light-7: rgba(164, 200, 180, 0.22);
+  --el-color-primary-light-8: rgba(164, 200, 180, 0.12);
+  --el-color-primary-light-9: rgba(164, 200, 180, 0.06);
+  --el-color-success: #74ad80;
+  --el-color-success-light-3: rgba(116, 173, 128, 0.72);
+  --el-color-success-light-5: rgba(116, 173, 128, 0.5);
+  --el-color-success-light-7: rgba(116, 173, 128, 0.22);
+  --el-color-success-light-8: rgba(116, 173, 128, 0.12);
+  --el-color-success-light-9: rgba(116, 173, 128, 0.06);
+  --el-color-success-dark-2: #85ce61;
+  --el-color-warning: #d9a45b;
+  --el-color-warning-light-3: rgba(217, 164, 91, 0.72);
+  --el-color-warning-light-5: rgba(217, 164, 91, 0.5);
+  --el-color-warning-light-7: rgba(217, 164, 91, 0.22);
+  --el-color-warning-light-8: rgba(217, 164, 91, 0.12);
+  --el-color-warning-light-9: rgba(217, 164, 91, 0.06);
+  --el-color-warning-dark-2: #ebb563;
+  --el-color-danger: #e0918a;
+  --el-color-danger-light-3: rgba(224, 145, 138, 0.72);
+  --el-color-danger-light-5: rgba(224, 145, 138, 0.5);
+  --el-color-danger-light-7: rgba(224, 145, 138, 0.22);
+  --el-color-danger-light-8: rgba(224, 145, 138, 0.12);
+  --el-color-danger-light-9: rgba(224, 145, 138, 0.06);
+  --el-color-danger-dark-2: #f78989;
+  --el-color-error: #e0918a;
+  --el-color-error-light-3: rgba(224, 145, 138, 0.72);
+  --el-color-error-light-5: rgba(224, 145, 138, 0.5);
+  --el-color-error-light-7: rgba(224, 145, 138, 0.22);
+  --el-color-error-light-8: rgba(224, 145, 138, 0.12);
+  --el-color-error-light-9: rgba(224, 145, 138, 0.06);
+  --el-color-error-dark-2: #f78989;
+  --el-color-info: #8fa39d;
+  --el-color-info-light-3: rgba(143, 163, 157, 0.72);
+  --el-color-info-light-5: rgba(143, 163, 157, 0.5);
+  --el-color-info-light-7: rgba(143, 163, 157, 0.22);
+  --el-color-info-light-8: rgba(143, 163, 157, 0.12);
+  --el-color-info-light-9: rgba(143, 163, 157, 0.06);
+  --el-color-info-dark-2: #a6b8b1;
+
+  --el-bg-color: #171e22;
+  --el-bg-color-overlay: #2a363b;
+  --el-bg-color-page: #171e22;
+  --el-dialog-bg-color: var(--pim-overlay);
+  --el-drawer-bg-color: var(--pim-overlay);
+  --el-message-bg-color: var(--pim-overlay);
+  --el-messagebox-color: #edf1ee;
+  --el-messagebox-content-color: #b9c8c2;
+  --el-messagebox-title-color: #edf1ee;
+  --el-text-color-primary: #edf1ee;
+  --el-text-color-regular: #b9c8c2;
+  --el-text-color-secondary: #9db0a9;
+  --el-text-color-placeholder: #8a9c95;
+  --el-text-color-disabled: #64756f;
+  --el-border-color: #3e5052;
+  --el-border-color-light: #35464a;
+  --el-border-color-lighter: #2c3a3e;
+  --el-border-color-extra-light: #263236;
+  --el-border-color-dark: #4a5e60;
+  --el-border-color-darker: #55686a;
+  --el-fill-color: #2c3a3e;
+  --el-fill-color-light: #262f33;
+  --el-fill-color-lighter: #222b2f;
+  --el-fill-color-extra-light: #1e262a;
+  --el-fill-color-blank: #1d262a;
+  --el-fill-color-dark: #313c40;
+  --el-fill-color-darker: #364246;
+  --el-disabled-bg-color: #222b2f;
+  --el-disabled-text-color: #64756f;
+  --el-disabled-border-color: #2c3a3e;
+  --el-mask-color: rgba(0, 0, 0, 0.62);
+  --el-mask-color-extra-light: rgba(0, 0, 0, 0.4);
+  --el-overlay-color-lighter: rgba(0, 0, 0, 0.55);
+  --el-box-shadow: 0 12px 32px 4px rgba(0, 0, 0, 0.4), 0 8px 20px rgba(0, 0, 0, 0.5);
+  --el-box-shadow-light: 0 0 12px rgba(0, 0, 0, 0.5);
+  --el-box-shadow-lighter: 0 0 6px rgba(0, 0, 0, 0.5);
+  --el-box-shadow-dark: 0 16px 48px 16px rgba(0, 0, 0, 0.5), 0 12px 32px rgba(0, 0, 0, 0.45),
+    0 8px 16px -8px rgba(0, 0, 0, 0.6);
+  --el-tag-text-color: #b9c8c2;
+  --el-tag-bg-color: rgba(237, 241, 238, 0.08);
+  --el-tag-border-color: #3e5052;
+  --el-tag-hover-color: #a4c8b4;
+  --el-table-border-color: var(--pim-line);
+  --el-scrollbar-bg-color: #3e5052;
+  --el-scrollbar-hover-bg-color: #4a5e60;
+  --el-scrollbar-opacity: 0.5;
+  --el-scrollbar-hover-opacity: 0.7;
 }
 
 html {
-  background: var(--pim-canvas);
+  background: var(--pim-page);
 }
 
 body {
   min-width: 320px;
   color: var(--pim-text);
-  background:
-    radial-gradient(circle at 8% 12%, rgba(255, 255, 255, 0.95), transparent 28rem),
-    radial-gradient(circle at 92% 8%, rgba(var(--pim-brand), 0.08), transparent 26rem),
-    var(--pim-canvas);
+  background: var(--pim-page-gradient);
 }
 
 button,
@@ -194,11 +445,11 @@ a {
   border: 1px solid var(--pim-border);
   border-radius: var(--pim-radius);
   background: var(--pim-glass);
-  box-shadow: var(--pim-shadow);
+  box-shadow: var(--pim-shadow-sm);
 }
 
 .el-card__header {
-  border-bottom-color: rgba(var(--pim-brand), 0.08);
+  border-bottom-color: var(--pim-line);
 }
 
 .el-button {
@@ -218,12 +469,33 @@ a {
   transform: none;
   background: var(--el-color-primary);
   border-color: var(--el-color-primary);
-  color: #fff;
+  color: var(--pim-on-accent);
   box-shadow: none;
 }
 
 .el-button:not(.is-disabled):active {
   transform: none;
+}
+
+/* 键盘焦点：松绿/峡湾蓝描边环，两种主题下都清晰；禁用态不画环 */
+.el-button:focus-visible,
+.el-input__wrapper:focus-within,
+.el-select__wrapper:focus-within,
+.el-textarea__inner:focus-within,
+.el-input__inner:focus-visible,
+.el-textarea__inner:focus-visible,
+.el-checkbox__inner:focus-visible,
+.el-radio__inner:focus-visible {
+  outline: 2px solid var(--pim-focus-ring);
+  outline-offset: 1px;
+}
+
+.el-button.is-disabled,
+.el-button.is-disabled:hover {
+  border-color: var(--pim-line-strong);
+  background: transparent;
+  color: var(--pim-text-disabled);
+  cursor: not-allowed;
 }
 
 .el-button--primary {
@@ -236,7 +508,7 @@ a {
 .el-button--primary:not(.is-disabled):hover {
   background: var(--el-color-primary);
   border-color: var(--el-color-primary);
-  color: #fff;
+  color: var(--pim-on-accent);
   box-shadow: none;
 }
 
@@ -256,7 +528,7 @@ a {
 .el-button--info:not(.is-disabled):hover {
   background: var(--el-color-primary);
   border-color: var(--el-color-primary);
-  color: #fff;
+  color: var(--pim-on-accent);
   box-shadow: none;
 }
 
@@ -275,7 +547,7 @@ a {
 }
 
 .el-button[class*="el-button--"]:not(.is-text):not(.is-link):not(.is-disabled):hover {
-  color: #fff;
+  color: var(--pim-on-accent);
 }
 
 .capsule-btn,
@@ -306,7 +578,7 @@ a {
 .btn-sm:not(.is-disabled):hover {
   background: var(--el-color-primary) !important;
   border-color: var(--el-color-primary) !important;
-  color: #fff !important;
+  color: var(--pim-on-accent) !important;
 }
 
 .el-button span,
@@ -318,8 +590,68 @@ a {
 .el-select__wrapper,
 .el-textarea__inner {
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.72);
-  box-shadow: 0 0 0 1px rgba(var(--pim-brand), 0.09) inset;
+  background: var(--pim-field);
+  box-shadow: 0 0 0 1px var(--pim-control-border) inset;
+  color: var(--pim-text-primary);
+}
+
+.el-input__wrapper:hover,
+.el-select__wrapper:hover {
+  box-shadow: 0 0 0 1px var(--pim-line-strong) inset;
+}
+
+.el-input__wrapper.is-focus,
+.el-select__wrapper.is-focus {
+  box-shadow: 0 0 0 1px var(--el-color-primary) inset !important;
+}
+
+.el-input__inner,
+.el-textarea__inner {
+  color: var(--pim-text-primary);
+}
+
+.el-input__inner::placeholder,
+.el-textarea__inner::placeholder {
+  color: var(--el-text-color-placeholder);
+}
+
+.el-input__suffix,
+.el-input__prefix,
+.el-select__icon {
+  color: var(--pim-text-soft);
+}
+
+/* 下拉面板 / 浮层：背景走 --el-bg-color-overlay，item 的 hover/选中由 EP 变量接管 */
+.el-select-dropdown,
+.el-cascader__dropdown,
+.el-dropdown-menu,
+.el-picker-panel,
+.el-popover,
+.el-tooltip__popper {
+  background: var(--el-bg-color-overlay);
+  border-color: var(--el-border-color-light);
+}
+
+.el-select-dropdown__item {
+  color: var(--el-text-color-regular);
+}
+
+.el-select-dropdown__item.is-hovering,
+.el-select-dropdown__item:hover {
+  background: var(--el-fill-color-light);
+}
+
+.el-select-dropdown__item.is-selected {
+  color: var(--el-color-primary);
+  font-weight: 600;
+}
+
+.el-select-dropdown__item.is-disabled {
+  color: var(--el-text-color-disabled);
+}
+
+.el-select-dropdown__empty {
+  color: var(--el-text-color-placeholder);
 }
 
 /* =========================================================================
@@ -436,9 +768,9 @@ a {
 
 .el-dialog {
   max-width: calc(100vw - 32px);
-  border: 1px solid var(--pim-border);
+  border: 1px solid var(--pim-line-strong);
   border-radius: 26px;
-  background: var(--pim-glass-strong);
+  background: var(--pim-overlay);
   box-shadow: 0 28px 90px rgba(var(--pim-brand), 0.2);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
@@ -446,13 +778,56 @@ a {
 }
 
 .el-dialog__title {
-  color: var(--pim-primary-90);
+  color: var(--pim-text-strong);
   font-weight: 400;
   letter-spacing: -0.02em;
 }
 
+.el-dialog__headerbtn .el-dialog__close {
+  color: var(--pim-text-soft);
+}
+
+.el-dialog__body {
+  color: var(--pim-text-primary);
+}
+
+.el-drawer {
+  background: var(--pim-overlay);
+  color: var(--pim-text-primary);
+}
+
+.el-drawer__header {
+  color: var(--pim-text-strong);
+  border-bottom-color: var(--pim-line);
+  margin-bottom: 0;
+}
+
+.el-message,
+.el-notification {
+  background: var(--el-bg-color-overlay);
+  border-color: var(--el-border-color-light);
+  color: var(--pim-text-primary);
+}
+
+.el-message__content,
+.el-notification__content {
+  color: var(--pim-text-primary);
+}
+
 .el-tag {
   border-radius: 999px;
+}
+
+/* effect="dark" 的实底标签：EP 默认反白字，深色主题的状态色都是中明度，
+   白字只有 2:1，换成深墨字（≥6:1），标签的可读性别只靠颜色——文字本身在。 */
+.dark-mode .el-tag--dark,
+.dark-mode .el-tag--dark.el-tag--primary,
+.dark-mode .el-tag--dark.el-tag--success,
+.dark-mode .el-tag--dark.el-tag--warning,
+.dark-mode .el-tag--dark.el-tag--danger,
+.dark-mode .el-tag--dark.el-tag--error,
+.dark-mode .el-tag--dark.el-tag--info {
+  --el-tag-text-color: var(--pim-on-accent);
 }
 
 .el-pagination {
@@ -461,6 +836,7 @@ a {
   --el-pagination-button-color: var(--pim-text-soft);
   --el-pagination-bg-color: transparent;
   --el-pagination-hover-color: var(--el-color-primary);
+  --el-pagination-font-size: 13px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -476,10 +852,88 @@ a {
   font-weight: 500;
 }
 
+/* 深色下选中页用松绿实底 + 深墨文字，浅色保持原来的品牌蓝淡底 */
+.dark-mode .el-pagination .el-pager li.is-active {
+  background: var(--pim-accent-solid);
+  color: var(--pim-on-accent);
+}
+
+.dark-mode .el-pagination button:disabled {
+  background: transparent;
+  color: var(--pim-text-disabled);
+}
+
 .el-pagination__total,
 .el-pagination__jump {
   color: var(--pim-text-faint);
   font-size: 12px;
+}
+
+.el-pagination__jump .el-input__wrapper {
+  background: var(--pim-field);
+}
+
+/* 单选/复选未选中态描边在深色下要可见 */
+.el-radio__inner,
+.el-checkbox__inner {
+  background: var(--pim-field);
+  border-color: var(--pim-control-border);
+}
+
+.el-radio__input.is-checked .el-radio__inner,
+.el-checkbox__input.is-checked .el-checkbox__inner {
+  background: var(--el-color-primary);
+  border-color: var(--el-color-primary);
+}
+
+.el-radio__input.is-checked + .el-radio__label,
+.el-checkbox__input.is-checked + .el-checkbox__label {
+  color: var(--pim-text-primary);
+}
+
+.el-radio__label,
+.el-checkbox__label {
+  color: var(--pim-text-primary);
+}
+
+.el-radio__input.is-disabled .el-radio__inner,
+.el-checkbox__input.is-disabled .el-checkbox__inner {
+  background: var(--pim-line);
+  border-color: var(--pim-line-strong);
+}
+
+/* 上传区、空态、加载遮罩 */
+.el-upload,
+.el-upload-dragger {
+  background: var(--pim-surface-soft);
+  border-color: var(--pim-control-border);
+}
+
+.el-empty__description {
+  color: var(--pim-text-faint);
+}
+
+.el-loading-mask {
+  background: rgba(23, 30, 34, 0.6);
+}
+
+.dark-mode .el-loading-mask {
+  background: rgba(23, 30, 34, 0.72);
+}
+
+/* 分段控件（视图切换）未选中态的底 */
+.el-radio-button__inner {
+  background: var(--pim-field);
+  border-color: var(--pim-control-border);
+  color: var(--pim-text-soft);
+  box-shadow: none;
+}
+
+.el-radio-button__orig-radio:checked + .el-radio-button__inner {
+  background: var(--el-color-primary);
+  border-color: var(--el-color-primary);
+  color: var(--pim-on-accent);
+  box-shadow: none;
 }
 
 @media (max-width: 767px) {

@@ -155,18 +155,18 @@ watch(dialogVisible, async (val) => {
 .share-result-dialog :deep(.el-dialog) {
   border-radius: 28px !important;
   overflow: hidden;
-  box-shadow: 0 20px 60px rgba(30, 50, 90, 0.15);
+  box-shadow: 0 20px 60px rgba(var(--pim-brand), 0.15);
 }
 
 .share-result-dialog :deep(.el-dialog__header) {
-  background: linear-gradient(135deg, rgba(30, 50, 90, 0.06), rgba(30, 50, 90, 0.02));
+  background: linear-gradient(135deg, rgba(var(--pim-brand), 0.06), rgba(var(--pim-brand), 0.02));
   padding: 20px 24px 16px;
   margin-right: 0;
-  border-bottom: 1px solid rgba(30, 50, 90, 0.06);
+  border-bottom: 1px solid rgba(var(--pim-brand), 0.06);
 }
 
 .share-result-dialog :deep(.el-dialog__title) {
-  color: #5E6470;
+  color: var(--pim-text-primary);
   font-weight: 700;
   font-size: 18px;
 }
@@ -198,7 +198,7 @@ watch(dialogVisible, async (val) => {
   width: 180px !important;
   height: 180px !important;
   border-radius: 12px;
-  box-shadow: 0 4px 16px rgba(30, 50, 90, 0.1);
+  box-shadow: 0 4px 16px rgba(var(--pim-brand), 0.1);
 }
 
 .share-actions {
@@ -225,13 +225,13 @@ watch(dialogVisible, async (val) => {
 }
 
 .capsule-btn-primary {
-  background: rgba(30, 50, 90, 0.85);
-  border-color: rgba(30, 50, 90, 0.85);
+  background: rgba(var(--pim-brand), 0.85);
+  border-color: rgba(var(--pim-brand), 0.85);
 }
 
 .capsule-btn-primary:hover {
-  background: rgba(30, 50, 90, 0.92);
-  border-color: rgba(30, 50, 90, 0.92);
+  background: rgba(var(--pim-brand), 0.92);
+  border-color: rgba(var(--pim-brand), 0.92);
 }
 
 /* Mobile responsive */
@@ -253,34 +253,5 @@ watch(dialogVisible, async (val) => {
   .share-actions .capsule-btn {
     width: 100%;
   }
-}
-
-/* 深色模式覆盖 */
-:global(.dark-mode) .share-result-dialog :deep(.el-dialog) {
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-}
-
-:global(.dark-mode) .share-result-dialog :deep(.el-dialog__header) {
-  background: linear-gradient(135deg, rgba(244, 244, 244, 0.06), rgba(244, 244, 244, 0.02));
-  border-bottom-color: rgba(244, 244, 244, 0.06);
-}
-
-:global(.dark-mode) .share-result-dialog :deep(.el-dialog__title) {
-  color: #f4f4f4;
-}
-
-:global(.dark-mode) .qr-canvas {
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
-}
-
-:global(.dark-mode) .capsule-btn-primary {
-  background: rgba(244, 244, 244, 0.85);
-  border-color: rgba(244, 244, 244, 0.85);
-  color: rgb(25, 39, 68);
-}
-
-:global(.dark-mode) .capsule-btn-primary:hover {
-  background: rgba(244, 244, 244, 0.92);
-  border-color: rgba(244, 244, 244, 0.92);
 }
 </style>

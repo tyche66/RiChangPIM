@@ -222,7 +222,7 @@ function removeUpload(id: string) {
   flex-direction: column;
   gap: 4px;
   padding: 8px 12px;
-  background: #fff;
+  background: var(--pim-surface);
   border: 1px solid var(--el-border-color-light);
   border-radius: 8px;
 }
@@ -257,10 +257,5 @@ function removeUpload(id: string) {
 }
 .upload-progress {
   margin-top: 4px;
-}
-
-/* 深色模式覆盖 */
-:global(.dark-mode) .upload-item {
-  background: rgba(25, 39, 68, 0.72);
 }
 </style>

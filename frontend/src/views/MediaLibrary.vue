@@ -1058,10 +1058,10 @@ async function handleBatchDelete() {
 /* ===== CSS Variables for checkerboard pattern ===== */
 .checkerboard {
   background-image:
-    linear-gradient(45deg, #e0e0e0 25%, transparent 25%),
-    linear-gradient(-45deg, #e0e0e0 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, #e0e0e0 75%),
-    linear-gradient(-45deg, transparent 75%, #e0e0e0 75%);
+    linear-gradient(45deg, var(--pim-line-strong) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--pim-line-strong) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--pim-line-strong) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--pim-line-strong) 75%);
   background-size: 16px 16px;
   background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
 }
@@ -1109,7 +1109,7 @@ async function handleBatchDelete() {
   justify-content: space-between;
   margin-bottom: 16px;
   padding: 12px 16px;
-  background: #fff;
+  background: var(--pim-surface);
   border-radius: 12px;
   border: 1px solid var(--el-border-color-light);
 }
@@ -1165,7 +1165,7 @@ async function handleBatchDelete() {
 }
 
 .gallery-card {
-  background: #fff;
+  background: var(--pim-surface);
   border: 2px solid var(--el-border-color-light);
   border-radius: 12px;
   overflow: hidden;
@@ -1212,13 +1212,13 @@ async function handleBatchDelete() {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  background: #fafafa;
+  background: var(--pim-media-bg);
 }
 
 .pdf-label {
   font-size: 13px;
   font-weight: 600;
-  color: #e74c3c;
+  color: var(--pim-danger);
 }
 
 .gallery-overlay {
@@ -1285,7 +1285,7 @@ async function handleBatchDelete() {
 
 /* List View */
 .ml-list {
-  background: #fff;
+  background: var(--pim-surface);
   border-radius: 12px;
   overflow: hidden;
 }
@@ -1392,7 +1392,7 @@ async function handleBatchDelete() {
   align-items: center;
   gap: 10px;
   padding: 8px 10px;
-  background: #fff;
+  background: var(--pim-surface);
   border-radius: 8px;
   margin-bottom: 6px;
   cursor: pointer;
@@ -1559,36 +1559,5 @@ async function handleBatchDelete() {
     width: 100% !important;
     max-width: 100vw;
   }
-}
-
-/* 深色模式覆盖 */
-:global(.dark-mode) .ml-toolbar {
-  background: rgba(25, 39, 68, 0.72);
-}
-
-:global(.dark-mode) .gallery-card {
-  background: #192744;
-  border-color: rgba(244, 244, 244, 0.08);
-}
-
-:global(.dark-mode) .gallery-card:hover {
-  border-color: var(--el-color-primary-light-3);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
-}
-
-:global(.dark-mode) .ml-list {
-  background: rgba(25, 39, 68, 0.72);
-}
-
-:global(.dark-mode) .ml-preview-img-wrap {
-  background: #192744;
-}
-
-:global(.dark-mode) .ml-empty-thumb {
-  background: #192744;
-}
-
-:global(.dark-mode) .ml-gallery-card {
-  background: #192744;
 }
 </style>

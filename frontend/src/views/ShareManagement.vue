@@ -159,16 +159,16 @@ onMounted(fetchShares)
 <style scoped>
 .share-management-page {
   min-height: 100vh;
-  background: #f0f0f0;
+  background: var(--pim-page);
   padding: 24px;
   box-sizing: border-box;
 }
 
 .share-management-page :deep(.el-card) {
-  background: rgba(255, 255, 255, 0.68);
+  background: var(--pim-glass);
   border-radius: 28px;
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  box-shadow: 0 4px 32px rgba(30, 50, 90, 0.06);
+  border: 1px solid var(--pim-surface-border);
+  box-shadow: 0 4px 32px rgba(var(--pim-brand), 0.06);
 }
 
 .share-management-page :deep(.el-card__body) {
@@ -184,7 +184,7 @@ onMounted(fetchShares)
 .card-header :deep(span) {
   font-size: 20px;
   font-weight: 600;
-  color: rgb(30, 50, 90);
+  color: rgb(var(--pim-brand));
   letter-spacing: 0.3px;
 }
 
@@ -205,20 +205,20 @@ onMounted(fetchShares)
   min-height: 0;
   border: 0;
   background: transparent;
-  color: rgb(30, 50, 90);
+  color: rgb(var(--pim-brand));
 }
 
 .action-link:hover {
   background: transparent;
-  color: rgb(30, 50, 90);
+  color: rgb(var(--pim-brand));
 }
 
 .action-link.danger {
-  color: #f56c6c;
+  color: var(--pim-danger-bright);
 }
 
 .action-link.danger:hover {
-  color: #f56c6c;
+  color: var(--pim-danger-bright);
 }
 
 @media (max-width: 768px) {
@@ -231,28 +231,5 @@ onMounted(fetchShares)
   .card-header :deep(span) {
     font-size: 18px;
   }
-}
-
-/* 深色模式覆盖 */
-:global(.dark-mode) .share-management-page {
-  background: #192744;
-}
-
-:global(.dark-mode) .share-management-page :deep(.el-card) {
-  background: rgba(25, 39, 68, 0.68);
-  border-color: rgba(244, 244, 244, 0.1);
-  box-shadow: 0 4px 32px rgba(0, 0, 0, 0.2);
-}
-
-:global(.dark-mode) .card-header :deep(span) {
-  color: rgb(244, 244, 244);
-}
-
-:global(.dark-mode) .action-link {
-  color: rgb(244, 244, 244);
-}
-
-:global(.dark-mode) .action-link:hover {
-  color: rgb(244, 244, 244);
 }
 </style>

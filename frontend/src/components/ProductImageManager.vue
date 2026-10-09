@@ -374,14 +374,14 @@ async function handlePickerSelect(payload: MediaItem | MediaItem[]) {
   aspect-ratio: 1;
   border-radius: 12px;
   overflow: hidden;
-  border: 2px solid rgba(30, 50, 90, 0.08);
-  background: #fff;
+  border: 2px solid rgba(var(--pim-brand), 0.08);
+  background: var(--pim-media-bg);
   position: relative;
   transition: border-color 0.2s;
 }
 
 .image-card:hover {
-  border-color: rgba(30, 50, 90, 0.2);
+  border-color: rgba(var(--pim-brand), 0.2);
 }
 
 .image-card-inner {
@@ -405,7 +405,7 @@ async function handlePickerSelect(payload: MediaItem | MediaItem[]) {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  background: #fff;
+  background: var(--pim-media-bg);
 }
 
 .thumb-error {
@@ -423,7 +423,7 @@ async function handlePickerSelect(payload: MediaItem | MediaItem[]) {
   top: 4px;
   left: 4px;
   background: var(--el-color-warning);
-  color: #fff;
+  color: var(--pim-on-accent);
   font-size: 11px;
   font-weight: 600;
   padding: 1px 8px;
@@ -440,7 +440,7 @@ async function handlePickerSelect(payload: MediaItem | MediaItem[]) {
   justify-content: center;
   gap: 4px;
   padding: 4px;
-  background: rgba(255, 255, 255, 0.92);
+  background: var(--pim-media-control-bg);
   backdrop-filter: blur(4px);
   opacity: 0;
   transition: opacity 0.2s;
@@ -495,14 +495,14 @@ async function handlePickerSelect(payload: MediaItem | MediaItem[]) {
 .glass-dialog :deep(.el-dialog) {
   border-radius: var(--radius-lg) !important;
   overflow: hidden;
-  box-shadow: 0 20px 60px rgba(30, 50, 90, 0.15);
+  box-shadow: 0 20px 60px rgba(var(--pim-brand), 0.15);
 }
 
 .glass-dialog :deep(.el-dialog__header) {
-  background: linear-gradient(135deg, rgba(30, 50, 90, 0.06), rgba(30, 50, 90, 0.02));
+  background: linear-gradient(135deg, rgba(var(--pim-brand), 0.06), rgba(var(--pim-brand), 0.02));
   padding: 20px 24px 16px;
   margin-right: 0;
-  border-bottom: 1px solid rgba(30, 50, 90, 0.06);
+  border-bottom: 1px solid rgba(var(--pim-brand), 0.06);
 }
 
 .glass-dialog :deep(.el-dialog__title) {
@@ -534,37 +534,5 @@ async function handlePickerSelect(payload: MediaItem | MediaItem[]) {
   font-size: 12px;
   color: var(--text-secondary);
   line-height: 1.5;
-}
-
-/* 深色模式覆盖 */
-:global(.dark-mode) .glass-dialog :deep(.el-dialog) {
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-}
-
-:global(.dark-mode) .glass-dialog :deep(.el-dialog__header) {
-  background: linear-gradient(135deg, rgba(244, 244, 244, 0.06), rgba(244, 244, 244, 0.02));
-  border-bottom-color: rgba(244, 244, 244, 0.06);
-}
-
-:global(.dark-mode) .image-card {
-  background: #192744;
-  border-color: rgba(244, 244, 244, 0.08);
-}
-
-:global(.dark-mode) .image-card:hover {
-  border-color: rgba(244, 244, 244, 0.2);
-}
-
-:global(.dark-mode) .product-thumb-img :deep(img) {
-  background: #192744;
-}
-
-:global(.dark-mode) .add-zone {
-  background: rgba(25, 39, 68, 0.72);
-  border-color: rgba(244, 244, 244, 0.08);
-}
-
-:global(.dark-mode) .add-zone:hover {
-  border-color: rgba(244, 244, 244, 0.28);
 }
 </style>

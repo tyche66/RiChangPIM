@@ -344,9 +344,9 @@ const handleSwitchUser = async () => {
   border-radius: 32px;
   background:
     radial-gradient(circle at 20% 0, rgba(255, 255, 255, 0.12), transparent 18rem),
-    rgb(30, 50, 90);
-  color: #fff;
-  box-shadow: 0 24px 70px rgba(30, 50, 90, 0.2);
+    var(--pim-sidebar);
+  color: var(--pim-brand-panel-ink);
+  box-shadow: 0 24px 70px rgba(var(--pim-brand), 0.2);
   overflow: hidden;
 }
 
@@ -376,7 +376,7 @@ const handleSwitchUser = async () => {
   justify-content: center;
   gap: 12px;
   padding: 0 20px;
-  color: #fff;
+  color: var(--pim-brand-panel-ink);
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
@@ -415,10 +415,10 @@ const handleSwitchUser = async () => {
   height: 86px;
   margin-left: 12px;
   padding: 0 24px;
-  border: 1px solid rgba(255, 255, 255, 0.72);
+  border: 1px solid var(--pim-border);
   border-radius: 28px;
-  background: rgba(255, 255, 255, 0.62);
-  box-shadow: 0 14px 45px rgba(30, 50, 90, 0.06);
+  background: var(--pim-header);
+  box-shadow: 0 14px 45px rgba(var(--pim-brand), 0.06);
   display: flex;
   align-items: center;
 }
@@ -449,13 +449,13 @@ const handleSwitchUser = async () => {
 .eyebrow {
   display: block;
   margin-bottom: 4px;
-  color: rgba(30, 50, 90, 0.48);
+  color: rgba(var(--pim-brand), 0.48);
   font-size: 10px;
   letter-spacing: 0.14em;
 }
 
 .header-heading h1 {
-  color: rgba(30, 50, 90, 0.9);
+  color: rgba(var(--pim-brand), 0.9);
   font-size: clamp(20px, 2vw, 28px);
   font-weight: 400;
   line-height: 1.05;
@@ -465,7 +465,7 @@ const handleSwitchUser = async () => {
 .menu-toggle,
 .user-chip {
   border: 0;
-  color: rgba(30, 50, 90, 0.8);
+  color: rgba(var(--pim-brand), 0.8);
   cursor: pointer;
 }
 
@@ -475,19 +475,19 @@ const handleSwitchUser = async () => {
   width: 42px;
   height: 42px;
   border-radius: 50%;
-  background: rgba(30, 50, 90, 0.08);
+  background: rgba(var(--pim-brand), 0.08);
 }
 
 .user-chip {
   gap: 10px;
   padding: 6px 10px 6px 6px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.6);
+  background: var(--pim-surface-strong);
 }
 
 .avatar {
-  color: #fff;
-  background: rgba(30, 50, 90, 0.82);
+  color: var(--pim-on-accent);
+  background: var(--pim-accent-solid);
 }
 
 .user-copy {
@@ -497,7 +497,7 @@ const handleSwitchUser = async () => {
 }
 
 .user-copy strong {
-  color: rgba(30, 50, 90, 0.88);
+  color: rgba(var(--pim-brand), 0.88);
   font-size: 13px;
   font-weight: 400;
   /* 用户名长度不可控，给个上限并省略号收尾，免得把标题挤换行。 */
@@ -509,7 +509,7 @@ const handleSwitchUser = async () => {
 
 /* 标签行：字号/字距对齐同文件的 .eyebrow，视觉上弱于用户名。 */
 .user-copy small {
-  color: rgba(30, 50, 90, 0.48);
+  color: rgba(var(--pim-brand), 0.48);
   font-size: 10px;
   letter-spacing: 0.14em;
   white-space: nowrap;
@@ -535,14 +535,14 @@ const handleSwitchUser = async () => {
 }
 
 .account-copy strong {
-  color: rgba(30, 50, 90, 0.92);
+  color: rgba(var(--pim-brand), 0.92);
   font-size: 17px;
   font-weight: 600;
   overflow-wrap: anywhere;
 }
 
 .account-copy small {
-  color: rgba(30, 50, 90, 0.5);
+  color: rgba(var(--pim-brand), 0.5);
   font-size: 11px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -550,7 +550,7 @@ const handleSwitchUser = async () => {
 
 .account-hint {
   margin: 16px 0 0;
-  color: rgba(30, 50, 90, 0.56);
+  color: rgba(var(--pim-brand), 0.56);
   font-size: 12px;
   line-height: 1.7;
 }
@@ -562,9 +562,9 @@ const handleSwitchUser = async () => {
 }
 
 .account-btn--strong {
-  border-color: rgb(30, 50, 90);
-  background: rgb(30, 50, 90);
-  color: #fff;
+  border-color: var(--pim-accent-solid);
+  background: var(--pim-accent-solid);
+  color: var(--pim-on-accent);
 }
 
 .el-main {
@@ -614,7 +614,7 @@ const handleSwitchUser = async () => {
     z-index: 2001;
     inset: 0;
     display: block;
-    background: rgba(30, 50, 90, 0.24);
+    background: var(--pim-scrim);
     backdrop-filter: blur(5px);
   }
 
@@ -670,59 +670,5 @@ const handleSwitchUser = async () => {
   .el-main {
     padding-top: 10px;
   }
-}
-
-/* 深色模式覆盖 */
-:global(.dark-mode) .el-header {
-  border-color: rgba(255, 255, 255, 0.1);
-  background: rgba(25, 39, 68, 0.72);
-  box-shadow: 0 14px 45px rgba(0, 0, 0, 0.2);
-}
-
-:global(.dark-mode) .eyebrow {
-  color: rgba(244, 244, 244, 0.48);
-}
-
-:global(.dark-mode) .header-heading h1 {
-  color: rgba(244, 244, 244, 0.9);
-}
-
-:global(.dark-mode) .menu-toggle,
-:global(.dark-mode) .user-chip {
-  color: rgba(244, 244, 244, 0.8);
-}
-
-:global(.dark-mode) .menu-toggle {
-  background: rgba(244, 244, 244, 0.08);
-}
-
-:global(.dark-mode) .user-chip {
-  background: rgba(244, 244, 244, 0.12);
-}
-
-:global(.dark-mode) .user-copy strong {
-  color: rgba(244, 244, 244, 0.88);
-}
-
-:global(.dark-mode) .user-copy small {
-  color: rgba(244, 244, 244, 0.48);
-}
-
-:global(.dark-mode) .account-copy strong {
-  color: rgba(244, 244, 244, 0.92);
-}
-
-:global(.dark-mode) .account-copy small {
-  color: rgba(244, 244, 244, 0.5);
-}
-
-:global(.dark-mode) .account-hint {
-  color: rgba(244, 244, 244, 0.56);
-}
-
-:global(.dark-mode) .account-btn--strong {
-  border-color: rgb(244, 244, 244);
-  background: rgb(244, 244, 244);
-  color: rgb(25, 39, 68);
 }
 </style>

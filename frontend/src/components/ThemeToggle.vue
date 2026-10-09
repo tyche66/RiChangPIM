@@ -3,6 +3,7 @@
     class="theme-toggle"
     :class="{ 'is-dark': isDark }"
     :title="isDark ? '切换到浅色模式' : '切换到深色模式'"
+    :aria-pressed="isDark"
     @click="toggleTheme"
   >
     <el-icon :size="18">
@@ -13,40 +14,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
 import { Sunny, Moon } from '@element-plus/icons-vue'
+import { useTheme, toggleTheme } from '@/composables/useTheme'
 
-const isDark = ref(false)
-
-const applyTheme = (dark: boolean) => {
-  if (dark) {
-    document.documentElement.classList.add('dark-mode')
-  } else {
-    document.documentElement.classList.remove('dark-mode')
-  }
-  localStorage.setItem('theme', dark ? 'dark' : 'light')
-}
-
-const toggleTheme = () => {
-  isDark.value = !isDark.value
-  applyTheme(isDark.value)
-}
-
-onMounted(() => {
-  const saved = localStorage.getItem('theme')
-  if (saved === 'dark') {
-    isDark.value = true
-  } else if (saved === 'light') {
-    isDark.value = false
-  } else {
-    isDark.value = window.matchMedia('(prefers-color-scheme: dark)').matches
-  }
-  applyTheme(isDark.value)
-})
-
-watch(isDark, (val) => {
-  applyTheme(val)
-})
+// 状态来自全局单例（useTheme.ts），切换即时生效并写入 localStorage。
+const { isDark } = useTheme()
 </script>
 
 <style scoped>
@@ -55,7 +27,7 @@ watch(isDark, (val) => {
   place-items: center;
   width: 36px;
   height: 36px;
-  border: 1px solid rgba(var(--pim-brand), 0.12);
+  border: 1px solid var(--pim-line-strong);
   border-radius: 10px;
   background: transparent;
   color: var(--pim-text-soft);
@@ -66,6 +38,11 @@ watch(isDark, (val) => {
 .theme-toggle:hover {
   background: rgba(var(--pim-brand), 0.08);
   color: var(--pim-text-strong);
+}
+
+.theme-toggle:focus-visible {
+  outline: 2px solid var(--pim-focus-ring);
+  outline-offset: 1px;
 }
 
 .theme-toggle.is-dark {

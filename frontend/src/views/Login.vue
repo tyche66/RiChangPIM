@@ -113,8 +113,8 @@ const handleLogin = async () => {
   justify-content: center;
   padding: clamp(12px, 2vw, 24px);
   background:
-    radial-gradient(circle at 85% 12%, rgba(30, 50, 90, 0.12), transparent 26rem),
-    #f0f0f0;
+    radial-gradient(circle at 85% 12%, rgba(var(--pim-brand), 0.12), transparent 26rem),
+    var(--pim-page);
 }
 
 .login-shell {
@@ -123,8 +123,8 @@ const handleLogin = async () => {
   display: grid;
   grid-template-columns: minmax(0, 1.35fr) minmax(360px, 0.65fr);
   border-radius: 44px;
-  background: rgba(255, 255, 255, 0.18);
-  box-shadow: 0 28px 90px rgba(30, 50, 90, 0.12);
+  background: var(--pim-shell-fill);
+  box-shadow: 0 28px 90px rgba(var(--pim-brand), 0.12);
   overflow: hidden;
 }
 
@@ -133,11 +133,11 @@ const handleLogin = async () => {
   display: flex;
   flex-direction: column;
   padding: clamp(28px, 5vw, 68px);
-  color: #fff;
+  color: var(--pim-brand-panel-ink);
   background:
     radial-gradient(circle at 78% 22%, rgba(255, 255, 255, 0.16), transparent 16rem),
     radial-gradient(circle at 24% 90%, rgba(255, 255, 255, 0.09), transparent 20rem),
-    rgb(30, 50, 90);
+    var(--pim-brand-panel);
 }
 
 .brand-lockup {
@@ -244,12 +244,12 @@ const handleLogin = async () => {
 }
 
 .form-kicker {
-  color: rgba(30, 50, 90, 0.45);
+  color: rgba(var(--pim-brand), 0.45);
 }
 
 .form-heading h2 {
   margin: 12px 0 8px;
-  color: rgba(30, 50, 90, 0.9);
+  color: rgba(var(--pim-brand), 0.9);
   font-size: 32px;
   font-weight: 400;
   letter-spacing: -0.04em;
@@ -257,7 +257,7 @@ const handleLogin = async () => {
 
 .form-heading p,
 .security-note {
-  color: rgba(30, 50, 90, 0.52);
+  color: rgba(var(--pim-brand), 0.52);
 }
 
 .form-heading p {
@@ -360,30 +360,5 @@ const handleLogin = async () => {
   .form-heading {
     margin-bottom: 24px;
   }
-}
-
-/* 深色模式覆盖 */
-:global(.dark-mode) .login-page {
-  background:
-    radial-gradient(circle at 85% 12%, rgba(244, 244, 244, 0.06), transparent 26rem),
-    #192744;
-}
-
-:global(.dark-mode) .login-shell {
-  background: rgba(25, 39, 68, 0.5);
-  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.3);
-}
-
-:global(.dark-mode) .form-kicker {
-  color: rgba(244, 244, 244, 0.45);
-}
-
-:global(.dark-mode) .form-heading h2 {
-  color: rgba(244, 244, 244, 0.9);
-}
-
-:global(.dark-mode) .form-heading p,
-:global(.dark-mode) .security-note {
-  color: rgba(244, 244, 244, 0.52);
 }
 </style>

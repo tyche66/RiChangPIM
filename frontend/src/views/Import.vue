@@ -442,16 +442,16 @@ onMounted(() => {
 <style scoped>
 .import-page {
   min-height: 100vh;
-  background: #f0f0f0;
+  background: var(--pim-page);
   padding: 24px;
   box-sizing: border-box;
 }
 
 .import-page :deep(.el-card) {
-  background: rgba(255, 255, 255, 0.68);
+  background: var(--pim-glass);
   border-radius: 28px;
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  box-shadow: 0 4px 32px rgba(30, 50, 90, 0.06);
+  border: 1px solid var(--pim-surface-border);
+  box-shadow: 0 4px 32px rgba(var(--pim-brand), 0.06);
 }
 
 .import-page :deep(.el-card__body) {
@@ -471,7 +471,7 @@ onMounted(() => {
   margin: 0;
   font-size: 20px;
   font-weight: 600;
-  color: rgb(30, 50, 90);
+  color: rgb(var(--pim-brand));
   letter-spacing: 0.3px;
 }
 
@@ -497,7 +497,7 @@ onMounted(() => {
 .progress-hint {
   margin-top: 8px;
   font-size: 13px;
-  color: #5E6470;
+  color: var(--pim-text-primary);
   text-align: center;
 }
 
@@ -511,7 +511,7 @@ onMounted(() => {
 }
 
 .muted {
-  color: #909399;
+  color: var(--pim-text-faint);
 }
 
 .import-form :deep(.el-button) {
@@ -531,13 +531,13 @@ onMounted(() => {
 
 .upload-dropzone :deep(.el-upload-dragger) {
   border-radius: 20px;
-  border: 2px dashed rgba(30, 50, 90, 0.2);
+  border: 2px dashed rgba(var(--pim-brand), 0.2);
   transition: border-color 0.2s ease, background-color 0.2s ease;
 }
 
 .upload-dropzone :deep(.el-upload-dragger:hover) {
-  border-color: rgb(30, 50, 90);
-  background: rgba(30, 50, 90, 0.03);
+  border-color: rgb(var(--pim-brand));
+  background: rgba(var(--pim-brand), 0.03);
 }
 
 .import-actions {
@@ -561,7 +561,7 @@ onMounted(() => {
 
 .failures-table h4 {
   margin: 0 0 12px 0;
-  color: #5E6470;
+  color: var(--pim-text-primary);
   font-weight: 600;
 }
 
@@ -575,37 +575,5 @@ onMounted(() => {
   .toolbar h2 {
     font-size: 18px;
   }
-}
-
-/* 深色模式覆盖 */
-:global(.dark-mode) .import-page {
-  background: #192744;
-}
-
-:global(.dark-mode) .import-page :deep(.el-card) {
-  background: rgba(25, 39, 68, 0.68);
-  border-color: rgba(244, 244, 244, 0.1);
-  box-shadow: 0 4px 32px rgba(0, 0, 0, 0.2);
-}
-
-:global(.dark-mode) .toolbar h2 {
-  color: rgb(244, 244, 244);
-}
-
-:global(.dark-mode) .progress-hint {
-  color: #f4f4f4;
-}
-
-:global(.dark-mode) .upload-dropzone :deep(.el-upload-dragger) {
-  border-color: rgba(244, 244, 244, 0.2);
-}
-
-:global(.dark-mode) .upload-dropzone :deep(.el-upload-dragger:hover) {
-  border-color: rgb(244, 244, 244);
-  background: rgba(244, 244, 244, 0.03);
-}
-
-:global(.dark-mode) .failures-table h4 {
-  color: #f4f4f4;
 }
 </style>

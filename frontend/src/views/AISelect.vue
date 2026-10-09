@@ -243,7 +243,7 @@ onBeforeUnmount(() => {
   min-height: 520px;
   border: 1px solid var(--pim-border);
   border-radius: var(--pim-radius);
-  background: #f7f6f2;
+  background: var(--pim-media-bg);
   box-shadow: var(--pim-shadow);
   overflow: hidden;
 }
@@ -256,9 +256,9 @@ onBeforeUnmount(() => {
   gap: 16px;
   margin: 0;
   padding: 12px 20px;
-  border: 1px solid #e6a23c;
+  border: 1px solid var(--pim-warning);
   border-radius: var(--pim-radius-sm);
-  background: rgba(230, 162, 60, 0.12);
+  background: var(--pim-warning-soft);
   color: var(--pim-text-soft);
   font-size: 12px;
   line-height: 1.6;
@@ -309,10 +309,5 @@ onBeforeUnmount(() => {
     min-height: 460px;
     border-radius: 22px;
   }
-}
-
-/* 深色模式覆盖 */
-:global(.dark-mode) .portal-stage {
-  background: #1a2540;
 }
 </style>

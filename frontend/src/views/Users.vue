@@ -538,16 +538,16 @@ onMounted(() => {
 <style scoped>
 .users-page {
   min-height: 100vh;
-  background: #f0f0f0;
+  background: var(--pim-page);
   padding: 24px;
   box-sizing: border-box;
 }
 
 .users-page :deep(.el-card) {
-  background: rgba(255, 255, 255, 0.68);
+  background: var(--pim-glass);
   border-radius: 28px;
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  box-shadow: 0 4px 32px rgba(30, 50, 90, 0.06);
+  border: 1px solid var(--pim-surface-border);
+  box-shadow: 0 4px 32px rgba(var(--pim-brand), 0.06);
 }
 
 .users-page :deep(.el-card__body) {
@@ -628,16 +628,5 @@ onMounted(() => {
     width: 95vw !important;
     max-width: 95vw !important;
   }
-}
-
-/* 深色模式覆盖 */
-:global(.dark-mode) .users-page {
-  background: #192744;
-}
-
-:global(.dark-mode) .users-page :deep(.el-card) {
-  background: rgba(25, 39, 68, 0.68);
-  border-color: rgba(244, 244, 244, 0.1);
-  box-shadow: 0 4px 32px rgba(0, 0, 0, 0.2);
 }
 </style>

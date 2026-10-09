@@ -818,19 +818,21 @@ onMounted(() => {
 <style scoped>
 /* ===== CSS Variables ===== */
 .quotations-page {
-  --brand-deep: rgba(30, 50, 90, 0.92);
-  --brand-primary: rgba(30, 50, 90, 0.85);
-  --brand-light: rgba(30, 50, 90, 0.08);
-  --brand-lighter: rgba(30, 50, 90, 0.04);
-  --text-primary: #5E6470;
-  --text-secondary: rgba(30, 50, 90, 0.6);
-  --bg-mist: #f0f0f0;
-  --glass-bg: rgba(255, 255, 255, 0.72);
-  --glass-border: rgba(255, 255, 255, 0.5);
-  --radius-lg: 28px;
-  --radius-md: 18px;
+  /* 以下别名全部指向 design-system.css 的全局语义 Token：
+     浅色保持原值，深色随 .dark-mode 自动切换，本文件不再需要深色覆盖块 */
+  --brand-deep: var(--pim-text-strong);
+  --brand-primary: var(--pim-text-strong);
+  --brand-light: rgba(var(--pim-brand), 0.08);
+  --brand-lighter: rgba(var(--pim-brand), 0.04);
+  --text-primary: var(--pim-text-primary);
+  --text-secondary: var(--pim-text-secondary);
+  --bg-mist: var(--pim-page);
+  --glass-bg: var(--pim-surface);
+  --glass-border: var(--pim-card-border);
+  --radius-lg: var(--pim-radius);
+  --radius-md: var(--pim-radius-sm);
   --radius-sm: 12px;
-  --shadow-soft: 0 4px 24px rgba(30, 50, 90, 0.06);
+  --shadow-soft: 0 4px 24px rgba(var(--pim-brand), 0.06);
   --transition-fast: 200ms cubic-bezier(0.4, 0, 0.2, 1);
   padding: 16px;
   min-height: 100vh;
@@ -848,7 +850,7 @@ onMounted(() => {
 
 .glass-card :deep(.el-card__header) {
   background: transparent;
-  border-bottom: 1px solid rgba(30, 50, 90, 0.06);
+  border-bottom: 1px solid rgba(var(--pim-brand), 0.06);
   padding: 20px 24px;
 }
 
@@ -894,19 +896,19 @@ onMounted(() => {
 /* ===== Capsule Components ===== */
 .capsule-input :deep(.el-input__wrapper) {
   border-radius: 20px;
-  box-shadow: 0 0 0 1px rgba(30, 50, 90, 0.1) inset;
+  box-shadow: 0 0 0 1px rgba(var(--pim-brand), 0.1) inset;
   padding: 4px 16px;
   transition: var(--transition-fast);
 }
 
 .capsule-input :deep(.el-input__wrapper):hover {
-  box-shadow: 0 0 0 1px rgba(30, 50, 90, 0.25) inset;
+  box-shadow: 0 0 0 1px rgba(var(--pim-brand), 0.25) inset;
 }
 
 .capsule-select :deep(.el-select__wrapper),
 .capsule-select :deep(.el-input__wrapper) {
   border-radius: 20px;
-  box-shadow: 0 0 0 1px rgba(30, 50, 90, 0.1) inset;
+  box-shadow: 0 0 0 1px rgba(var(--pim-brand), 0.1) inset;
   padding: 4px 16px;
 }
 
@@ -1021,8 +1023,8 @@ onMounted(() => {
 
 .pagination-wrap :deep(.el-pager li.active),
 .pagination-wrap :deep(.el-pager li.active:hover) {
-  background: var(--brand-primary);
-  color: #fff;
+  background: var(--pim-accent-solid);
+  color: var(--pim-on-accent);
 }
 
 .pagination-wrap :deep(.el-pager li:hover:not(.active)),
@@ -1035,14 +1037,14 @@ onMounted(() => {
 .glass-dialog :deep(.el-dialog) {
   border-radius: var(--radius-lg) !important;
   overflow: hidden;
-  box-shadow: 0 20px 60px rgba(30, 50, 90, 0.15);
+  box-shadow: 0 20px 60px rgba(var(--pim-brand), 0.15);
 }
 
 .glass-dialog :deep(.el-dialog__header) {
-  background: linear-gradient(135deg, rgba(30, 50, 90, 0.06), rgba(30, 50, 90, 0.02));
+  background: linear-gradient(135deg, rgba(var(--pim-brand), 0.06), rgba(var(--pim-brand), 0.02));
   padding: 20px 24px 16px;
   margin-right: 0;
-  border-bottom: 1px solid rgba(30, 50, 90, 0.06);
+  border-bottom: 1px solid rgba(var(--pim-brand), 0.06);
 }
 
 .glass-dialog :deep(.el-dialog__title) {
@@ -1077,7 +1079,7 @@ onMounted(() => {
   font-weight: 600;
   color: var(--text-secondary);
   padding-bottom: 6px;
-  border-bottom: 1px solid rgba(30, 50, 90, 0.08);
+  border-bottom: 1px solid rgba(var(--pim-brand), 0.08);
   margin-bottom: 6px;
 }
 
@@ -1096,7 +1098,7 @@ onMounted(() => {
 
 .quote-item-row {
   padding: 8px 0;
-  border-bottom: 1px solid rgba(30, 50, 90, 0.04);
+  border-bottom: 1px solid rgba(var(--pim-brand), 0.04);
 }
 
 .quote-item-name {
@@ -1320,41 +1322,5 @@ onMounted(() => {
   .quote-items-header .quote-col-qty {
     grid-column: span 2;
   }
-}
-
-/* 深色模式覆盖 */
-:global(.dark-mode) .quotations-page {
-  --brand-deep: rgba(244, 244, 244, 0.92);
-  --brand-primary: rgba(244, 244, 244, 0.85);
-  --brand-light: rgba(244, 244, 244, 0.08);
-  --brand-lighter: rgba(244, 244, 244, 0.04);
-  --text-primary: #f4f4f4;
-  --text-secondary: rgba(244, 244, 244, 0.6);
-  --bg-mist: #192744;
-  --glass-bg: rgba(25, 39, 68, 0.72);
-  --glass-border: rgba(25, 39, 68, 0.5);
-  --shadow-soft: 0 4px 24px rgba(0, 0, 0, 0.2);
-}
-
-:global(.dark-mode) .glass-card :deep(.el-card__header) {
-  border-bottom-color: rgba(244, 244, 244, 0.06);
-}
-
-:global(.dark-mode) .capsule-input :deep(.el-input__wrapper),
-:global(.dark-mode) .capsule-select :deep(.el-select__wrapper),
-:global(.dark-mode) .capsule-select :deep(.el-input__wrapper) {
-  background: rgba(25, 39, 68, 0.72);
-  box-shadow: 0 0 0 1px rgba(244, 244, 244, 0.1) inset;
-}
-
-:global(.dark-mode) .capsule-input :deep(.el-input__wrapper):hover,
-:global(.dark-mode) .capsule-select :deep(.el-select__wrapper):hover,
-:global(.dark-mode) .capsule-select :deep(.el-input__wrapper):hover {
-  box-shadow: 0 0 0 1px rgba(244, 244, 244, 0.25) inset;
-}
-
-:global(.dark-mode) .glass-dialog :deep(.el-dialog) {
-  background: rgba(25, 39, 68, 0.92);
-  border-color: rgba(244, 244, 244, 0.1);
 }
 </style>
