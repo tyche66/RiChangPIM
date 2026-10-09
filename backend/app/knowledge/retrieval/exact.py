@@ -7,7 +7,9 @@ from app.models.knowledge import KnowledgeChunk, KnowledgeDocument
 from app.models.product import Product
 
 
-async def exact_search(db, *, query: str, product_id: str | None, current_user: dict, limit: int = 10):
+async def exact_search(
+    db, *, query: str, product_id: str | None, current_user: dict, limit: int = 10
+):
     stmt = (
         select(
             KnowledgeChunk.id.label("chunk_id"),
@@ -33,6 +35,8 @@ async def exact_search(db, *, query: str, product_id: str | None, current_user: 
                 KnowledgeDocument.title.ilike(f"%{query}%"),
             )
         )
-    stmt = stmt.order_by(KnowledgeDocument.title.asc(), KnowledgeChunk.chunk_index.asc()).limit(limit)
+    stmt = stmt.order_by(
+        KnowledgeDocument.title.asc(), KnowledgeChunk.chunk_index.asc()
+    ).limit(limit)
     result = await db.execute(stmt)
     return [dict(row._mapping) for row in result.all()]

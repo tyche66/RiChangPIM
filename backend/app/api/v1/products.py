@@ -663,7 +663,10 @@ async def add_product_images(
             status_code=422,
             detail={
                 "code": 42201,
-                "msg": f"产品图片数量已达上限（最多 {MAX_PRODUCT_IMAGES} 张），当前 {current_count} 张，尝试添加 {len(data.attachment_ids)} 张",
+                "msg": (
+                    f"产品图片数量已达上限（最多 {MAX_PRODUCT_IMAGES} 张），"
+                    f"当前 {current_count} 张，尝试添加 {len(data.attachment_ids)} 张"
+                ),
             },
         )
 
@@ -868,7 +871,10 @@ async def bind_product_scene_images(
             status_code=422,
             detail={
                 "code": 42201,
-                "msg": f"场景图数量已达上限（最多 {MAX_PRODUCT_SCENE_IMAGES} 张），当前 {current_count} 张，尝试添加 {len(data.scene_image_ids)} 张",
+                "msg": (
+                    f"场景图数量已达上限（最多 {MAX_PRODUCT_SCENE_IMAGES} 张），"
+                    f"当前 {current_count} 张，尝试添加 {len(data.scene_image_ids)} 张"
+                ),
             },
         )
 

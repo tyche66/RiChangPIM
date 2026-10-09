@@ -92,8 +92,7 @@ def _content_type_for(attachment: Attachment) -> str:
 
 def _iter_minio_object(obj) -> Iterator[bytes]:
     try:
-        for chunk in obj.stream(1024 * 1024):
-            yield chunk
+        yield from obj.stream(1024 * 1024)
     finally:
         obj.close()
         obj.release_conn()
@@ -147,7 +146,10 @@ async def list_files(
         )
         has_manual = (
             select(1)
-            .where(ProductManual.attachment_id == Attachment.id, ProductManual.is_deleted.is_(False))
+            .where(
+                ProductManual.attachment_id == Attachment.id,
+                ProductManual.is_deleted.is_(False),
+            )
             .exists()
         )
         has_scene = (
@@ -503,7 +505,10 @@ async def replace_file(
             status_code=422,
             detail={
                 "code": 42204,
-                "msg": f"替换文件类型不匹配：原文件类型为 {attachment.file_type}，新文件类型为 {file_type}",
+                "msg": (
+                    f"替换文件类型不匹配：原文件类型为 {attachment.file_type}，"
+                    f"新文件类型为 {file_type}"
+                ),
             },
         )
 

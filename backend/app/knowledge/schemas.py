@@ -21,7 +21,14 @@ ALLOWED_SCOPE_FILTERS = {
     "has_manual",
     "face_price_status",
 }
-FORBIDDEN_CLIENT_KEYS = {"role", "role_code", "permission", "permissions", "sensitivity", "security_level"}
+FORBIDDEN_CLIENT_KEYS = {
+    "role",
+    "role_code",
+    "permission",
+    "permissions",
+    "sensitivity",
+    "security_level",
+}
 
 
 class KnowledgeScope(BaseModel):
@@ -37,7 +44,9 @@ class KnowledgeScope(BaseModel):
     def validate_filters(cls, value: dict[str, Any]) -> dict[str, Any]:
         unknown = set(value) - ALLOWED_SCOPE_FILTERS
         if unknown:
-            raise ValueError(f"scope.filters contains unsupported fields: {', '.join(sorted(unknown))}")
+            raise ValueError(
+                f"scope.filters contains unsupported fields: {', '.join(sorted(unknown))}"
+            )
         return value
 
 
@@ -59,7 +68,9 @@ class KnowledgeClientContext(BaseModel):
     @classmethod
     def reject_forbidden_keys(cls, data: Any) -> Any:
         if isinstance(data, dict) and (set(data) & FORBIDDEN_CLIENT_KEYS):
-            raise ValueError("client_context must not include role, permission, or sensitivity fields")
+            raise ValueError(
+                "client_context must not include role, permission, or sensitivity fields"
+            )
         return data
 
 

@@ -385,7 +385,9 @@ class OpenAIAdapter(AIServiceAdapter):
         msgs.append({"role": "user", "content": message})
         return msgs
 
-    async def _post(self, path: str, payload: dict[str, Any], client: httpx.AsyncClient | None = None) -> dict[str, Any]:
+    async def _post(
+        self, path: str, payload: dict[str, Any], client: httpx.AsyncClient | None = None
+    ) -> dict[str, Any]:
         attempts = 0
         last_msg: str | None = None
         http_client = client or self._client

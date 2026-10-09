@@ -15,7 +15,9 @@ def record_query(*, trace_id: str, intent: str, status: str, latency_ms: int) ->
     )
 
 
-def record_tool(*, trace_id: str, tool: str, status: str, latency_ms: int, result_count: int = 0) -> None:
+def record_tool(
+    *, trace_id: str, tool: str, status: str, latency_ms: int, result_count: int = 0
+) -> None:
     logger.info(
         "knowledge_tool trace_id=%s tool=%s status=%s latency_ms=%s result_count=%s",
         trace_id,

@@ -421,16 +421,17 @@ def reset() -> None:
     _volume_free_bytes.values.clear()
     _volume_threshold_bytes.values.clear()
     _knowledge_query_total.values.clear()
-    _knowledge_query_duration_seconds.counts = {ub: 0 for ub in _knowledge_query_duration_seconds.buckets}
-    _knowledge_query_duration_seconds.sums = 0.0
-    _knowledge_retrieval_duration_seconds.counts = {ub: 0 for ub in _knowledge_retrieval_duration_seconds.buckets}
-    _knowledge_retrieval_duration_seconds.sums = 0.0
+    for hist in (_knowledge_query_duration_seconds, _knowledge_retrieval_duration_seconds):
+        hist.counts = {ub: 0 for ub in hist.buckets}
+        hist.sums = 0.0
     _knowledge_retrieval_candidates.values.clear()
     _knowledge_retrieval_no_result_total.values.clear()
     _knowledge_citation_count.values.clear()
     _knowledge_insufficient_sources_total.values.clear()
     _knowledge_jobs_total.values.clear()
-    _knowledge_job_duration_seconds.counts = {ub: 0 for ub in _knowledge_job_duration_seconds.buckets}
+    _knowledge_job_duration_seconds.counts = {
+        ub: 0 for ub in _knowledge_job_duration_seconds.buckets
+    }
     _knowledge_job_duration_seconds.sums = 0.0
     _knowledge_queue_depth.values.clear()
     _knowledge_dead_jobs.values.clear()

@@ -18,6 +18,19 @@ from app.models.product import Brand, Category, Product, ProductImage, Supplier
 _PREVIEW_EXPIRE_SECONDS = 900
 _CONTENT_TOKEN_SCOPE = "file_content"
 
+# 搜索工具支持的等值过滤字段
+_SEARCH_FILTER_FIELDS = (
+    "status", "stock_status", "completeness_status", "category_id",
+    "brand_id", "supplier_id", "material",
+)
+
+# 产品卡中允许作为独立事实回填的字段（字段名与 _product_card 输出一一对应）
+_CARD_FACT_FIELDS = (
+    "product_no", "product_name", "face_price_display", "stock_status_display",
+    "status", "completeness_status", "material", "specification", "colors",
+    "cost_price", "supplier_name",
+)
+
 PRODUCT_SEARCH_ALIASES = {
     "办公桌": ("办公桌", "班台", "总裁桌", "独立主管桌", "洽谈桌", "会议桌"),
     "桌子": ("办公桌", "班台", "总裁桌", "独立主管桌", "洽谈桌", "会议桌"),
@@ -81,7 +94,7 @@ class ProductSearchTool:
             keywords = [keyword]
         for item in keywords:
             stmt = stmt.where(_search_term(item))
-        for field in ("status", "stock_status", "completeness_status", "category_id", "brand_id", "supplier_id", "material"):
+        for field in _SEARCH_FILTER_FIELDS:
             value = params.filters.get(field)
             if value:
                 stmt = stmt.where(getattr(Product, field) == value)
@@ -90,7 +103,10 @@ class ProductSearchTool:
         if params.filters.get("face_price_max") is not None:
             stmt = stmt.where(Product.face_price <= params.filters["face_price_max"])
         if params.sort_by == "face_price":
-            direction = Product.face_price.desc() if params.sort_order == "desc" else Product.face_price.asc()
+            if params.sort_order == "desc":
+                direction = Product.face_price.desc()
+            else:
+                direction = Product.face_price.asc()
             stmt = stmt.order_by(case((Product.face_price == 99999, 1), else_=0), direction)
         stmt = stmt.limit(min(params.limit, 100))
         rows = (await context.db.execute(stmt)).scalars().all()
@@ -126,7 +142,9 @@ class ProductGetManyTool:
         if params.product_nos:
             conds.append(Product.product_no.in_(params.product_nos))
         if not conds:
-            raise KnowledgeGatewayError(KnowledgeErrorCode.PLAN_INVALID, "缺少产品编号或 ID", status_code=400)
+            raise KnowledgeGatewayError(
+                KnowledgeErrorCode.PLAN_INVALID, "缺少产品编号或 ID", status_code=400
+            )
         stmt = stmt.where(or_(*conds)).limit(20)
         rows = (await context.db.execute(stmt)).scalars().all()
         return _product_payload(rows, context.current_user)
@@ -148,7 +166,10 @@ class ProductCompareTool:
     )
 
     async def run(self, params: ProductCompareInput, context: ToolContext) -> dict[str, Any]:
-        return await ProductGetManyTool().run(ProductGetManyInput(product_ids=params.product_ids, product_nos=params.product_nos), context)
+        inner = ProductGetManyInput(
+            product_ids=params.product_ids, product_nos=params.product_nos
+        )
+        return await ProductGetManyTool().run(inner, context)
 
 
 def _base_product_stmt():
@@ -202,10 +223,27 @@ def _product_payload(products: list[Product], current_user: dict[str, Any]) -> d
         sid = f"db_product_{p.id}"
         card = _product_card(p, current_user)
         cards.append(card)
-        sources.append(Source(source_id=sid, source_type="database_fact", title=f"产品当前事实: {p.product_no}", product_id=str(p.id), observed_at=now, access_policy="role_projected").model_dump(mode="json"))
-        for name in ("product_no", "product_name", "face_price_display", "stock_status_display", "status", "completeness_status", "material", "specification", "colors", "cost_price", "supplier_name"):
+        sources.append(
+            Source(
+                source_id=sid,
+                source_type="database_fact",
+                title=f"产品当前事实: {p.product_no}",
+                product_id=str(p.id),
+                observed_at=now,
+                access_policy="role_projected",
+            ).model_dump(mode="json")
+        )
+        for name in _CARD_FACT_FIELDS:
             if name in card:
-                facts.append(Fact(source_id=sid, name=name, value=card[name], observed_at=now, product_id=str(p.id)).model_dump(mode="json"))
+                facts.append(
+                    Fact(
+                        source_id=sid,
+                        name=name,
+                        value=card[name],
+                        observed_at=now,
+                        product_id=str(p.id),
+                    ).model_dump(mode="json")
+                )
     return {"products": cards, "facts": facts, "sources": sources}
 
 

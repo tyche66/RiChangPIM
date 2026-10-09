@@ -6,7 +6,9 @@ from app.knowledge.retrieval.filters import apply_document_filters
 from app.models.knowledge import KnowledgeChunk, KnowledgeDocument
 
 
-async def keyword_search(db, *, query: str, product_id: str | None, current_user: dict, limit: int = 10):
+async def keyword_search(
+    db, *, query: str, product_id: str | None, current_user: dict, limit: int = 10
+):
     ts_query = func.plainto_tsquery("simple", query)
     rank = func.ts_rank_cd(KnowledgeChunk.text_search, ts_query).label("rank")
     stmt = (

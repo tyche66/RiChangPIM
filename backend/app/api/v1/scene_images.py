@@ -217,7 +217,11 @@ async def create_scene_image(
     return {"code": 200, "data": _scene_image_response(scene_image, request)}
 
 
-@router.get("/{scene_image_id}", response_model=dict, dependencies=[Depends(PermissionChecker("scene_image:view"))])
+@router.get(
+    "/{scene_image_id}",
+    response_model=dict,
+    dependencies=[Depends(PermissionChecker("scene_image:view"))],
+)
 async def get_scene_image(
     request: Request,
     scene_image_id: UUID,

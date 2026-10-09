@@ -45,7 +45,9 @@ async def create_share(
     try:
         creator_id = UUID(current_user["sub"])
     except (KeyError, ValueError):
-        raise HTTPException(status_code=401, detail={"code": 40103, "msg": "当前用户身份无效"})
+        raise HTTPException(
+            status_code=401, detail={"code": 40103, "msg": "当前用户身份无效"}
+        ) from None
 
     # 验证 target 真实未删除
     if share_data.share_type == "proposal":

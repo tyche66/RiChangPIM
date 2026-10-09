@@ -2,25 +2,31 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import datetime
 from typing import Any, Protocol, runtime_checkable
 from uuid import UUID, uuid4
 
-from sqlalchemy import inspect as sa_inspect, select
+from sqlalchemy import inspect as sa_inspect
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
 @runtime_checkable
 class ConversationStore(Protocol):
     async def create_session(self, metadata: dict[str, Any]) -> str: ...
-    async def append_turn(self, session_id: str, request_digest: dict[str, Any], response_digest: dict[str, Any], trace: dict[str, Any]) -> str: ...
+    async def append_turn(
+        self, session_id: str, request_digest: dict[str, Any],
+        response_digest: dict[str, Any], trace: dict[str, Any],
+    ) -> str: ...
     async def load_context(self, session_id: str, policy: Any) -> list[dict[str, str]]: ...
-    async def list_sessions(self, user_id: UUID, cursor: str | None = None) -> list[dict[str, Any]]: ...
+    async def list_sessions(
+        self, user_id: UUID, cursor: str | None = None
+    ) -> list[dict[str, Any]]: ...
     async def delete_session(self, user_id: UUID, session_id: str) -> None: ...
 
 
 def digest_text(text: str) -> dict[str, Any]:
-    return {"length": len(text or ""), "sha256": hashlib.sha256((text or "").encode("utf-8")).hexdigest()}
+    sha256 = hashlib.sha256((text or "").encode("utf-8")).hexdigest()
+    return {"length": len(text or ""), "sha256": sha256}
 
 
 class DigestConversationStore:
@@ -31,15 +37,24 @@ class DigestConversationStore:
     async def create_session(self, metadata: dict[str, Any]) -> str:
         return str(uuid4())
 
-    async def append_turn(self, session_id: str, request_digest: dict[str, Any], response_digest: dict[str, Any], trace: dict[str, Any]) -> str:
+    async def append_turn(
+        self, session_id: str, request_digest: dict[str, Any],
+        response_digest: dict[str, Any], trace: dict[str, Any],
+    ) -> str:
         from app.models.audit import AIConversation
 
         turn_id = str(uuid4())
         conv = AIConversation(
             session_id=session_id,
             user_id=self.user_id,
-            question=f"length={request_digest.get('length', 0)} sha256={request_digest.get('sha256', '')}",
-            answer=f"length={response_digest.get('length', 0)} sha256={response_digest.get('sha256', '')}",
+            question=(
+                f"length={request_digest.get('length', 0)} "
+                f"sha256={request_digest.get('sha256', '')}"
+            ),
+            answer=(
+                f"length={response_digest.get('length', 0)} "
+                f"sha256={response_digest.get('sha256', '')}"
+            ),
             sources=json.dumps(trace.get("source_ids") or [], ensure_ascii=False),
             tool_calls=json.dumps(trace.get("tool_names") or [], ensure_ascii=False),
         )

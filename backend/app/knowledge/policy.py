@@ -15,11 +15,17 @@ class ToolAuthzResult:
 
 @runtime_checkable
 class ToolAuthorizationPolicy(Protocol):
-    def authorize(self, tool_name: str, pool: PermissionPool, current_user: dict, required_permissions: set[str]) -> ToolAuthzResult: ...
+    def authorize(
+        self, tool_name: str, pool: PermissionPool, current_user: dict,
+        required_permissions: set[str],
+    ) -> ToolAuthzResult: ...
 
 
 class DefaultToolAuthorizationPolicy:
-    def authorize(self, tool_name: str, pool: PermissionPool, current_user: dict, required_permissions: set[str]) -> ToolAuthzResult:
+    def authorize(
+        self, tool_name: str, pool: PermissionPool, current_user: dict,
+        required_permissions: set[str],
+    ) -> ToolAuthzResult:
         if tool_name not in pool.allowed_tools:
             return ToolAuthzResult(False, "tool not allowed for permission pool")
         if current_user.get("role_code") == "admin":

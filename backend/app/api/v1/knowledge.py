@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
-from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import ValidationError
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.base import AIServiceAdapter
 from app.adapters.factory import get_ai_adapter
@@ -33,7 +33,11 @@ async def query(
     if not settings.KNOWLEDGE_GATEWAY_ENABLED:
         raise HTTPException(
             status_code=503,
-            detail={"code": "CAPABILITY_DISABLED", "msg": "Knowledge Gateway 已关闭", "retryable": False},
+            detail={
+                "code": "CAPABILITY_DISABLED",
+                "msg": "Knowledge Gateway 已关闭",
+                "retryable": False,
+            },
         )
     try:
         body = KnowledgeQueryRequest.model_validate(await request.json())

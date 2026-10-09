@@ -18,7 +18,6 @@ from app.models.product import Product, ProductImage
 from app.models.sales import Proposal, Quotation, QuotationItem
 from app.schemas.quotation import (
     QuotationCreate,
-    QuotationResponse,
     QuotationUpdate,
 )
 
@@ -279,11 +278,23 @@ async def export_quotation_pdf(
     if not gotenberg_url:
         raise HTTPException(status_code=503, detail={"code": 50301, "msg": "PDF 服务未配置"})
 
+    def _row_cells(item):
+        prod = prod_map.get(item.product_id)
+        if prod and prod.product_no:
+            p_no = escape(str(prod.product_no))
+        else:
+            p_no = escape(str(item.product_id))
+        if prod and prod.product_name:
+            p_name = escape(str(prod.product_name))
+        else:
+            p_name = "-"
+        return p_no, p_name
+
     rows_html = "".join(
         f"""
         <tr>
-          <td>{escape(str(prod_map.get(item.product_id) and prod_map[item.product_id].product_no or item.product_id))}</td>
-          <td>{escape(str(prod_map.get(item.product_id) and prod_map[item.product_id].product_name or "-"))}</td>
+          <td>{_row_cells(item)[0]}</td>
+          <td>{_row_cells(item)[1]}</td>
           <td class="num">{item.quantity}</td>
           <td class="num">{_round(item.unit_price):.2f}</td>
           <td class="num">{_round(item.tax_rate * 100):.2f}%</td>
@@ -293,6 +304,7 @@ async def export_quotation_pdf(
         for item in quotation.items
     )
     valid_until = quotation.valid_until.strftime("%Y-%m-%d") if quotation.valid_until else "-"
+    _pre_tax_total = _round(sum(it.subtotal * (1 + it.tax_rate) for it in quotation.items))
     html = f"""<!doctype html>
 <html lang="zh-CN">
 <head>
@@ -332,7 +344,7 @@ async def export_quotation_pdf(
   </table>
   <div class="total">
     <div>折扣：{_round(quotation.discount * 100):.2f}%</div>
-    <div>合计（含税后折前）：{_round(sum(it.subtotal * (1 + it.tax_rate) for it in quotation.items)):.2f}</div>
+    <div>合计（含税后折前）：{_pre_tax_total:.2f}</div>
     <strong>总计：{_round(quotation.total_amount):.2f}</strong>
   </div>
 </body>
@@ -404,9 +416,7 @@ async def create_quotation(
     if not proposal:
         raise HTTPException(status_code=404, detail={"code": 40401, "msg": "关联方案不存在"})
 
-    products = await _validate_quotation_items(
-        [i.product_id for i in quotation_data.items], db
-    )
+    await _validate_quotation_items([i.product_id for i in quotation_data.items], db)
 
     quotation = Quotation(
         quotation_no=_gen_quotation_no(),
@@ -491,9 +501,7 @@ async def update_quotation(
                 status_code=422, detail={"code": 42201, "msg": "报价明细不可为空"}
             )
         if new_items is not None:
-            products = await _validate_quotation_items(
-                [i.product_id for i in new_items], db
-            )
+            await _validate_quotation_items([i.product_id for i in new_items], db)
             old_items = await db.execute(
                 select(QuotationItem).where(QuotationItem.quotation_id == quotation.id)
             )

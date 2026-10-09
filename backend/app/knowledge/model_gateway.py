@@ -23,7 +23,9 @@ class ModelResult:
 
 @runtime_checkable
 class ModelGateway(Protocol):
-    async def generate_answer(self, *, session_id: str, message: str, context: dict[str, Any], trace_id: str) -> ModelResult: ...
+    async def generate_answer(
+        self, *, session_id: str, message: str, context: dict[str, Any], trace_id: str
+    ) -> ModelResult: ...
 
 
 class AdapterModelGateway:
@@ -33,7 +35,9 @@ class AdapterModelGateway:
     def available(self) -> bool:
         return self.adapter is not None and not isinstance(self.adapter, NoneAdapter)
 
-    async def generate_answer(self, *, session_id: str, message: str, context: dict[str, Any], trace_id: str) -> ModelResult:
+    async def generate_answer(
+        self, *, session_id: str, message: str, context: dict[str, Any], trace_id: str
+    ) -> ModelResult:
         if not self.available():
             raise KnowledgeGatewayError(
                 KnowledgeErrorCode.CAPABILITY_DISABLED,
@@ -50,11 +54,20 @@ class AdapterModelGateway:
                 stream=False,
             )
         except AIAdapterTimeoutError as exc:
-            raise KnowledgeGatewayError(KnowledgeErrorCode.MODEL_TIMEOUT, "AI 服务响应超时", status_code=504, retryable=True) from exc
+            raise KnowledgeGatewayError(
+                KnowledgeErrorCode.MODEL_TIMEOUT, "AI 服务响应超时", status_code=504, retryable=True
+            ) from exc
         except AIAdapterRateLimitError as exc:
-            raise KnowledgeGatewayError(KnowledgeErrorCode.MODEL_RATE_LIMIT, "AI 服务请求过于频繁", status_code=502, retryable=True) from exc
+            raise KnowledgeGatewayError(
+                KnowledgeErrorCode.MODEL_RATE_LIMIT,
+                "AI 服务请求过于频繁",
+                status_code=502,
+                retryable=True,
+            ) from exc
         except Exception as exc:
-            raise KnowledgeGatewayError(KnowledgeErrorCode.MODEL_INVALID, "AI 服务暂不可用", status_code=503, retryable=True) from exc
+            raise KnowledgeGatewayError(
+                KnowledgeErrorCode.MODEL_INVALID, "AI 服务暂不可用", status_code=503, retryable=True
+            ) from exc
         latency_ms = int((time.perf_counter() - start) * 1000)
         return ModelResult(
             answer=str(resp.get("answer") or ""),

@@ -38,15 +38,20 @@ class QualitySummaryTool:
 
     async def run(self, params: QualitySummaryInput, context: ToolContext) -> dict[str, Any]:
         total = await _count(context, Product.is_deleted.is_(False))
+        counts = [
+            ("pending_price", await _count(context, Product.face_price == 99999)),
+            ("stock_unknown", await _count(context, Product.stock_status == "unknown")),
+            ("draft_products", await _count(context, Product.status == "draft")),
+            (
+                "pending_completeness",
+                await _count(context, Product.completeness_status == "pending"),
+            ),
+        ]
+        facts = [_summary_fact("total_products", total)]
+        facts.extend(_summary_fact(name, value) for name, value in counts)
         return {
-            "facts": [
-                {"name": "total_products", "value": total, "source_id": "db_quality_summary", "source_type": "database_fact"},
-                {"name": "pending_price", "value": await _count(context, Product.face_price == 99999), "source_id": "db_quality_summary", "source_type": "database_fact"},
-                {"name": "stock_unknown", "value": await _count(context, Product.stock_status == "unknown"), "source_id": "db_quality_summary", "source_type": "database_fact"},
-                {"name": "draft_products", "value": await _count(context, Product.status == "draft"), "source_id": "db_quality_summary", "source_type": "database_fact"},
-                {"name": "pending_completeness", "value": await _count(context, Product.completeness_status == "pending"), "source_id": "db_quality_summary", "source_type": "database_fact"},
-            ],
-            "sources": [{"source_id": "db_quality_summary", "source_type": "database_fact", "title": "产品质量规则统计", "access_policy": "role_projected"}],
+            "facts": facts,
+            "sources": [_summary_source("产品质量规则统计")],
         }
 
 
@@ -84,11 +89,37 @@ class QualityListIssuesTool:
             if product_issues:
                 issues.extend(product_issues)
                 products.append(_product_card(p, context.current_user))
-        return {"issues": issues[:100], "products": products[:100], "sources": [{"source_id": "db_quality_issues", "source_type": "database_fact", "title": "产品质量问题列表", "access_policy": "role_projected"}]}
+        return {
+            "issues": issues[:100],
+            "products": products[:100],
+            "sources": [_summary_source("产品质量问题列表", source_id="db_quality_issues")],
+        }
+
+
+def _summary_fact(name: str, value: int) -> dict[str, Any]:
+    return {
+        "name": name,
+        "value": value,
+        "source_id": "db_quality_summary",
+        "source_type": "database_fact",
+    }
+
+
+def _summary_source(title: str, source_id: str = "db_quality_summary") -> dict[str, Any]:
+    return {
+        "source_id": source_id,
+        "source_type": "database_fact",
+        "title": title,
+        "access_policy": "role_projected",
+    }
 
 
 async def _count(context: ToolContext, condition) -> int:
-    result = await context.db.execute(select(func.count()).select_from(Product).where(Product.is_deleted.is_(False), condition))
+    result = await context.db.execute(
+        select(func.count())
+        .select_from(Product)
+        .where(Product.is_deleted.is_(False), condition)
+    )
     return int(result.scalar() or 0)
 
 
@@ -110,4 +141,10 @@ def _issues_for(p: Product) -> list[dict[str, Any]]:
 
 
 def _issue(p: Product, issue_type: str, label: str) -> dict[str, Any]:
-    return {"product_id": str(p.id), "product_no": p.product_no, "product_name": p.product_name, "issue_type": issue_type, "label": label}
+    return {
+        "product_id": str(p.id),
+        "product_no": p.product_no,
+        "product_name": p.product_name,
+        "issue_type": issue_type,
+        "label": label,
+    }
