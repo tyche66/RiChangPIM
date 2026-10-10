@@ -24,8 +24,11 @@ run() { local name="$1"; shift; echo "── $name"; "$@"; local rc=$?; if [ $rc
 if [ "${1:-all}" != frontend ]; then
   (cd backend && run "backend ruff" "$PY" -m ruff check app)
   (cd backend && run "backend unit" "$PY" -m pytest tests/unit -q -p no:cacheprovider)
+  # 集成默认跑「仅依赖 PG」的安全子集（宿主无 Redis/MinIO，文件/媒体类用例会挂）；
+  # 全量：GATE_IT_TESTS=tests scripts/gate.sh backend（建议在 compose 网络内执行）。
   if [ -n "${TEST_DATABASE_URL:-}" ]; then
-    (cd backend && run "backend contract/integration" "$PY" -m pytest tests -q --ignore=tests/unit -p no:cacheprovider)
+    IT_TARGET="${GATE_IT_TESTS:-tests/test_seed_data.py tests/test_permission_contract.py tests/test_migration_schema.py}"
+    (cd backend && run "backend contract/integration" "$PY" -m pytest $IT_TARGET -q -p no:cacheprovider)
   else
     echo "── backend contract/integration: SKIP (未设置 TEST_DATABASE_URL)"
   fi
