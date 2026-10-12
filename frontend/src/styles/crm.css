@@ -1,0 +1,364 @@
+/*
+ * CRM / 内容域共享样式（HLD §12.3）。
+ *
+ * 7 个 view + 3 个组件共用同一套卡片/表格/工具栏外观；若在每个 SFC 的 <style scoped>
+ * 里重复一遍既冗长又容易漂移，故集中在此，由 main.ts 全局引入。
+ * 所有颜色走 design-system.css 的语义 Token，深色模式自动跟随。
+ */
+
+.crm-page {
+  padding: 16px;
+  min-height: 100vh;
+  background: var(--pim-page);
+}
+
+.crm-card {
+  background: var(--pim-surface);
+  border: 1px solid var(--pim-card-border);
+  border-radius: var(--pim-radius);
+  box-shadow: 0 4px 24px rgba(var(--pim-brand), 0.06);
+  overflow: hidden;
+}
+
+.crm-card :deep(.el-card__header) {
+  background: transparent;
+  border-bottom: 1px solid rgba(var(--pim-brand), 0.06);
+  padding: 18px 24px;
+}
+
+.crm-card :deep(.el-card__body) {
+  padding: 20px 24px;
+}
+
+.crm-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.crm-card__title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--pim-text-strong);
+}
+
+.crm-card__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ===== 工具栏 / 搜索表单 ===== */
+.crm-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px 12px;
+  margin-bottom: 16px;
+}
+
+.crm-toolbar :deep(.el-form-item) {
+  margin-bottom: 0;
+}
+
+.crm-field {
+  width: 200px;
+}
+
+/* ===== 胶囊控件（沿用既有观感） ===== */
+.crm-input :deep(.el-input__wrapper),
+.crm-input :deep(.el-textarea__inner) {
+  border-radius: 20px;
+  box-shadow: 0 0 0 1px rgba(var(--pim-brand), 0.1) inset;
+}
+
+.crm-input--area :deep(.el-textarea__inner) {
+  border-radius: 16px;
+}
+
+.crm-select :deep(.el-select__wrapper) {
+  border-radius: 20px;
+  box-shadow: 0 0 0 1px rgba(var(--pim-brand), 0.1) inset;
+}
+
+.crm-btn {
+  border-radius: 20px !important;
+  padding: 8px 20px;
+  font-weight: 500;
+}
+
+.crm-btn--primary {
+  background: var(--pim-text-strong);
+  border-color: var(--pim-text-strong);
+  color: var(--pim-on-accent);
+}
+
+.crm-link {
+  padding: 0;
+  min-height: 0;
+  border: 0;
+  background: transparent;
+  color: var(--pim-text-primary);
+  font-weight: 500;
+}
+
+.crm-link:hover {
+  background: transparent;
+  color: var(--pim-text-strong);
+}
+
+.crm-link--danger {
+  color: var(--pim-danger-bright);
+}
+
+.crm-link--danger:hover {
+  color: var(--pim-danger-bright);
+}
+
+/* ===== 表格 ===== */
+.crm-table-wrap {
+  overflow-x: auto;
+  border-radius: var(--pim-radius-sm);
+}
+
+.crm-table {
+  width: 100%;
+}
+
+.crm-mono {
+  font-family: var(--pim-font-mono);
+  color: var(--pim-text-secondary);
+  font-size: 12px;
+}
+
+.crm-tag {
+  border-radius: 12px;
+  padding: 2px 10px;
+  font-weight: 500;
+}
+
+.crm-pagination {
+  margin-top: 20px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.crm-pagination :deep(.el-pager li.active) {
+  background: var(--pim-accent-solid);
+  color: var(--pim-on-accent);
+}
+
+.crm-empty {
+  padding: 32px 8px;
+  text-align: center;
+  color: var(--pim-text-secondary);
+  font-size: 13px;
+}
+
+/* ===== 驾驶舱 KPI ===== */
+.crm-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.crm-kpi {
+  padding: 18px 20px;
+  border: 1px solid var(--pim-card-border);
+  border-radius: var(--pim-radius);
+  background: var(--pim-surface);
+  box-shadow: 0 4px 24px rgba(var(--pim-brand), 0.05);
+}
+
+.crm-kpi__label {
+  color: var(--pim-text-secondary);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+}
+
+.crm-kpi__value {
+  margin-top: 8px;
+  color: var(--pim-text-strong);
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.crm-kpi__foot {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--pim-text-secondary);
+  font-size: 12px;
+}
+
+.crm-trend {
+  font-weight: 600;
+}
+
+.crm-trend--up {
+  color: var(--pim-success-bright, #1f9d55);
+}
+
+.crm-trend--down {
+  color: var(--pim-danger-bright);
+}
+
+/* ===== 图表 ===== */
+.crm-chart {
+  width: 100%;
+  height: 320px;
+}
+
+/* ===== 详情页 ===== */
+.crm-detail-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.crm-detail-head__title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--pim-text-strong);
+}
+
+.crm-section {
+  margin-top: 20px;
+}
+
+.crm-section__title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 0 12px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--pim-text-primary);
+}
+
+.crm-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.crm-list-item {
+  padding: 12px 14px;
+  border: 1px solid var(--pim-border);
+  border-radius: 14px;
+}
+
+.crm-list-item__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  color: var(--pim-text-secondary);
+  font-size: 12px;
+}
+
+.crm-list-item__body {
+  margin-top: 6px;
+  color: var(--pim-text-primary);
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ===== 内容工坊 ===== */
+.crm-content-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+}
+
+.crm-content-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--pim-card-border);
+  border-radius: var(--pim-radius);
+  background: var(--pim-surface);
+}
+
+.crm-content-card__title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--pim-text-strong);
+}
+
+.crm-content-card__body {
+  color: var(--pim-text-primary);
+  font-size: 13px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.crm-hashtags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.crm-warning {
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--pim-danger-bg, rgba(220, 38, 38, 0.08));
+  color: var(--pim-danger-bright);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.crm-content-card__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: auto;
+}
+
+/* ===== 图纸 ===== */
+.crm-uploader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.crm-asset-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+@media (max-width: 600px) {
+  .crm-page {
+    padding: 8px;
+  }
+
+  .crm-field {
+    width: 100%;
+  }
+
+  .crm-kpi__value {
+    font-size: 24px;
+  }
+
+  .crm-chart {
+    height: 240px;
+  }
+}

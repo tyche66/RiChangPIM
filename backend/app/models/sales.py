@@ -13,6 +13,8 @@ class Proposal(CommonBase):
     proposal_name = Column(String(255), nullable=False)
     creator_id = Column(PGUUID(as_uuid=True), ForeignKey("user.id"), nullable=False)
     customer_name = Column(String(128))
+    customer_id = Column(PGUUID(as_uuid=True), ForeignKey("customers.id"), nullable=True)
+    project_id = Column(PGUUID(as_uuid=True), ForeignKey("projects.id"), nullable=True)
     status = Column(String(20), default="draft")
     ai_polished = Column(Boolean, default=False)
     total_face_value = Column(Float, default=0)

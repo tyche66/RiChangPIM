@@ -1,14 +1,18 @@
 from app.api.v1.auth import router as auth_router
 from app.api.v1.brands import router as brands_router
 from app.api.v1.categories import router as categories_router
+from app.api.v1.content import router as content_router
+from app.api.v1.customers import router as customers_router
 from app.api.v1.files import router as files_router
 from app.api.v1.health import router as health_router
 from app.api.v1.knowledge import router as knowledge_router
 from app.api.v1.knowledge_sources import router as knowledge_sources_router
 from app.api.v1.pending_actions import router as pending_actions_router
 from app.api.v1.products import router as products_router
+from app.api.v1.projects import router as projects_router
 from app.api.v1.proposals import router as proposals_router
 from app.api.v1.quotations import router as quotations_router
+from app.api.v1.reminders import router as reminders_router
 from app.api.v1.roles import router as roles_router
 from app.api.v1.scene_images import router as scene_images_router
 from app.api.v1.share_token import router as share_token_router
@@ -24,8 +28,11 @@ __all__ = [
     "users_router",
     "roles_router",
     "products_router",
+    "projects_router",
     "categories_router",
     "brands_router",
+    "content_router",
+    "customers_router",
     "suppliers_router",
     "tags_router",
     "proposals_router",
@@ -36,6 +43,7 @@ __all__ = [
     "pending_actions_router",
     "share_token_router",
     "quotations_router",
+    "reminders_router",
     "files_router",
     "stats_router",
     "scene_images_router",

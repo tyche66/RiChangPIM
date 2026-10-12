@@ -164,6 +164,11 @@ class Attachment(CommonBase):
     file_size = Column(Integer, nullable=False)
     storage_type = Column(String(20), default="minio")
     oss_key = Column(String(512), nullable=False)
+    # HLD §4.8 受控增量（迁移 0018）：NULL=历史/文件中心语义；
+    # 'product'|'customer'|'project'|'content' 时下载/预览/媒体库必须先过
+    # core.attachment_access.can_access_attachment。
+    biz_domain = Column(String(32), nullable=True)
+    biz_scope_id = Column(PGUUID(as_uuid=True), nullable=True)
 
     __table_args__ = (
         CheckConstraint(

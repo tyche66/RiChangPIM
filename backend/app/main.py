@@ -29,9 +29,14 @@ from app.api.v1 import (
     version,
 )
 from app.api.v1.brands import router as brands_router
+from app.api.v1.content import router as content_router
+from app.api.v1.customers import router as customers_router
+from app.api.v1.dashboard import router as dashboard_router
 from app.api.v1.files import router as files_router
 from app.api.v1.manuals import router as manuals_router
+from app.api.v1.projects import router as projects_router
 from app.api.v1.quotations import router as quotations_router
+from app.api.v1.reminders import router as reminders_router
 from app.api.v1.scene_images import router as scene_images_router
 from app.api.v1.stats import router as stats_router
 from app.api.v1.suppliers import router as suppliers_router
@@ -210,6 +215,11 @@ app.include_router(quotations_router, prefix="/api/v1/quotations", tags=["quotat
 app.include_router(files_router, prefix="/api/v1/files", tags=["files"])
 app.include_router(manuals_router, prefix="/api/v1/manuals", tags=["manuals"])
 app.include_router(stats_router, prefix="/api/v1/stats", tags=["stats"])
+app.include_router(dashboard_router)
+app.include_router(customers_router)
+app.include_router(projects_router)
+app.include_router(content_router)
+app.include_router(reminders_router)
 app.include_router(scene_images_router, prefix="/api/v1/scene-images", tags=["scene_images"])
 app.include_router(version.router, prefix="/api/v1", tags=["version"])
 

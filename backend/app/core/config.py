@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     # 这个值是 APP_VERSION 没被注入时的兜底：原来写死 "0.1.0"，于是任何忘记传
     # 构建参数的部署（以及全部开发环境）都会在 /api/v1/version、/health、
     # OpenAPI 文档里报 0.1.0，和真实产品版本差了 8 个 MINOR。兜底值必须是真话。
-    VERSION: str = "1.9.2"
+    VERSION: str = "1.9.3"
     APP_VERSION: str | None = None
     BUILD_ID: str = "dev-local"
     GIT_COMMIT: str = "unknown"
@@ -117,6 +117,15 @@ class Settings(BaseSettings):
     # 但 DNS rebinding 仍有残留风险，所以默认关闭，只在来源可信的部署上手动打开。
     PRODUCT_IMPORT_ALLOW_URL_FETCH: bool = False
     PRODUCT_IMPORT_URL_TIMEOUT: float = 10.0
+
+    # 提醒引擎（HLD §14）
+    REMINDER_HOUR: int = 9
+    REMINDER_SKIP_WEEKEND: bool = False
+    REMINDER_ADOPT_DAYS: int = 2
+    REMINDER_PUBLISH_DAYS: int = 2
+    REMINDER_METRIC_DAYS: str = "1,3,7"
+    REMINDER_ESCALATE_HOURS: int = 24
+    REMINDER_LLM_POLISH: bool = False
 
     def model_post_init(self, __context) -> None:
         if self.AI_API_KEY_FILE:

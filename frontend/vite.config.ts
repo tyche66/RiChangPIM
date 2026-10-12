@@ -39,6 +39,7 @@ export default defineConfig(({ mode }) => {
           vue: ['vue', 'vue-router', 'pinia'],
           'element-plus': ['element-plus'],
           vendor: ['axios', '@vueuse/core'],
+          echarts: ['echarts/core', 'echarts/charts', 'echarts/components', 'echarts/renderers', 'vue-echarts'],
         },
       },
     },

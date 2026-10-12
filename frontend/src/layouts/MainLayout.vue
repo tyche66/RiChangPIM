@@ -68,6 +68,45 @@
             报价管理
           </el-menu-item>
         </el-sub-menu>
+        <el-sub-menu
+          v-if="showCrmMenu"
+          index="m-crm"
+        >
+          <template #title>
+            <el-icon><Briefcase /></el-icon>
+            <span>客户与项目</span>
+          </template>
+          <el-menu-item
+            v-if="hasPerm('dashboard:view')"
+            index="/dashboard"
+          >
+            驾驶舱
+          </el-menu-item>
+          <el-menu-item
+            v-if="hasPerm('customer:view')"
+            index="/customers"
+          >
+            客户管理
+          </el-menu-item>
+          <el-menu-item
+            v-if="hasPerm('project:view')"
+            index="/projects"
+          >
+            项目管理
+          </el-menu-item>
+          <el-menu-item
+            v-if="hasPerm('content:view')"
+            index="/content/workshop"
+          >
+            内容工坊
+          </el-menu-item>
+          <el-menu-item
+            v-if="hasPerm('content:view')"
+            index="/content/publications"
+          >
+            发布与曝光
+          </el-menu-item>
+        </el-sub-menu>
         <el-sub-menu index="m-admin">
           <template #title>
             <el-icon><Setting /></el-icon>
@@ -125,6 +164,18 @@
             </div>
           </div>
           <div class="header-actions">
+            <button
+              type="button"
+              class="header-icon-btn"
+              aria-label="我的待办"
+              title="我的待办"
+              @click="todoDrawerOpen = true"
+            >
+              <el-icon :size="19">
+                <List />
+              </el-icon>
+            </button>
+            <NotificationBell />
             <ThemeToggle />
             <button
               class="user-chip"
@@ -191,15 +242,20 @@
         </div>
       </template>
     </el-dialog>
+
+    <TodoDrawer v-model="todoDrawerOpen" />
   </el-container>
 </template>
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Cpu, Document, DocumentCopy, InfoFilled, Menu, Setting } from '@element-plus/icons-vue'
+import { Briefcase, Cpu, Document, DocumentCopy, InfoFilled, List, Menu, Setting } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
+import { hasPermission } from '@/types/permissions'
 import ThemeToggle from '@/components/ThemeToggle.vue'
+import NotificationBell from '@/components/NotificationBell.vue'
+import TodoDrawer from '@/components/TodoDrawer.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -207,7 +263,21 @@ const authStore = useAuthStore()
 const mobileMenuOpen = ref(false)
 const accountDialogVisible = ref(false)
 const accountBusy = ref(false)
+const todoDrawerOpen = ref(false)
 const menuRef = ref<{ updateActiveIndex?: (index: string) => void } | null>(null)
+
+function hasPerm(perm: string): boolean {
+  return hasPermission(authStore.permissions, perm)
+}
+
+// 客户与项目分组：任一子项有权限才渲染整个分组。
+const showCrmMenu = computed(
+  () =>
+    hasPerm('dashboard:view') ||
+    hasPerm('customer:view') ||
+    hasPerm('project:view') ||
+    hasPerm('content:view'),
+)
 
 const activeMenu = computed(() => route.path)
 
@@ -229,6 +299,10 @@ const subMenuMap: Record<string, string> = {
   'ai-select': 'm-ai',
   manuals: 'm-ai',
   import: 'm-ai',
+  dashboard: 'm-crm',
+  customers: 'm-crm',
+  projects: 'm-crm',
+  content: 'm-crm',
 }
 const defaultOpenedMenus = computed(() => {
   const key = route.path.split('/')[1]
@@ -270,9 +344,17 @@ const routeLabels: Record<string, [string, string]> = {
   'ai-select': ['AI 功能', 'AI 选品'],
   manuals: ['AI 功能', '产品知识库'],
   import: ['AI 功能', '批量导入'],
+  dashboard: ['客户与项目', '驾驶舱'],
+  customers: ['客户与项目', '客户管理'],
+  projects: ['客户与项目', '项目管理'],
+  'content/workshop': ['客户与项目', '内容工坊'],
+  'content/publications': ['客户与项目', '发布与曝光'],
   version: ['系统信息', '版本'],
 }
-const currentLabels = computed(() => routeLabels[route.path.split('/')[1]] || ['工作台', 'AI-PIM'])
+// content 域有两个二级页面（工坊/发布），单段 key 无法区分，故优先按完整路径查表。
+const currentLabels = computed(
+  () => routeLabels[route.path] || routeLabels[route.path.split('/')[1]] || ['工作台', 'AI-PIM'],
+)
 const pageSection = computed(() => currentLabels.value[0])
 const pageTitle = computed(() => route.params.id ? `${currentLabels.value[1]}详情` : currentLabels.value[1])
 // 顶栏只显示真实用户名。「当前用户」是标签，不参与占位——不用它冒名顶替真实用户名。
@@ -476,6 +558,23 @@ const handleSwitchUser = async () => {
   height: 42px;
   border-radius: 50%;
   background: rgba(var(--pim-brand), 0.08);
+}
+
+.header-icon-btn {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(var(--pim-brand), 0.08);
+  color: rgba(var(--pim-brand), 0.8);
+  cursor: pointer;
+  transition: background 200ms ease;
+}
+
+.header-icon-btn:hover {
+  background: rgba(var(--pim-brand), 0.14);
 }
 
 .user-chip {

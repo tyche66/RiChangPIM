@@ -26,6 +26,23 @@
 
 **不要去改的历史记录**（改了就是篡改发布史）：`BUILD_LOG.md` 的构建记录、`PROJECT_MANAGEMENT.md` 的发布台账、`TODO.md` 的「已发布」条目、`docs/08-开发路线图.md` 的里程碑行。`RELEASE_GATE.md` 已改成版本无关，不需要跟着版本走。
 
+## v1.9.3 — 2026-10-12
+
+本版本引入 CRM-Lite 模块：客户域、项目域、驾驶舱、新媒体工坊和提醒引擎，新增 16 个权限码与 manager/designer/operator 角色，前端新增 7 个视图与通知组件。向后兼容，生产升级按 `docs/云端更新包.md` 正常执行迁移并保留数据卷即可；需求设计见 `docs/10-客户项目与新媒体(CRM-Lite).md`（其 A9 条原目标 v1.10.0，实际以本节声明的 v1.9.3 为准）。
+
+### 新增
+- 客户域：客户 CRUD、阶段状态机、PII 脱敏、对话/需求/跟进/方案子资源
+- 项目域：项目 CRUD、成员管理、图纸资产（.dwg/.dxf/.skp/.psd 上传）
+- 驾驶舱：5 端点（overview/funnel/sales/todos/content）+ 缓存层
+- 新媒体工坊：AI 生成 + 合规守卫 + 发布登记 + 曝光录入 + Excel 导入
+- 提醒引擎：R1/R1b/R2/R3/E1 规则 + worker + 通知
+- 权限：16 新权限码 + manager/designer/operator 角色
+- 前端：7 视图 + 3 组件 + echarts 懒加载
+
+### 数据库
+- 新增迁移 `0020_crm_perms`（16 个 CRM 权限码 + manager/designer/operator 角色种子）、`0021_content_tables`、`0022_reminders`，迁移 head 前进到 `0022_reminders`
+- customers/projects 相关表由启动入口的初始化流程（`Base.metadata.create_all`）创建，不在迁移内
+
 ## v1.9.2 — 2026-09-29
 
 本版本修复 AI 门户查询结果区的三类缺陷（卡片网格退化、推荐卡片不出图、答案 Markdown 原文直出），把后台与门户的深色模式从「逐页堆 `:global(.dark-mode)` 覆盖」重做为按语义 Token 的实现，并补一个非 Docker 的本机一键启动脚本。

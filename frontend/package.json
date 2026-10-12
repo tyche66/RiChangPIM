@@ -1,7 +1,7 @@
 {
   "name": "ai-pim-frontend",
   "private": true,
-  "version": "1.9.2",
+  "version": "1.9.3",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -14,10 +14,12 @@
   "dependencies": {
     "@vueuse/core": "^10.7.0",
     "axios": "^1.6.0",
+    "echarts": "^5.5.0",
     "element-plus": "^2.5.0",
     "pinia": "^2.1.0",
     "qrcode": "^1.5.4",
     "vue": "^3.4.0",
+    "vue-echarts": "^7.0.3",
     "vue-router": "^4.2.0"
   },
   "devDependencies": {

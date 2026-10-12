@@ -5,7 +5,7 @@ from collections.abc import Iterator
 from urllib.parse import quote
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import RedirectResponse, Response, StreamingResponse
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -58,6 +58,38 @@ _ALLOWED = {
         50 * 1024 * 1024,
     ),
 }
+
+# HLD §12.4 图纸扩展名白名单（V2-21/V-08）
+_ALLOWED_EXT_DRAWING = frozenset({".dwg", ".dxf", ".skp", ".psd"})
+_DRAWING_MAX_SIZE = 95 * 1024 * 1024  # 95MB（nginx client_max_body_size=100M，留余量）
+
+
+def _get_file_extension(filename: str) -> str:
+    """取最后一段扩展名（小写）。a.dwg.exe → .exe"""
+    if "." not in filename:
+        return ""
+    return "." + filename.rsplit(".", 1)[-1].lower()
+
+
+def _validate_drawing_magic(data: bytes, ext: str) -> bool:
+    """魔数校验（HLD §12.4）。
+
+    DWG: AC10…（如 AC1015）
+    PSD: 8BPS
+    DXF: ASCII '  0 SECTION' 头宽松匹配
+    SKP: 无特定魔数，仅校验扩展名
+    """
+    if ext == ".dwg":
+        return data[:4] == b"AC10"
+    if ext == ".psd":
+        return data[:4] == b"8BPS"
+    if ext == ".dxf":
+        # DXF 文件以 ASCII "  0 SECTION" 开头（宽松匹配前 20 字节）
+        head = data[:20].decode("ascii", errors="ignore")
+        return "0" in head and "SECTION" in head
+    if ext == ".skp":
+        return True  # SKP 无特定魔数
+    return False
 
 _PREVIEW_EXPIRE_SECONDS = 900
 _DOWNLOAD_EXPIRE_MINUTES = 5
@@ -409,15 +441,24 @@ async def get_file_references(
 async def upload_file(
     request: Request,
     file: UploadFile = File(...),
+    biz_domain: str | None = Form(None),
+    biz_scope_id: UUID | None = Form(None),
     db: AsyncSession = Depends(get_db),
 ):
     content_type = file.content_type or ""
-    if content_type not in _ALLOWED:
+    file_ext = _get_file_extension(file.filename or "")
+
+    if content_type in _ALLOWED:
+        file_type, max_size = _ALLOWED[content_type]
+    elif file_ext in _ALLOWED_EXT_DRAWING:
+        # HLD §12.4: 图纸扩展名放行，强制 content_type/file_type
+        file_type = "other"
+        max_size = _DRAWING_MAX_SIZE
+    else:
         raise HTTPException(
             status_code=422,
             detail={"code": 42202, "msg": f"不支持的文件类型: {content_type}"},
         )
-    file_type, max_size = _ALLOWED[content_type]
 
     data = await file.read()
     if len(data) > max_size:
@@ -425,6 +466,14 @@ async def upload_file(
             status_code=422,
             detail={"code": 42203, "msg": f"文件大小超过上限 {max_size} 字节"},
         )
+
+    # HLD §12.4: 魔数校验（DWG/PSD/DXF）
+    if file_ext in _ALLOWED_EXT_DRAWING:
+        if not _validate_drawing_magic(data, file_ext):
+            raise HTTPException(
+                status_code=422,
+                detail={"code": 42202, "msg": f"文件魔数校验失败: {file_ext}"},
+            )
 
     extension = content_type.split("/")[-1]
     if content_type == "application/pdf":
@@ -450,6 +499,8 @@ async def upload_file(
         file_size=len(data),
         storage_type="minio",
         oss_key=object_key,
+        biz_domain=biz_domain,
+        biz_scope_id=biz_scope_id,
     )
     db.add(attachment)
     await db.commit()
@@ -493,12 +544,19 @@ async def replace_file(
         raise HTTPException(status_code=404, detail={"code": 40401, "msg": "附件不存在"})
 
     content_type = file.content_type or ""
-    if content_type not in _ALLOWED:
+    file_ext = _get_file_extension(file.filename or "")
+
+    if content_type in _ALLOWED:
+        file_type, max_size = _ALLOWED[content_type]
+    elif file_ext in _ALLOWED_EXT_DRAWING:
+        # HLD §12.4: 图纸扩展名放行，强制 content_type/file_type
+        file_type = "other"
+        max_size = _DRAWING_MAX_SIZE
+    else:
         raise HTTPException(
             status_code=422,
             detail={"code": 42202, "msg": f"不支持的文件类型: {content_type}"},
         )
-    file_type, max_size = _ALLOWED[content_type]
 
     if file_type != attachment.file_type:
         raise HTTPException(
@@ -518,6 +576,14 @@ async def replace_file(
             status_code=422,
             detail={"code": 42203, "msg": f"文件大小超过上限 {max_size} 字节"},
         )
+
+    # HLD §12.4: 魔数校验（DWG/PSD/DXF）
+    if file_ext in _ALLOWED_EXT_DRAWING:
+        if not _validate_drawing_magic(data, file_ext):
+            raise HTTPException(
+                status_code=422,
+                detail={"code": 42202, "msg": f"文件魔数校验失败: {file_ext}"},
+            )
 
     extension = content_type.split("/")[-1]
     if content_type == "application/pdf":

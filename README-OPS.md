@@ -217,6 +217,21 @@ curl -s --noproxy '*' http://127.0.0.1:888/api/v1/health   # version 必须是�
 回滚：`docker compose build` 会留下上一版镜像（`docker images | grep richangpim`），
 `docker tag` 回去再 `up -d --no-deps <service>`；所以升级后先别清理镜像。
 
+
+## Worker 部署
+
+提醒 worker 与 backend 同镜像，通过 docker-compose 启动：
+
+```bash
+docker compose up -d worker
+docker compose up --scale worker=2  # 多实例
+```
+
+- 每 60s 扫描到期提醒并派发通知
+- 每 10 分钟执行一致性校正和升级检查
+- 健康检查：/tmp/worker_heartbeat 文件存在且 <180s
+- 多实例安全：FOR UPDATE SKIP LOCKED + Redis 锁
+
 ## 健康检查
 
 ### 后端健康检查

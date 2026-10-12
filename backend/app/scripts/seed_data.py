@@ -34,6 +34,9 @@ ROLES = [
     ("purchaser", "采购员", "负责产品与供应商的维护"),
     ("sales", "销售员", "负责方案/报价/分享，查看产品信息"),
     ("viewer", "访客", "只读查看产品与统计看板"),
+    ("manager", "经理", "数据范围全量、无 user/role/系统码"),
+    ("designer", "设计师", "绑定项目内可见；无 customer:view"),
+    ("operator", "运营", "内容工坊操作；无 customer:/project: 码"),
 ]
 
 # (perm_code, perm_name, resource, action, type)
@@ -103,6 +106,28 @@ PERMISSIONS = [
     ("ai:pending_action", "AI 待确认动作", "ai", "pending_action", "write"),
     ("knowledge:manage", "知识索引管理", "knowledge", "manage", "write"),
     ("knowledge:debug", "知识调试", "knowledge", "debug", "read"),
+    # scene_image（G0-4.8 漂移修复）
+    ("scene_image:view", "场景图查看", "scene_image", "view", "read"),
+    ("scene_image:create", "场景图新增", "scene_image", "create", "write"),
+    ("scene_image:edit", "场景图编辑", "scene_image", "edit", "write"),
+    ("scene_image:delete", "场景图删除", "scene_image", "delete", "write"),
+    # CRM-Lite（HLD §6.1）
+    ("customer:view", "客户查看", "customer", "view", "read"),
+    ("customer:edit", "客户编辑", "customer", "edit", "write"),
+    ("customer:pii", "客户明文查看", "customer", "pii", "read"),
+    ("customer:export", "客户导出", "customer", "export", "read"),
+    ("customer:transfer", "客户移交", "customer", "transfer", "write"),
+    ("project:view", "项目查看", "project", "view", "read"),
+    ("project:edit", "项目编辑", "project", "edit", "write"),
+    ("project:member", "项目成员管理", "project", "member", "write"),
+    ("project:asset", "项目图纸管理", "project", "asset", "write"),
+    ("dashboard:view", "驾驶舱查看", "dashboard", "view", "read"),
+    ("content:view", "内容查看", "content", "view", "read"),
+    ("content:generate", "内容生成", "content", "generate", "write"),
+    ("content:adopt", "内容采纳", "content", "adopt", "write"),
+    ("content:publish", "内容发布", "content", "publish", "write"),
+    ("content:metric", "内容曝光", "content", "metric", "write"),
+    ("reminder:edit", "提醒管理", "reminder", "edit", "write"),
 ]
 
 # 角色 -> 权限映射；"*" 表示全部权限点
@@ -172,6 +197,17 @@ ROLE_PERMISSIONS = {
         "scene_image:create",
         "scene_image:edit",
         "scene_image:delete",
+        # CRM-Lite
+        "customer:view",
+        "customer:edit",
+        "customer:pii",
+        "project:view",
+        "project:edit",
+        "project:member",
+        "project:asset",
+        "dashboard:view",
+        "content:view",
+        "reminder:edit",
     ],
     "viewer": [
         "product:view",
@@ -180,6 +216,39 @@ ROLE_PERMISSIONS = {
         "scene_image:view",
         "ai:access",
         "ai:knowledge",
+    ],
+    "manager": [
+        "customer:view",
+        "customer:edit",
+        "customer:pii",
+        "customer:export",
+        "customer:transfer",
+        "project:view",
+        "project:edit",
+        "project:member",
+        "project:asset",
+        "dashboard:view",
+        "content:view",
+        "content:generate",
+        "content:adopt",
+        "content:publish",
+        "content:metric",
+        "reminder:edit",
+    ],
+    "designer": [
+        "project:view",
+        "project:asset",
+        "dashboard:view",
+        "reminder:edit",
+    ],
+    "operator": [
+        "dashboard:view",
+        "content:view",
+        "content:generate",
+        "content:adopt",
+        "content:publish",
+        "content:metric",
+        "reminder:edit",
     ],
 }
 
@@ -290,7 +359,7 @@ async def _ensure_admin_user(db, check_only):
     ).scalar_one_or_none()
     if not role:
         # 角色种子本应在同一次 seed 中先于用户写入；若仍缺失，说明种子流程异常，
-        # 必须作为真实失败退出（非零），不得静默跳过导致“看似成功”。
+        # 必须作为真实失败退出（非零），不得静默跳过导致"看似成功"。
         raise RuntimeError("admin 角色不存在，无法创建初始管理员用户，请检查角色种子是否成功写入")
     exist = (
         await db.execute(

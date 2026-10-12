@@ -32,6 +32,21 @@ from starlette.types import ASGIApp
 
 logger = logging.getLogger("app.audit")
 
+# HLD §6.5：敏感模块请求体审计统一 [redacted]（密码/密钥/客户 PII 等不落库）。
+# 新模块（客户/对话/跟进/需求/内容/提醒/驾驶舱）随 CRM 上线同步扩入。
+SENSITIVE_MODULES = {
+    "ai",
+    "auth",
+    "users",
+    "customers",
+    "customer_dialogues",
+    "follow_ups",
+    "requirements",
+    "content",
+    "reminders",
+    "dashboard",
+}
+
 # Rolling window of (timestamp, status) for 5xx counting in the last 24h.
 # Bounded: at one request per second for 24h this holds ~86k tuples (~few MB);
 # if throughput ever exceeds that, switch to a time-bucketed counter.
@@ -226,7 +241,7 @@ def audit_action(
             # V1.2 §5.2 / §6.5: redact request bodies for sensitive modules so
             # the audit log never persists passwords, AI keys or request-body
             # payloads from login/AI endpoints.
-            if module in {"ai", "auth", "users"} and body_summary:
+            if module in SENSITIVE_MODULES and body_summary:
                 body_summary = "[redacted]"
 
             try:
@@ -383,4 +398,4 @@ class AuditMiddleware(BaseHTTPMiddleware):
         return response
 
 
-__all__ = ["AuditMiddleware", "audit_action"]
+__all__ = ["AuditMiddleware", "SENSITIVE_MODULES", "audit_action"]
