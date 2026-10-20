@@ -392,11 +392,16 @@ def _params_for_tool(
         if entities.price_min is not None:
             filters["face_price_min"] = entities.price_min
         return {
-            "keyword": None if entities.keywords else request.message[:80],
+            "keyword": (
+                None
+                if entities.keywords or entities.facets.has_constraints()
+                else request.message[:80]
+            ),
             "keywords": entities.keywords,
             "product_nos": entities.product_nos,
             "product_ids": entities.product_ids,
             "filters": filters,
+            "facets": entities.facets.model_dump(mode="json"),
             "sort_by": (
                 "face_price"
                 if entities.price_sort
@@ -443,6 +448,8 @@ def _deterministic_answer(
         if issues:
             return f"查询到 {len(issues)} 个待治理问题，已按权限返回产品和问题列表。"
         return "已完成质量统计，具体结果见 facts。"
+    if plan.entities.facets.shape and not products:
+        return "未找到符合指定桌形的产品。"
     if products:
         if plan.entities.specification_sort:
             selected = products[0]

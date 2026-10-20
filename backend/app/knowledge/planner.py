@@ -6,6 +6,7 @@ from typing import Protocol, runtime_checkable
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.knowledge.entities import QueryEntities
+from app.knowledge.facets import extract_product_facets
 from app.knowledge.intent import KnowledgeIntent
 from app.knowledge.schemas import KnowledgeQueryRequest
 
@@ -69,6 +70,13 @@ KEYWORD_STOP_TERMS = (
     "最短",
     "的",
 )
+FACET_RESIDUAL_STOP_TERMS = (
+    "找出", "找一下", "帮我找", "帮我", "请问", "请", "给我", "我想要", "想要", "需要",
+    "查询", "查一下", "查找", "推荐", "有没有", "一下", "一张", "一个", "产品", "能",
+    "可以", "帮忙", "桌面为", "桌面是", "桌面呈", "桌面", "形状为", "形状是",
+    "预算", "价格", "面价", "不超过", "低于", "以内", "元", "块", "RMB", "rmb",
+    "吗", "呢", "的",
+)
 
 
 class QueryPlan(BaseModel):
@@ -98,8 +106,19 @@ class RuleBasedPlanner:
         entities = QueryEntities()
         entities.product_ids = [str(x) for x in request.scope.product_ids] + UUID_RE.findall(msg)
         entities.product_nos = _extract_product_nos(msg)
+        entities.facets, facet_residual = extract_product_facets(msg)
         entities.status_terms = [code for term, code in QUALITY_TERMS.items() if term in msg]
-        entities.keywords = _keywords(msg, entities.product_nos)
+        entities.keywords = _keywords(
+            facet_residual,
+            entities.product_nos,
+            allow_compact_chinese=not entities.facets.has_constraints(),
+        )
+        if entities.facets.has_constraints():
+            residual_keyword = _facet_residual_keyword(
+                facet_residual, entities.product_nos, entities.keywords
+            )
+            if residual_keyword and residual_keyword not in entities.keywords:
+                entities.keywords.append(residual_keyword)
         prices = [
             float(value)
             for match in PRICE_RE.findall(msg)
@@ -143,6 +162,17 @@ class RuleBasedPlanner:
                 ],
                 answer_mode="action_proposal_draft",
             )
+        if entities.facets.has_constraints():
+            return QueryPlan(
+                intent=KnowledgeIntent.PRODUCT_SEARCH,
+                entities=entities,
+                required_tools=["product.search"],
+                retrieval={
+                    "enabled": not bool(entities.facets.shape),
+                    "topics": entities.keywords[:5],
+                },
+                answer_mode="search",
+            )
         if any(x in msg for x in ("比较", "哪个更适合", "区别", "差别")):
             return QueryPlan(
                 intent=KnowledgeIntent.PRODUCT_COMPARE,
@@ -180,18 +210,22 @@ class RuleBasedPlanner:
             return QueryPlan(
                 intent=KnowledgeIntent.KNOWLEDGE_QUESTION,
                 entities=entities,
-                required_tools=["product.search"] if entities.keywords else [],
+                required_tools=["product.search"]
+                if entities.keywords or entities.facets.has_constraints()
+                else [],
                 retrieval={"enabled": True, "topics": entities.keywords[:5]},
                 answer_mode="knowledge",
             )
         return QueryPlan(
             intent=(
                 KnowledgeIntent.PRODUCT_SEARCH
-                if entities.keywords
+                if entities.keywords or entities.facets.has_constraints()
                 else KnowledgeIntent.KNOWLEDGE_QUESTION
             ),
             entities=entities,
-            required_tools=["product.search"] if entities.keywords else [],
+            required_tools=["product.search"]
+            if entities.keywords or entities.facets.has_constraints()
+            else [],
             retrieval={"enabled": True, "topics": entities.keywords[:5]},
             answer_mode="search" if entities.keywords else "knowledge",
         )
@@ -209,7 +243,9 @@ def _extract_product_nos(message: str) -> list[str]:
     return out[:20]
 
 
-def _keywords(message: str, product_nos: list[str]) -> list[str]:
+def _keywords(
+    message: str, product_nos: list[str], *, allow_compact_chinese: bool = True
+) -> list[str]:
     text = message
     for no in product_nos:
         text = text.replace(no, " ")
@@ -234,9 +270,27 @@ def _keywords(message: str, product_nos: list[str]) -> list[str]:
         if term in text and term not in out:
             out.append(term)
     compact = re.sub(r"[\s，。！？,.;：:]", "", text)
-    if not out and re.fullmatch(r"[\u4e00-\u9fff]{2,12}", compact):
+    if (
+        allow_compact_chinese
+        and not out
+        and re.fullmatch(r"[\u4e00-\u9fff]{2,12}", compact)
+    ):
         out.append(compact)
     return out[:10]
+
+
+def _facet_residual_keyword(
+    message: str, product_nos: list[str], extracted_keywords: list[str]
+) -> str | None:
+    text = PRICE_RE.sub(" ", message)
+    for no in product_nos + extracted_keywords:
+        text = text.replace(no, " ")
+    for term in FACET_RESIDUAL_STOP_TERMS:
+        text = text.replace(term, " ")
+    compact = re.sub(r"[\s，。！？,.;：:、]", "", text)
+    if len(compact) < 2 or not re.search(r"[\u4e00-\u9fffA-Za-z0-9]", compact):
+        return None
+    return compact
 
 
 def get_planner() -> Planner:

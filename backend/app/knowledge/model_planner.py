@@ -3,12 +3,14 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import unicodedata
 from typing import Any
 
 from sqlalchemy import select
 
 from app.adapters.none import NoneAdapter
 from app.core.config import settings
+from app.knowledge.facets import FACET_QUERY_ALIASES
 from app.knowledge.planner import Planner, QueryPlan
 from app.knowledge.policy import ToolAuthorizationPolicy, get_tool_authorization_policy
 from app.knowledge.schemas import KnowledgeQueryRequest
@@ -89,25 +91,55 @@ class ModelToolPlanner:
             # The model may omit entities that the deterministic parser already
             # extracted. Never let model planning discard an explicit tag/product
             # constraint or price bound.
-            model_params["keywords"] = list(dict.fromkeys(
-                fallback.entities.keywords + model_params.get("keywords", [])
-            ))
+            model_keywords = [
+                _remove_explicit_facet_terms(keyword, fallback.entities.facets)
+                for keyword in model_params.get("keywords", [])
+            ]
+            model_params["keywords"] = list(
+                dict.fromkeys(
+                    fallback.entities.keywords + [keyword for keyword in model_keywords if keyword]
+                )
+            )
+            model_params["keyword"] = _remove_explicit_facet_terms(
+                model_params.get("keyword"), fallback.entities.facets
+            ) or None
             model_params["product_nos"] = list(dict.fromkeys(
                 fallback.entities.product_nos + model_params.get("product_nos", [])
             ))
             model_params["product_ids"] = list(dict.fromkeys(
                 fallback.entities.product_ids + model_params.get("product_ids", [])
             ))
-            fallback_params = self.fallback.plan(request)
-            model_params["filters"] = {
-                **fallback_params.tool_params.get("product.search", {}).get("filters", {}),
-                **model_params.get("filters", {}),
+            rule_filters = dict(request.scope.filters)
+            if fallback.entities.price_min is not None:
+                rule_filters["face_price_min"] = fallback.entities.price_min
+            if fallback.entities.price_max is not None:
+                rule_filters["face_price_max"] = fallback.entities.price_max
+            model_filters = model_params.get("filters", {})
+            if model_filters.get("keyword"):
+                model_filters["keyword"] = _remove_explicit_facet_terms(
+                    model_filters["keyword"], fallback.entities.facets
+                )
+                if not model_filters["keyword"]:
+                    model_filters.pop("keyword")
+            model_params["filters"] = _merge_search_filters(rule_filters, model_filters)
+            rule_facets = fallback.entities.facets.model_dump(mode="json")
+            model_facets = model_params.get("facets", {})
+            model_params["facets"] = {
+                dimension: rule_facets[dimension] or model_facets.get(dimension, [])
+                for dimension in ("category", "shape")
             }
+        elif fallback.entities.facets.has_constraints() and "product.search" not in selected:
+            # Do not let model tool selection bypass a deterministic hard facet.
+            selected = ["product.search"]
+            params_by_tool = {}
         return fallback.model_copy(
             update={
                 "required_tools": selected,
                 "tool_params": params_by_tool,
-                "retrieval": {"enabled": True, "topics": fallback.entities.keywords[:5]},
+                "retrieval": {
+                    "enabled": not bool(fallback.entities.facets.shape),
+                    "topics": fallback.entities.keywords[:5],
+                },
             }
         )
 
@@ -123,6 +155,33 @@ class ModelToolPlanner:
             tools.add(name)
         return tools
 
+
+def _merge_search_filters(rule_filters: dict, model_filters: dict) -> dict:
+    merged = {**model_filters, **rule_filters}
+    for field, combine in (("face_price_min", max), ("face_price_max", min)):
+        rule_value = rule_filters.get(field)
+        model_value = model_filters.get(field)
+        if rule_value is not None and model_value is not None:
+            try:
+                merged[field] = combine(float(rule_value), float(model_value))
+            except (TypeError, ValueError):
+                merged[field] = rule_value
+    return merged
+
+
+def _remove_explicit_facet_terms(value: str, facets) -> str:
+    if not value:
+        return ""
+    remaining = unicodedata.normalize("NFKC", value)
+    aliases = {
+        alias
+        for dimension in ("category", "shape")
+        for canonical in getattr(facets, dimension)
+        for alias in FACET_QUERY_ALIASES[dimension][canonical]
+    }
+    for alias in sorted(aliases, key=len, reverse=True):
+        remaining = remaining.replace(alias, " ")
+    return " ".join(remaining.split())
 
 async def _category_context(db) -> list[dict[str, Any]]:
     result = await db.execute(
@@ -158,6 +217,9 @@ def _planning_instructions(categories: list[dict[str, Any]], allowed_tools: set[
         "最贵时用 desc；最长时 sort_by 用 specification_length 且 sort_order 用 desc；"
         "最短时 sort_order 用 asc。当前产品、价格、库存和规格问题使用 product.search。"
         "product.search 参数：keywords(string数组)、product_nos(string数组)、filters(object)、"
+        "facets(object，category(string数组)、shape(string数组))。"
+        "明确的 category 与 shape 条件必须同时满足（AND）；"
+        "shape 只能匹配 tag_type=shape 的标签，不得改写为泛关键词或文本搜索条件。"
         "sort_by(face_price 或 specification_length)、sort_order(asc 或 desc)、limit(1-100)。"
         "product.get_many/product.compare 参数：product_ids(string数组) "
         "或 product_nos(string数组)。"

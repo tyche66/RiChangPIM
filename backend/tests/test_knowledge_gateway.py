@@ -87,6 +87,60 @@ def test_planner_extracts_unknown_short_category_as_fallback_search_term():
     assert plan.entities.price_sort == "asc"
 
 
+@pytest.mark.parametrize(
+    ("message", "category", "shape"),
+    [
+        ("弧形会议桌", ["会议桌"], ["弧形"]),
+        ("圆弧型会议台", ["会议桌"], ["弧形"]),
+        ("长方形洽谈桌", ["洽谈桌"], ["矩形"]),
+    ],
+)
+def test_planner_normalizes_explicit_category_and_shape_facets(message, category, shape):
+    plan = RuleBasedPlanner().plan(KnowledgeQueryRequest(message=message))
+
+    assert plan.intent == "product_search"
+    assert plan.entities.facets.category == category
+    assert plan.entities.facets.shape == shape
+    assert plan.required_tools == ["product.search"]
+    assert plan.retrieval["enabled"] is False
+    assert _params_for_tool(
+        "product.search", plan, KnowledgeQueryRequest(message=message)
+    )["facets"] == {"category": category, "shape": shape}
+
+
+def test_planner_preserves_unimplemented_terms_alongside_hard_facets():
+    message = "8人蓝色弧型会议桌"
+    plan = RuleBasedPlanner().plan(KnowledgeQueryRequest(message=message))
+
+    assert plan.entities.facets.category == ["会议桌"]
+    assert plan.entities.facets.shape == ["弧形"]
+    assert "8人蓝色" in plan.entities.keywords
+
+
+def test_planner_does_not_turn_request_filler_into_a_search_keyword():
+    plan = RuleBasedPlanner().plan(KnowledgeQueryRequest(message="帮我推荐弧形会议桌"))
+
+    assert plan.entities.facets.category == ["会议桌"]
+    assert plan.entities.facets.shape == ["弧形"]
+    assert plan.entities.keywords == []
+
+
+def test_shape_query_without_exact_matches_reports_no_matching_shape():
+    plan = RuleBasedPlanner().plan(KnowledgeQueryRequest(message="弧形会议桌"))
+
+    answer = _deterministic_answer(
+        plan,
+        facts=[],
+        products=[],
+        sources=[],
+        issues=[],
+        suppliers=[],
+        pending_actions=[],
+    )
+
+    assert answer == "未找到符合指定桌形的产品。"
+
+
 def test_planner_keeps_mixed_tag_and_specification_number():
     plan = RuleBasedPlanner().plan(KnowledgeQueryRequest(message="MT有3000的会议桌吗"))
 

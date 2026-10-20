@@ -6,14 +6,23 @@ from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
-from sqlalchemy import case, or_, select
+from sqlalchemy import case, func, or_, select
 from sqlalchemy.orm import selectinload
 
 from app.core.security import create_access_token
 from app.knowledge.errors import KnowledgeErrorCode, KnowledgeGatewayError
+from app.knowledge.facets import FACET_QUERY_ALIASES, SHAPE_TAG_TYPES, ProductFacets
 from app.knowledge.schemas import Fact, Source
 from app.knowledge.tools.base import ToolContext, ToolDefinition
-from app.models.product import Brand, Category, Product, ProductImage, Supplier
+from app.models.product import (
+    Brand,
+    Category,
+    Product,
+    ProductImage,
+    ProductTag,
+    Supplier,
+    Tag,
+)
 
 _PREVIEW_EXPIRE_SECONDS = 900
 _CONTENT_TOKEN_SCOPE = "file_content"
@@ -47,6 +56,7 @@ class ProductSearchInput(BaseModel):
     product_nos: list[str] = Field(default_factory=list, max_length=20)
     product_ids: list[UUID] = Field(default_factory=list, max_length=20)
     filters: dict[str, Any] = Field(default_factory=dict)
+    facets: ProductFacets = Field(default_factory=ProductFacets)
     sort_by: str | None = None
     sort_order: str | None = None
     limit: int = Field(default=20, ge=1, le=100)
@@ -83,32 +93,7 @@ class ProductSearchTool:
     )
 
     async def run(self, params: ProductSearchInput, context: ToolContext) -> dict[str, Any]:
-        stmt = _base_product_stmt()
-        if params.product_ids:
-            stmt = stmt.where(Product.id.in_(params.product_ids))
-        if params.product_nos:
-            stmt = stmt.where(Product.product_no.in_(params.product_nos))
-        keywords = params.keywords or []
-        keyword = params.keyword or params.filters.get("keyword")
-        if keyword and not keywords:
-            keywords = [keyword]
-        for item in keywords:
-            stmt = stmt.where(_search_term(item))
-        for field in _SEARCH_FILTER_FIELDS:
-            value = params.filters.get(field)
-            if value:
-                stmt = stmt.where(getattr(Product, field) == value)
-        if params.filters.get("face_price_min") is not None:
-            stmt = stmt.where(Product.face_price >= params.filters["face_price_min"])
-        if params.filters.get("face_price_max") is not None:
-            stmt = stmt.where(Product.face_price <= params.filters["face_price_max"])
-        if params.sort_by == "face_price":
-            if params.sort_order == "desc":
-                direction = Product.face_price.desc()
-            else:
-                direction = Product.face_price.asc()
-            stmt = stmt.order_by(case((Product.face_price == 99999, 1), else_=0), direction)
-        stmt = stmt.limit(min(params.limit, 100))
+        stmt = _build_product_search_statement(params)
         rows = (await context.db.execute(stmt)).scalars().all()
         if params.sort_by == "specification_length":
             rows.sort(
@@ -182,6 +167,81 @@ def _base_product_stmt():
     ).where(Product.is_deleted.is_(False))
 
 
+def _build_product_search_statement(params: ProductSearchInput):
+    stmt = _base_product_stmt()
+    if params.product_ids:
+        stmt = stmt.where(Product.id.in_(params.product_ids))
+    if params.product_nos:
+        stmt = stmt.where(Product.product_no.in_(params.product_nos))
+    keywords = params.keywords or []
+    keyword = params.keyword or params.filters.get("keyword")
+    if keyword and not keywords:
+        keywords = [keyword]
+    for item in keywords:
+        stmt = stmt.where(_search_term(item))
+    for field in _SEARCH_FILTER_FIELDS:
+        value = params.filters.get(field)
+        if value:
+            stmt = stmt.where(getattr(Product, field) == value)
+    if params.filters.get("face_price_min") is not None:
+        stmt = stmt.where(Product.face_price >= params.filters["face_price_min"])
+    if params.filters.get("face_price_max") is not None:
+        stmt = stmt.where(Product.face_price <= params.filters["face_price_max"])
+    stmt = _apply_product_facets(stmt, params.facets)
+    if params.sort_by == "face_price":
+        direction = (
+            Product.face_price.desc()
+            if params.sort_order == "desc"
+            else Product.face_price.asc()
+        )
+        stmt = stmt.order_by(case((Product.face_price == 99999, 1), else_=0), direction)
+    return stmt.limit(min(params.limit, 100))
+
+
+def _apply_product_facets(stmt, facets: ProductFacets):
+    if facets.category:
+        category_names = {
+            alias
+            for canonical in facets.category
+            for alias in FACET_QUERY_ALIASES["category"][canonical]
+        }
+        category_tree = (
+            select(Category.id.label("id"), Category.parent_id.label("parent_id"))
+            .where(
+                func.lower(func.trim(Category.category_name)).in_(
+                    [name.casefold() for name in category_names]
+                ),
+                Category.is_deleted.is_(False),
+            )
+            .cte(name="category_tree", recursive=True)
+        )
+        descendants = (
+            select(Category.id, Category.parent_id)
+            .join(category_tree, Category.parent_id == category_tree.c.id)
+            .where(Category.is_deleted.is_(False))
+        )
+        category_tree = category_tree.union(descendants)
+        stmt = stmt.where(Product.category_id.in_(select(category_tree.c.id)))
+
+    if facets.shape:
+        shape_names = {
+            alias
+            for canonical in facets.shape
+            for alias in FACET_QUERY_ALIASES["shape"][canonical]
+        }
+        matching_products = select(ProductTag.product_id).join(
+            Tag, Tag.id == ProductTag.tag_id
+        ).where(
+            ProductTag.product_id == Product.id,
+            ProductTag.is_deleted.is_(False),
+            func.lower(func.trim(Tag.tag_name)).in_([name.casefold() for name in shape_names]),
+            Tag.tag_type.in_(SHAPE_TAG_TYPES),
+            Tag.is_deleted.is_(False),
+        )
+        stmt = stmt.where(Product.id.in_(matching_products))
+    return stmt
+
+
 def _search_term(keyword: str):
     terms = PRODUCT_SEARCH_ALIASES.get(keyword, (keyword,))
     return or_(*(_search_term_exact(term) for term in terms))
@@ -189,7 +249,6 @@ def _search_term(keyword: str):
 
 def _search_term_exact(term: str):
     like = f"%{term}%"
-    from app.models.product import Tag
     return or_(
         Product.product_no.ilike(like),
         Product.product_name.ilike(like),
