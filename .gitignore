@@ -40,3 +40,7 @@ Thumbs.db
 *Zone.Identifier
 .opencode/
 MANIFEST.txt
+
+# AOCI agent host integration (machine-bound; do not commit)
+opencode.json
+opencode.json.backup.*
