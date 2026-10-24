@@ -14,6 +14,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 
 import AppHeader from '@/components/AppHeader.vue'
+import ShareDetailDialog from '@/components/ShareDetailDialog.vue'
 import ShareSceneDialog from '@/components/ShareSceneDialog.vue'
 import {
   ShareAccessError,
@@ -37,6 +38,8 @@ const passwordInput = ref('')
 const share = ref<ShareEnvelopeData | null>(null)
 const scenes = ref<ShareSceneImage[]>([])
 const sceneOpen = ref(false)
+const detailOpen = ref(false)
+const detailItem = ref<ShareProductItem | null>(null)
 const failedImages = ref<Set<string>>(new Set())
 
 const STATUS_LABELS: Record<string, string> = { draft: '草稿', confirmed: '已确认' }
@@ -84,6 +87,13 @@ function statusLabel(status?: string | null): string {
 function taxRateText(rate?: number | null): string {
   if (rate === null || rate === undefined) return MISSING_TEXT
   return `${(rate * 100).toFixed(0)}%`
+}
+
+function openScenes(item: ShareProductItem) {
+  const available = sceneImagesOf(item)
+  if (!available.length) return
+  scenes.value = available
+  sceneOpen.value = true
 }
 
 /** 含税小计由未税单价、数量、税率现算，后端只给未税 subtotal。 */
@@ -166,45 +176,17 @@ function groupTitle(group: SpaceGroup): string {
   return '未指定位置'
 }
 
-/** 材质/颜色/材质说明：快照优先，其次当前字段，缺失显示资料未提供。 */
-function materialText(item: ShareProductItem): string {
-  const snapshot = item.product_snapshot
-  const value = snapshot?.material ?? item.material
-  return value || MISSING_TEXT
-}
-
-function colorsText(item: ShareProductItem): string {
-  const snapshot = item.product_snapshot
-  const value = snapshot?.colors ?? item.colors
-  if (!value) return MISSING_TEXT
-  return String(value)
-}
-
-function materialDescText(item: ShareProductItem): string {
-  const snapshot = item.product_snapshot
-  // The salesperson's line-level note is the customer-facing source of truth.
-  // Keep the product snapshot as a fallback for legacy rows without a note.
-  const value = item.material_desc || snapshot?.material_description || item.material_description
-  return value || MISSING_TEXT
-}
-
-function specText(item: ShareProductItem): string {
-  const snapshot = item.product_snapshot
-  const value = snapshot?.specification ?? item.specification
-  return value || MISSING_TEXT
-}
-
+/** 材质/颜色/材质说明/规格：只在商品详情弹窗里使用，见 ShareDetailDialog。 */
 function categoryText(item: ShareProductItem): string {
   const snapshot = item.product_snapshot
   const value = snapshot?.category_name ?? item.category_name
   return value || MISSING_TEXT
 }
 
-function openScenes(item: ShareProductItem) {
-  const available = sceneImagesOf(item)
-  if (!available.length) return
-  scenes.value = available
-  sceneOpen.value = true
+/** 打开商品详情弹窗；弹窗内再点“查看场景图”时才进入灯箱。 */
+function openDetail(item: ShareProductItem) {
+  detailItem.value = item
+  detailOpen.value = true
 }
 
 async function load() {
@@ -318,17 +300,11 @@ onMounted(load)
                 <thead>
                   <tr>
                     <th scope="col">商品</th>
-                    <th scope="col">分类</th>
-                    <th scope="col">材质</th>
-                    <th scope="col">颜色</th>
-                    <th scope="col">材质说明</th>
-                    <th scope="col">规格</th>
                     <th scope="col" class="is-numeric">面价</th>
                     <th v-if="!isProposal" scope="col" class="is-numeric">单价</th>
                     <th scope="col" class="is-numeric">数量</th>
-                    <th v-if="!isProposal" scope="col" class="is-numeric">税率</th>
-                    <th v-if="!isProposal" scope="col" class="is-numeric">未税小计</th>
                     <th scope="col" class="is-numeric">{{ isProposal ? '行合计' : '含税小计' }}</th>
+                    <th scope="col" class="share-table__action-head">详情</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -337,9 +313,8 @@ onMounted(load)
                       <button
                         type="button"
                         class="share-product"
-                        :class="{ 'share-product--static': !sceneImagesOf(item).length }"
-                        :disabled="!sceneImagesOf(item).length"
-                        @click="openScenes(item)"
+                        title="查看商品详情"
+                        @click="openDetail(item)"
                       >
                         <span class="share-product__thumb">
                           <img
@@ -357,24 +332,20 @@ onMounted(load)
                         <span class="share-product__text">
                           <span class="share-product__name">{{ item.product_name || MISSING_TEXT }}</span>
                           <span class="product-code">{{ item.product_no || MISSING_TEXT }}</span>
-                          <span v-if="sceneImagesOf(item).length" class="share-product__hint">
-                            {{ sceneImagesOf(item).length }} 张场景图 · 点击查看
-                          </span>
+                          <span class="share-product__hint">{{ categoryText(item) }}</span>
                         </span>
                       </button>
                     </td>
-                    <td>{{ categoryText(item) }}</td>
-                    <td>{{ materialText(item) }}</td>
-                    <td>{{ colorsText(item) }}</td>
-                    <td class="share-cell--wrap">{{ materialDescText(item) }}</td>
-                    <td>{{ specText(item) }}</td>
                     <td class="is-numeric">{{ formatPrice(item.face_price) }}</td>
                     <td v-if="!isProposal" class="is-numeric">{{ formatPrice(item.unit_price) }}</td>
                     <td class="is-numeric">{{ item.quantity ?? MISSING_TEXT }}</td>
-                    <td v-if="!isProposal" class="is-numeric">{{ taxRateText(item.tax_rate) }}</td>
-                    <td v-if="!isProposal" class="is-numeric">{{ formatPrice(item.subtotal) }}</td>
                     <td class="is-numeric">
                       <strong>{{ isProposal ? lineTotal(item) : taxedSubtotal(item) }}</strong>
+                    </td>
+                    <td class="share-table__action">
+                      <button type="button" class="button button--secondary button--small" @click="openDetail(item)">
+                        查看详情
+                      </button>
                     </td>
                   </tr>
                 </tbody>
@@ -391,6 +362,9 @@ onMounted(load)
     </template>
 
     <ShareSceneDialog :images="sceneOpen ? scenes : null" @close="sceneOpen = false" />
+
+    <!-- 商品详情：明细表只放摘要，规格/材质/颜色/材质说明与场景图在点击后展开 -->
+    <ShareDetailDialog :item="detailItem" @close="detailOpen = false" @open-scenes="openScenes" />
   </main>
 </template>
 

@@ -71,11 +71,22 @@ test('public share displays Track C space and snapshot fields', async ({ page })
   await page.goto('/share/track-c-token')
   await expect(page.getByRole('heading', { name: '3F · Meeting room' })).toBeVisible()
   const row = page.getByRole('row').filter({ hasText: 'TRACK-C-001' })
+  // 明细表只放摘要：分类作为副标题展示，其余字段收进详情弹窗
   await expect(row).toContainText('Meeting tables')
-  await expect(row).toContainText('Oak')
-  await expect(row).toContainText('Walnut')
-  await expect(row).toContainText('Oak top')
-  await expect(row).toContainText('2400 x 1200')
+  await expect(row).not.toContainText('Oak top')
+
+  await row.getByRole('button', { name: '查看详情' }).click()
+  const detail = page.getByRole('dialog', { name: '商品详情' })
+  await expect(detail).toBeVisible()
+  await expect(detail).toContainText('Meeting tables')
+  await expect(detail).toContainText('Oak')
+  await expect(detail).toContainText('Walnut')
+  await expect(detail).toContainText('Oak top')
+  await expect(detail).toContainText('2400 x 1200')
+  await expect(detail).toContainText('3F · Meeting room')
+
+  await detail.getByRole('button', { name: '关闭' }).click()
+  await expect(detail).toBeHidden()
 })
 
 test('login and stream knowledge query', async ({ page }) => {
