@@ -1480,6 +1480,8 @@ button.citation:hover { background: var(--pine); border-color: var(--pine); colo
 /* 商品详情弹窗（与场景图灯箱同一套原生 dialog 口径） */
 .share-detail-dialog {
   width: min(520px, calc(100vw - 32px));
+  /* 原生 dialog 设了 width 之后默认的 margin:auto 居中会失效，必须显式写回 */
+  margin: auto;
   padding: 0;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
@@ -1540,6 +1542,8 @@ button.citation:hover { background: var(--pine); border-color: var(--pine); colo
 /* 场景图灯箱 */
 .scene-dialog {
   width: min(860px, calc(100vw - 32px));
+  /* 同 share-detail-dialog：设了 width 后必须显式写回居中 */
+  margin: auto;
   padding: 0;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);

@@ -70,6 +70,9 @@ const sceneImages = computed(() =>
 )
 
 function close() {
+  // 点「关闭」/「×」只负责收起原生 dialog；item 由父组件复位，
+  // watch(item) 里看到 null 会把 dialog 同步关掉。
+  dialog.value?.close()
   emit('close')
 }
 

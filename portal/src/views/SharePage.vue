@@ -189,6 +189,12 @@ function openDetail(item: ShareProductItem) {
   detailOpen.value = true
 }
 
+/** 关闭后必须把 item 一起复位，否则再次点同一个商品（或点关闭）时 watch 不会触发。 */
+function closeDetail() {
+  detailOpen.value = false
+  detailItem.value = null
+}
+
 async function load() {
   if (!token) {
     phase.value = 'failed'
@@ -364,7 +370,7 @@ onMounted(load)
     <ShareSceneDialog :images="sceneOpen ? scenes : null" @close="sceneOpen = false" />
 
     <!-- 商品详情：明细表只放摘要，规格/材质/颜色/材质说明与场景图在点击后展开 -->
-    <ShareDetailDialog :item="detailItem" @close="detailOpen = false" @open-scenes="openScenes" />
+    <ShareDetailDialog :item="detailOpen ? detailItem : null" @close="closeDetail" @open-scenes="openScenes" />
   </main>
 </template>
 

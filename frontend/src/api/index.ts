@@ -189,7 +189,13 @@ api.interceptors.response.use(
     } else if (!error.response) {
       console.error('[API Network Error]', error.message)
       if (!originalRequest.suppressErrorMessage) {
-        ElMessage.error('网络连接失败，请检查后端服务是否正常运行 (http://localhost:8000)')
+        // 超时和真正连不上要分开说：内容生成/导入这类慢接口超时时后端往往还在干活，
+        // 报「后端服务未运行」会把用户引到错误的排查方向。
+        if (error.code === 'ECONNABORTED' || /timeout/i.test(error.message || '')) {
+          ElMessage.error('请求超时：服务端仍在处理或耗时过长，请稍后到列表确认结果')
+        } else {
+          ElMessage.error('网络连接失败，请检查后端服务是否正常运行')
+        }
       }
     }
 

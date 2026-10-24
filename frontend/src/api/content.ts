@@ -261,8 +261,17 @@ export const contentApi = {
       ApiEnvelope<ContentModelCatalog>
     >,
 
+  /*
+   * 内容生成是同步调用 AI 的慢接口：后端 CONTENT_AI_TIMEOUT 默认 180s，nginx 的
+   * /api/v1/content/batches 给了 300s。如果走全局 30s 超时，用户会在 30 秒时看到
+   * 「网络连接失败」（nginx 记录 499 客户端断开），而后端其实还在生成、稍后照样
+   * 提交批次 —— 用户以为失败、库里有结果。
+   * 305s 比 nginx 的 300s 多 5s，让网关先把 504/结果返回给前端。
+   */
   generate: (data: ContentGenerateRequest) =>
-    api.post('/content/batches', data) as Promise<ApiEnvelope<ContentBatchResult>>,
+    api.post('/content/batches', data, { timeout: 305000 }) as Promise<
+      ApiEnvelope<ContentBatchResult>
+    >,
 
   getBatch: (id: string) => api.get(`/content/batches/${id}`) as Promise<ApiEnvelope<ContentBatch>>,
 
@@ -356,7 +365,9 @@ export const contentApi = {
     tone?: string | null
     product_ids?: string[]
     requested_count?: number
-  }) => api.post('/content/topics/runs', data) as Promise<ApiEnvelope<ContentTopicRun>>,
+  }) => api.post('/content/topics/runs', data, { timeout: 305000 }) as Promise<
+    ApiEnvelope<ContentTopicRun>
+  >,
 
   listTopicRuns: (params?: { page?: number; size?: number }) =>
     api.get('/content/topics/runs', { params, suppressErrorMessage: true }) as Promise<
