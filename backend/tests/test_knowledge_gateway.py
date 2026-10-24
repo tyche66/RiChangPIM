@@ -6,6 +6,11 @@ import pytest
 from pydantic import ValidationError
 
 from app.adapters.none import NoneAdapter
+from app.knowledge.attributes import (
+    AliasEntry,
+    AttributeDefinitionView,
+    AttributeDictionary,
+)
 from app.knowledge.events import sse_event
 from app.knowledge.gateway import _deterministic_answer, _params_for_tool
 from app.knowledge.model_gateway import AdapterModelGateway
@@ -13,6 +18,41 @@ from app.knowledge.permission_pool import RoleBasedPoolResolver
 from app.knowledge.planner import RuleBasedPlanner
 from app.knowledge.schemas import KnowledgeQueryRequest, KnowledgeQueryResponse
 from app.knowledge.tools.registry import default_tool_registry
+
+
+def _seeded_planner() -> RuleBasedPlanner:
+    definitions = {
+        code: AttributeDefinitionView(
+            code=code,
+            name=name,
+            data_type=data_type,
+            multi_value=code == "category",
+            searchable=True,
+            hard_filterable=True,
+        )
+        for code, name, data_type in (
+            ("category", "类目", "option"),
+            ("shape", "桌形", "option"),
+            ("face_price", "面价", "number"),
+        )
+    }
+    aliases = [
+        AliasEntry("category", option, alias, alias)
+        for option, terms in (
+            ("会议桌", ("会议桌", "会议台")),
+            ("洽谈桌", ("洽谈桌",)),
+            ("办公桌", ("办公桌",)),
+        )
+        for alias in terms
+    ] + [
+        AliasEntry("shape", option, alias, alias)
+        for option, terms in (
+            ("arc", ("弧形", "弧型", "圆弧型")),
+            ("rect", ("矩形", "长方形")),
+        )
+        for alias in terms
+    ]
+    return RuleBasedPlanner(AttributeDictionary(definitions=definitions, aliases=aliases))
 
 
 def test_query_schema_rejects_long_message():
@@ -60,6 +100,7 @@ def test_planner_compare_and_security():
     planner = RuleBasedPlanner()
     plan = planner.plan(KnowledgeQueryRequest(message="比较 A100 和 A200 区别"))
     assert plan.intent == "product_compare"
+    assert plan.entities.product_nos == ["A100", "A200"]
     assert "product.compare" in plan.required_tools
     slash_dot = planner.plan(KnowledgeQueryRequest(message="查 EMD86L/R.200170 规格"))
     assert "EMD86L/R.200170" in slash_dot.entities.product_nos
@@ -72,17 +113,19 @@ def test_planner_compare_and_security():
 
 
 def test_planner_extracts_chinese_product_search_terms_and_price_sort():
-    planner = RuleBasedPlanner()
+    planner = _seeded_planner()
     plan = planner.plan(KnowledgeQueryRequest(message="找出最便宜的铭达办公桌"))
 
     assert plan.intent == "product_search"
-    assert plan.entities.keywords == ["铭达", "办公桌"]
+    assert plan.entities.keywords == ["铭达"]
+    assert plan.entities.facets.category == ["办公桌"]
 
 
-def test_planner_extracts_unknown_short_category_as_fallback_search_term():
-    plan = RuleBasedPlanner().plan(KnowledgeQueryRequest(message="最便宜的洽谈桌"))
+def test_planner_uses_governed_category_and_price_sort():
+    plan = _seeded_planner().plan(KnowledgeQueryRequest(message="最便宜的洽谈桌"))
 
-    assert plan.entities.keywords == ["洽谈桌"]
+    assert plan.entities.facets.category == ["洽谈桌"]
+    assert plan.entities.keywords == []
     assert plan.required_tools == ["product.search"]
     assert plan.entities.price_sort == "asc"
 
@@ -96,37 +139,39 @@ def test_planner_extracts_unknown_short_category_as_fallback_search_term():
     ],
 )
 def test_planner_normalizes_explicit_category_and_shape_facets(message, category, shape):
-    plan = RuleBasedPlanner().plan(KnowledgeQueryRequest(message=message))
+    plan = _seeded_planner().plan(KnowledgeQueryRequest(message=message))
 
     assert plan.intent == "product_search"
     assert plan.entities.facets.category == category
-    assert plan.entities.facets.shape == shape
+    expected_shape_code = {"弧形": "arc", "矩形": "rect"}[shape[0]]
+    assert plan.entities.facets.shape == [expected_shape_code]
     assert plan.required_tools == ["product.search"]
     assert plan.retrieval["enabled"] is False
     assert _params_for_tool(
         "product.search", plan, KnowledgeQueryRequest(message=message)
-    )["facets"] == {"category": category, "shape": shape}
+    )["facets"] == {"category": category, "shape": [expected_shape_code]}
 
 
 def test_planner_preserves_unimplemented_terms_alongside_hard_facets():
     message = "8人蓝色弧型会议桌"
-    plan = RuleBasedPlanner().plan(KnowledgeQueryRequest(message=message))
+    plan = _seeded_planner().plan(KnowledgeQueryRequest(message=message))
 
     assert plan.entities.facets.category == ["会议桌"]
-    assert plan.entities.facets.shape == ["弧形"]
-    assert "8人蓝色" in plan.entities.keywords
+    assert plan.entities.facets.shape == ["arc"]
+    assert plan.entities.keywords == ["蓝色"]
+    assert plan.entities.query.numeric_filters == []
 
 
 def test_planner_does_not_turn_request_filler_into_a_search_keyword():
-    plan = RuleBasedPlanner().plan(KnowledgeQueryRequest(message="帮我推荐弧形会议桌"))
+    plan = _seeded_planner().plan(KnowledgeQueryRequest(message="帮我推荐弧形会议桌"))
 
     assert plan.entities.facets.category == ["会议桌"]
-    assert plan.entities.facets.shape == ["弧形"]
+    assert plan.entities.facets.shape == ["arc"]
     assert plan.entities.keywords == []
 
 
 def test_shape_query_without_exact_matches_reports_no_matching_shape():
-    plan = RuleBasedPlanner().plan(KnowledgeQueryRequest(message="弧形会议桌"))
+    plan = _seeded_planner().plan(KnowledgeQueryRequest(message="弧形会议桌"))
 
     answer = _deterministic_answer(
         plan,
@@ -142,16 +187,18 @@ def test_shape_query_without_exact_matches_reports_no_matching_shape():
 
 
 def test_planner_keeps_mixed_tag_and_specification_number():
-    plan = RuleBasedPlanner().plan(KnowledgeQueryRequest(message="MT有3000的会议桌吗"))
+    plan = _seeded_planner().plan(KnowledgeQueryRequest(message="MT有3000的会议桌吗"))
 
-    assert plan.entities.keywords == ["MT", "3000", "会议桌"]
+    assert plan.entities.facets.category == ["会议桌"]
+    assert plan.entities.keywords == ["MT", "3000"]
     assert plan.entities.price_max is None
 
 
 def test_planner_extracts_explicit_price_bound_without_turning_it_into_keyword():
-    plan = RuleBasedPlanner().plan(KnowledgeQueryRequest(message="预算3000元以内的会议桌"))
+    plan = _seeded_planner().plan(KnowledgeQueryRequest(message="预算3000元以内的会议桌"))
 
-    assert plan.entities.keywords == ["会议桌"]
+    assert plan.entities.facets.category == ["会议桌"]
+    assert plan.entities.keywords == []
     assert plan.entities.price_max == 3000
     assert (
         _params_for_tool(
@@ -164,7 +211,7 @@ def test_planner_extracts_explicit_price_bound_without_turning_it_into_keyword()
 
 
 def test_planner_routes_natural_language_to_knowledge_retrieval():
-    plan = RuleBasedPlanner().plan(
+    plan = _seeded_planner().plan(
         KnowledgeQueryRequest(message="二十人会议室需要怎样配置桌椅，空间利用率会更好？")
     )
 
@@ -205,7 +252,7 @@ def test_price_sorted_products_return_the_most_expensive_product():
 
 
 def test_planner_and_answer_support_longest_product_specification():
-    plan = RuleBasedPlanner().plan(KnowledgeQueryRequest(message="最长的桌子"))
+    plan = _seeded_planner().plan(KnowledgeQueryRequest(message="最长的桌子"))
     answer = _deterministic_answer(
         plan,
         facts=[],

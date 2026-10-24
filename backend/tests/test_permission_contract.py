@@ -19,6 +19,8 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from app.api.v1.audit import router as audit_router
+from app.api.v1.content import router as content_router
+from app.api.v1.content_skills import router as content_skills_router
 from app.api.v1.files import router as files_router
 from app.api.v1.products import router as products_router
 from app.api.v1.proposals import router as proposals_router
@@ -53,6 +55,33 @@ EXPECTED_ROUTE_PERMISSIONS = {
     ("POST", "/api/v1/users/{user_id}/disable"): "user:disable",
     ("POST", "/api/v1/proposals/{proposal_id}/confirm"): "proposal:confirm",
     ("GET", "/api/v1/audit/operation-logs"): "audit:view",
+    ("GET", "/api/v1/content/models"): "content:view",
+    ("POST", "/api/v1/content/batches"): "content:generate",
+    ("GET", "/api/v1/content/batches/{batch_id}"): "content:view",
+    ("GET", "/api/v1/content/items"): "content:view",
+    ("GET", "/api/v1/content/items/{item_id}"): "content:view",
+    ("PUT", "/api/v1/content/items/{item_id}"): "content:adopt",
+    ("POST", "/api/v1/content/items/{item_id}/adopt"): "content:adopt",
+    ("POST", "/api/v1/content/items/{item_id}/reject"): "content:adopt",
+    ("POST", "/api/v1/content/items/{item_id}/produce"): "content:adopt",
+    ("POST", "/api/v1/content/items/{item_id}/duplicate"): "content:generate",
+    ("POST", "/api/v1/content/items/{item_id}/publish"): "content:publish",
+    ("GET", "/api/v1/content/publications"): "content:view",
+    ("POST", "/api/v1/content/metrics"): "content:metric",
+    # Track B: Skills 选用列表与管理中心（管理中心仅 admin）
+    ("GET", "/api/v1/content/skills"): "content:view",
+    ("GET", "/api/v1/content/skills/manage"): "content:manage",
+    ("POST", "/api/v1/content/skills/manage"): "content:manage",
+    ("PUT", "/api/v1/content/skills/manage/{skill_id}"): "content:manage",
+    ("POST", "/api/v1/content/skills/manage/{skill_id}/toggle"): "content:manage",
+    ("DELETE", "/api/v1/content/skills/manage/{skill_id}"): "content:manage",
+    # Track B: 独立选题
+    ("POST", "/api/v1/content/topics/runs"): "content:generate",
+    ("GET", "/api/v1/content/topics/runs"): "content:view",
+    ("GET", "/api/v1/content/topics/runs/{run_id}"): "content:view",
+    ("GET", "/api/v1/content/topics/items/{item_id}"): "content:view",
+    ("POST", "/api/v1/content/topics/items/{item_id}/adopt"): "content:adopt",
+    ("POST", "/api/v1/content/topics/items/{item_id}/reject"): "content:adopt",
 }
 
 _ROUTER_PREFIX = [
@@ -64,6 +93,8 @@ _ROUTER_PREFIX = [
     (proposals_router, "/api/v1/proposals"),
     (audit_router, "/api/v1/audit"),
     (share_token_router, "/api/v1"),
+    (content_router, ""),
+    (content_skills_router, ""),
 ]
 
 
@@ -95,7 +126,13 @@ def _migration_permissions():
     """从 seed migration 和后续权限 migration 加载 PERMISSIONS。"""
     versions_dir = pathlib.Path(__file__).resolve().parent.parent / "alembic" / "versions"
     permissions = []
-    for filename in ("0004_seed_data.py", "0008_v11_audit_workflow_ocr.py", "0011_add_media_permissions.py"):
+    for filename in (
+        "0004_seed_data.py",
+        "0008_v11_audit_workflow_ocr.py",
+        "0011_add_media_permissions.py",
+        "0020_crm_perms.py",
+        "0027_content_skills.py",
+    ):
         path = versions_dir / filename
         spec = importlib.util.spec_from_file_location(f"_mig_{filename}", path)
         mod = importlib.util.module_from_spec(spec)

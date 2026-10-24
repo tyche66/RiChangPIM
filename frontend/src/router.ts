@@ -170,6 +170,22 @@ const routes = [
         meta: { permissions: ['content:view'], permission: 'content:view' },
       },
       {
+        path: 'content/topics',
+        name: 'ContentTopics',
+        component: () => import('@/views/ContentTopics.vue'),
+        meta: { permissions: ['content:view'], permission: 'content:view' },
+      },
+      {
+        path: 'content/skills',
+        name: 'ContentSkills',
+        component: () => import('@/views/ContentSkills.vue'),
+        meta: {
+          permissions: ['content:manage'],
+          permission: 'content:manage',
+          adminOnly: true,
+        },
+      },
+      {
         path: 'version',
         name: 'Version',
         component: () => import('@/views/Version.vue'),
@@ -218,6 +234,14 @@ router.beforeEach(async (to, _from, next) => {
   if (to.path === '/login') {
     const redirect = to.query.redirect as string
     next(redirect || '/products')
+    return
+  }
+
+  // Admin-only routes: the Skills management centre requires an explicit
+  // role_code check so a non-admin can never reach it by URL, even if their
+  // permission set is stale. This mirrors the backend guard.
+  if (to.meta.adminOnly && authStore.userRoleCode !== 'admin') {
+    next({ name: 'Products' })
     return
   }
 

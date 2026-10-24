@@ -21,6 +21,8 @@ def build_adapter(
     embedding_api_url: str | None = None,
     embedding_api_key: str | None = None,
     timeout: float = 30.0,
+    max_retries: int = 2,
+    allowed_chat_models: set[str] | frozenset[str] | None = None,
 ) -> AIServiceAdapter:
     """Build an adapter instance from a type selector.
 
@@ -44,8 +46,10 @@ def build_adapter(
             chat_model=chat_model or "gpt-4o-mini",
             embedding_model=embedding_model or "nvidia/nemotron-3-embed-1b:free",
             timeout=timeout,
+            max_retries=max_retries,
             embedding_api_key=embedding_api_key,
             embedding_api_url=embedding_api_url,
+            allowed_chat_models=frozenset(allowed_chat_models or ()),
         )
         return OpenAIAdapter(cfg)
 
@@ -86,4 +90,35 @@ def get_ai_adapter() -> AIServiceAdapter:
     return _cached_adapter
 
 
+def _parse_model_allowlist(raw: str | None) -> set[str]:
+    return {item.strip() for item in (raw or "").split(",") if item.strip()}
+
+
+def get_content_ai_adapter() -> AIServiceAdapter:
+    """Get the content-domain adapter without touching the knowledge adapter."""
+    global _cached_content_adapter
+    if _cached_content_adapter is not None:
+        return _cached_content_adapter
+
+    from app.core.config import settings
+
+    allowed_models = _parse_model_allowlist(settings.CONTENT_AI_CHAT_MODELS)
+    default_model = settings.CONTENT_AI_CHAT_MODEL
+    if not allowed_models or default_model not in allowed_models:
+        _cached_content_adapter = NoneAdapter()
+        return _cached_content_adapter
+
+    _cached_content_adapter = build_adapter(
+        adapter_type="openai" if settings.CONTENT_AI_API_KEY else "none",
+        api_url=settings.CONTENT_AI_API_URL,
+        api_key=settings.CONTENT_AI_API_KEY,
+        chat_model=default_model,
+        timeout=settings.CONTENT_AI_TIMEOUT,
+        max_retries=settings.CONTENT_AI_MAX_RETRIES,
+        allowed_chat_models=allowed_models,
+    )
+    return _cached_content_adapter
+
+
 _cached_adapter: AIServiceAdapter | None = None
+_cached_content_adapter: AIServiceAdapter | None = None

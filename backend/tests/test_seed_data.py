@@ -27,12 +27,6 @@ from _db_probe import (
 )
 from sqlalchemy import create_engine, text
 
-# Import seed_data definitions for role identity (role names/codes),
-# NOT for permission counts — counts must be dynamic because subsequent
-# migrations (e.g. 0011_add_media_permissions) add permissions that seed_data
-# does not enumerate in its PERMISSIONS list.
-from app.scripts.seed_data import ROLE_PERMISSIONS
-
 
 def _sync_url():
     return to_sync_url(resolve_test_database_url())
@@ -129,7 +123,7 @@ def _expected_role_permission_count(engine):
 
 
 def test_role_count(seeded_db):
-    assert _count(seeded_db, "role") == 4
+    assert _count(seeded_db, "role") == 7
 
 
 def test_permission_count(seeded_db):
@@ -171,7 +165,7 @@ def test_downgrade_removes_seed():
     alembic_upgrade(url, "head")
     eng = create_engine(_sync_url())
     try:
-        assert _count(eng, "role") == 4
+        assert _count(eng, "role") == 7
         assert _count(eng, "permission") == _expected_permission_count(eng)
         # Roll back past the seed migration (0004); tables remain, seed is gone.
         alembic_downgrade(url, "0003_add_quotation_subtotal")

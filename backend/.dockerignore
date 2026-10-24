@@ -1,26 +1,19 @@
+# Keep local configuration and heavyweight local tooling out of the image.
+# The Docker build context for the backend is ./backend, so the repository-root
+# .dockerignore does not apply here.
+.env
+.env.*
+!.env.example
+venv/
+.venv/
 __pycache__/
 *.py[cod]
-*$py.class
-*.so
-.Python
-venv/
-env/
-.venv/
-.env
-.env.local
 .pytest_cache/
-.coverage
-htmlcov/
-.mypy_cache/
 .ruff_cache/
-*.swp
-*.swo
+.mypy_cache/
+htmlcov/
+.coverage
+.pytest_cache
+backend.log
 *.log
-.git/
-.gitignore
-*.md
-tests/
-!docker/
-!docker/backend-entrypoint.sh
-out.txt
-err.txt
+回收站/

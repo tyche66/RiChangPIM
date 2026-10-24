@@ -10,7 +10,7 @@ from .exceptions import (
     AIAdapterTimeoutError,
     AIAdapterUnavailableError,
 )
-from .factory import build_adapter, get_ai_adapter
+from .factory import build_adapter, get_ai_adapter, get_content_ai_adapter
 from .none import NoneAdapter
 from .openai import OpenAIAdapter, OpenAIConfig, register_vector_dim
 
@@ -31,4 +31,5 @@ __all__ = [
     "NoneAdapter",
     "build_adapter",
     "get_ai_adapter",
+    "get_content_ai_adapter",
 ]

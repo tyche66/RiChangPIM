@@ -30,10 +30,12 @@ from app.api.v1 import (
 )
 from app.api.v1.brands import router as brands_router
 from app.api.v1.content import router as content_router
+from app.api.v1.content_skills import router as content_skills_router
 from app.api.v1.customers import router as customers_router
 from app.api.v1.dashboard import router as dashboard_router
 from app.api.v1.files import router as files_router
 from app.api.v1.manuals import router as manuals_router
+from app.api.v1.project_spaces import router as project_spaces_router
 from app.api.v1.projects import router as projects_router
 from app.api.v1.quotations import router as quotations_router
 from app.api.v1.reminders import router as reminders_router
@@ -167,13 +169,14 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
     _app.state.started_at = time.time()
     yield
     # Release adapter-held HTTP clients (e.g. OpenAIAdapter's httpx.AsyncClient).
-    from app.adapters.factory import _cached_adapter
+    from app.adapters.factory import _cached_adapter, _cached_content_adapter
 
-    if _cached_adapter is not None:
-        try:
-            await _cached_adapter.aclose()
-        except Exception:
-            pass
+    for adapter in (_cached_adapter, _cached_content_adapter):
+        if adapter is not None:
+            try:
+                await adapter.aclose()
+            except Exception:
+                pass
 
 
 app = FastAPI(
@@ -218,7 +221,9 @@ app.include_router(stats_router, prefix="/api/v1/stats", tags=["stats"])
 app.include_router(dashboard_router)
 app.include_router(customers_router)
 app.include_router(projects_router)
+app.include_router(project_spaces_router)
 app.include_router(content_router)
+app.include_router(content_skills_router)
 app.include_router(reminders_router)
 app.include_router(scene_images_router, prefix="/api/v1/scene-images", tags=["scene_images"])
 app.include_router(version.router, prefix="/api/v1", tags=["version"])

@@ -7,6 +7,13 @@ from sqlalchemy import func, select
 
 from app.knowledge.documents.backfill import backfill_product_manual, upsert_product_card
 from app.knowledge.documents.product_card import DatabaseProductFactProvider
+from app.knowledge.tools.base import ToolContext
+from app.knowledge.tools.product import ProductSearchInput, ProductSearchTool
+from app.models.catalog_attribute import (
+    CatalogAttributeDefinition,
+    CatalogAttributeOption,
+    ProductAttributeValue,
+)
 from app.models.doc_chunk import ProductManualChunk
 from app.models.knowledge import KnowledgeChunk, KnowledgeDocument
 from app.models.product import Attachment, Brand, Category, Product, ProductManual, Supplier, Tag
@@ -82,6 +89,110 @@ async def test_product_card_provider_excludes_sensitive_fields(db, integration_s
     assert "888" not in text
     assert "supplier" not in text.lower()
     assert "unknown" not in text.lower()
+
+
+async def _add_shape_attribute(db, product: Product):
+    attribute_code = f"test_shape_{uuid4().hex}"
+    definition = CatalogAttributeDefinition(
+        code=attribute_code,
+        name="桌形",
+        data_type="option",
+        multi_value=False,
+        searchable=True,
+        hard_filterable=True,
+        enabled=True,
+        sort_order=10,
+        is_deleted=False,
+    )
+    option = CatalogAttributeOption(
+        definition=definition,
+        code="arc",
+        label="弧形",
+        enabled=True,
+        sort_order=0,
+        is_deleted=False,
+    )
+    db.add_all(
+        [
+            definition,
+            ProductAttributeValue(
+                product_id=product.id,
+                definition=definition,
+                option=option,
+                source="manual",
+                verified=True,
+                is_deleted=False,
+            ),
+        ]
+    )
+    await db.commit()
+    return attribute_code
+
+
+@pytest.mark.anyio
+async def test_product_search_serializes_attributes_with_async_postgres(
+    db, _sessionmaker, integration_setup_db
+):
+    product = await _create_product_graph(db)
+    product.product_name = "弧形会议桌"
+    product.description = "异步召回校验"
+    await db.flush()
+    product_id = product.id
+    attribute_code = await _add_shape_attribute(db, product)
+
+    # A new session ensures no relationships from fixture construction can hide lazy loads.
+    async with _sessionmaker() as search_db:
+        context = ToolContext(
+            db=search_db,
+            current_user={"sub": "integration-test"},
+            permission_pool=None,
+            trace_id="product-attribute-search-test",
+        )
+        result = await ProductSearchTool().run(
+            ProductSearchInput(
+                product_ids=[product_id],
+                hard_facets=[{"attribute_code": attribute_code, "values": ["arc"]}],
+            ),
+            context,
+        )
+
+    assert len(result["products"]) == 1
+    assert result["products"][0]["attributes"][attribute_code][0]["label"] == "弧形"
+    assert result["products"][0]["attributes"][attribute_code][0]["option_code"] == "arc"
+    assert result["products"][0]["matched_facets"] == [attribute_code]
+
+    # Text-recall products are serialized through _product_card as well.
+    async with _sessionmaker() as search_db:
+        context = ToolContext(
+            db=search_db,
+            current_user={"sub": "integration-test"},
+            permission_pool=None,
+            trace_id="product-attribute-text-recall-test",
+        )
+        text_result = await ProductSearchTool().run(
+            ProductSearchInput(
+                product_ids=[uuid4()],
+                soft_terms=["异步召回校验"],
+            ),
+            context,
+        )
+    assert text_result["text_candidates"][0]["id"] == str(product_id)
+
+
+@pytest.mark.anyio
+async def test_product_card_provider_loads_attributes_with_async_postgres(
+    db, _sessionmaker, integration_setup_db
+):
+    product = await _create_product_graph(db)
+    product_id = product.id
+    await _add_shape_attribute(db, product)
+
+    # Re-query from a clean identity map to exercise selectin eager loading.
+    async with _sessionmaker() as card_db:
+        payload = await DatabaseProductFactProvider(card_db).build_product_card(product_id)
+
+    assert "attributes" in payload.metadata["fact_keys"]
+    assert "属性: 桌形: 弧形" in payload.chunks[0].chunk_text
 
 
 @pytest.mark.anyio

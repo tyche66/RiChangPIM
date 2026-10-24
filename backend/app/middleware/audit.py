@@ -19,6 +19,7 @@
 from __future__ import annotations
 
 import functools
+import inspect
 import logging
 import time
 from collections import deque
@@ -328,6 +329,16 @@ def audit_action(
                 response_code,
             )
             return result
+
+        # FastAPI 用 ``call.__globals__`` 解析字符串注解（PEP 563 / ``from
+        # __future__ import annotations``）。wrapper 定义在 audit 模块，拿不到
+        # endpoint 所在模块的命名空间，遇到 ``UUID`` 等业务类型就会解析失败
+        # （PydanticUndefinedAnnotation / NameError）。这里按 endpoint 自身模块
+        # 解析一次签名再挂到 wrapper 上，保证装饰行为不影响路由解析。
+        try:
+            wrapper.__signature__ = inspect.signature(func, eval_str=True)
+        except Exception:  # noqa: BLE001 - 解析失败时保持原行为
+            logger.debug("audit signature eval skipped %s", func.__name__)
 
         return wrapper
 

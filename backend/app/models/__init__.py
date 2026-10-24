@@ -1,11 +1,18 @@
 from app.models.ai_action import PendingAction
 from app.models.audit import AIConversation, OperationLog, Share, ShareLog, ShareToken, Visitor
+from app.models.catalog_attribute import (
+    CatalogAttributeAlias,
+    CatalogAttributeDefinition,
+    CatalogAttributeOption,
+    ProductAttributeValue,
+)
 from app.models.content import (
     ContentBatch,
     ContentItem,
     ContentMetricSnapshot,
     ContentPublication,
 )
+from app.models.content_skill import ContentSkill, ContentTopicItem, ContentTopicRun
 from app.models.customer import (
     Customer,
     CustomerDialogue,
@@ -31,18 +38,30 @@ from app.models.product import (
 )
 from app.models.project import Project, ProjectAsset, ProjectMember
 from app.models.reminder import Notification, Reminder
-from app.models.sales import Proposal, ProposalItem, Quotation, QuotationItem
+from app.models.sales import (
+    ProjectSpace,
+    Proposal,
+    ProposalItem,
+    Quotation,
+    QuotationItem,
+)
 from app.models.user import Permission, Role, RolePermission, User
 
 __all__ = [
     "AIConversation",
     "Attachment",
     "Brand",
+    "CatalogAttributeAlias",
+    "CatalogAttributeDefinition",
+    "CatalogAttributeOption",
     "Category",
     "ContentBatch",
     "ContentItem",
     "ContentMetricSnapshot",
     "ContentPublication",
+    "ContentSkill",
+    "ContentTopicItem",
+    "ContentTopicRun",
     "Customer",
     "CustomerDialogue",
     "CustomerDialogueAttachment",
@@ -57,11 +76,13 @@ __all__ = [
     "PendingAction",
     "Permission",
     "Product",
+    "ProductAttributeValue",
     "ProductImage",
     "ProductManual",
     "ProductManualChunk",
     "ProductTag",
     "Project",
+    "ProjectSpace",
     "ProjectAsset",
     "ProjectMember",
     "Proposal",

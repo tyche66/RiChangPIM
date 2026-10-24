@@ -7,7 +7,7 @@ from fastapi import HTTPException
 from app.api.v1.quotations import export_quotation_pdf, router
 from app.core.permission import PermissionChecker
 from app.models import doc_chunk as _doc_chunk  # noqa: F401 - registers SQLAlchemy relationships
-from app.models.sales import Quotation, QuotationItem
+from app.models.sales import Proposal, Quotation, QuotationItem
 
 
 class _ScalarResult:
@@ -27,8 +27,10 @@ class _ScalarResult:
 class _DB:
     def __init__(self, quotation):
         self._quotation = quotation
+        self.statements = []
 
-    async def execute(self, _stmt):
+    async def execute(self, stmt):
+        self.statements.append(stmt)
         return _ScalarResult(self._quotation)
 
 
@@ -72,6 +74,13 @@ def _quotation():
         status="draft",
         is_deleted=False,
     )
+    quotation.proposal = Proposal(
+        id=quotation.proposal_id,
+        proposal_no="PR-TEST-001",
+        proposal_name="PDF proposal relationship",
+        creator_id=uuid4(),
+        is_deleted=False,
+    )
     quotation.items = [
         QuotationItem(
             id=uuid4(),
@@ -100,18 +109,23 @@ def test_quotation_pdf_route_keeps_view_permission():
 @pytest.mark.anyio
 async def test_export_quotation_pdf_returns_gotenberg_pdf(monkeypatch):
     quotation = _quotation()
+    db = _DB(quotation)
     monkeypatch.setattr("app.api.v1.quotations.settings.GOTENBERG_URL", "http://pdf:3000")
     monkeypatch.setattr("app.api.v1.quotations.httpx.AsyncClient", _GotenbergClient)
     _GotenbergClient.next_response = _GotenbergResponse(200, b"%PDF-1.7\ncontent")
 
     response = await export_quotation_pdf.__wrapped__(
-        request=None, quotation_id=quotation.id, db=_DB(quotation)
+        request=None, quotation_id=quotation.id, db=db
     )
 
     assert response.media_type == "application/pdf"
     assert response.body == b"%PDF-1.7\ncontent"
     assert _GotenbergClient.posted_url == "http://pdf:3000/forms/chromium/convert/html"
     assert _GotenbergClient.posted_files["files"][0] == "index.html"
+    assert b"PDF proposal relationship" in _GotenbergClient.posted_files["files"][1]
+    loader_paths = [str(option.path) for option in db.statements[0]._with_options]
+    assert any("Quotation.items" in path for path in loader_paths)
+    assert any("Quotation.proposal" in path for path in loader_paths)
 
 
 @pytest.mark.anyio

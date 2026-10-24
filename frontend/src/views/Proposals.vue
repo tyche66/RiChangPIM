@@ -198,42 +198,96 @@
     <el-dialog
       v-model="showCreateDialog"
       title="新增方案"
-      class="glass-dialog"
+      class="glass-dialog proposal-form-dialog"
       append-to-body
       lock-scroll
       :close-on-click-modal="false"
-      width="640px"
+      width="920px"
     >
       <el-form
         ref="createFormRef"
         :model="createForm"
         :rules="createFormRules"
-        label-width="100px"
+        label-width="88px"
+        label-position="top"
       >
-        <el-form-item
-          label="方案名称"
-          prop="proposal_name"
-        >
-          <el-input
-            v-model="createForm.proposal_name"
-            placeholder="请输入方案名称"
-            class="capsule-input"
-          />
-        </el-form-item>
-        <el-form-item
-          label="客户名称"
-          prop="customer_name"
-        >
-          <el-input
-            v-model="createForm.customer_name"
-            placeholder="请输入客户名称"
-            class="capsule-input"
-          />
-        </el-form-item>
+        <el-row :gutter="16">
+          <el-col :span="12">
+            <el-form-item
+              label="方案名称"
+              prop="proposal_name"
+            >
+              <el-input
+                v-model="createForm.proposal_name"
+                placeholder="请输入方案名称"
+                class="capsule-input"
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item
+              label="客户名称"
+              prop="customer_name"
+            >
+              <el-input
+                v-model="createForm.customer_name"
+                placeholder="请输入客户名称"
+                class="capsule-input"
+              />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="16">
+          <el-col :span="12">
+            <el-form-item label="关联客户">
+              <el-select
+                v-model="createForm.customer_id"
+                filterable
+                remote
+                clearable
+                reserve-keyword
+                placeholder="可选：关联客户档案"
+                :remote-method="searchCustomers"
+                :loading="customerLoading"
+                class="capsule-select full-width"
+              >
+                <el-option
+                  v-for="c in customerOptions"
+                  :key="c.id"
+                  :label="c.name"
+                  :value="c.id"
+                />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="关联项目">
+              <el-select
+                v-model="createForm.project_id"
+                filterable
+                clearable
+                placeholder="可选：关联项目并绑定空间编号"
+                class="capsule-select full-width"
+              >
+                <el-option
+                  v-for="p in projectOptions"
+                  :key="p.id"
+                  :label="p.name"
+                  :value="p.id"
+                />
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
         <el-form-item
           label="商品明细"
+          class="items-form-item"
+          label-width="0"
         >
-          <ProposalItemEditor v-model="createForm.items" />
+          <ProposalItemEditor
+            v-model="createForm.items"
+            compact
+          />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -333,6 +387,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { ArrowDown } from '@element-plus/icons-vue'
 import { proposalApi, shareApi } from '@/api'
+import { customerApi } from '@/api/customer'
+import { projectApi } from '@/api/project'
 import { useAuthStore } from '@/stores/auth'
 import { hasPermission } from '@/types/permissions'
 import type { Proposal, ProposalItem, ShareCreateRequest, ShareForm, ProposalToken } from '@/types/sales'
@@ -371,11 +427,49 @@ const queryParams = reactive({
 const createForm = reactive({
   proposal_name: '',
   customer_name: '',
+  customer_id: null as string | null,
+  project_id: null as string | null,
   items: [] as ProposalItem[],
 })
+// 客户/项目选项。方案明细的楼层/空间名称由业务员直接输入；
+// ProjectSpace API 仍保留给后台空间维护，不作为方案通用选项来源。
+const customerOptions = ref<Array<{ id: string; name: string }>>([])
+const projectOptions = ref<Array<{ id: string; name: string }>>([])
+const customerLoading = ref(false)
 
 const createFormRules: FormRules = {
   proposal_name: [{ required: true, message: '请输入方案名称', trigger: 'blur' }],
+}
+
+// ---------------------------------------------------------------------------
+// 客户/项目选项
+// ---------------------------------------------------------------------------
+
+async function searchCustomers() {
+  customerLoading.value = true
+  try {
+    const res = await customerApi.list({ page: 1, size: 20 })
+    customerOptions.value = (res.data?.list || []).map((c: { id: string; name: string }) => ({
+      id: c.id,
+      name: c.name,
+    }))
+  } catch {
+    customerOptions.value = []
+  } finally {
+    customerLoading.value = false
+  }
+}
+
+async function loadProjects() {
+  try {
+    const res = await projectApi.list({ page: 1, size: 100 })
+    projectOptions.value = (res.data?.list || []).map((p: { id: string; name: string }) => ({
+      id: p.id,
+      name: p.name,
+    }))
+  } catch {
+    projectOptions.value = []
+  }
 }
 
 const showShareDialog = ref(false)
@@ -466,52 +560,109 @@ const handleRevert = async (row: Proposal) => {
   }
 }
 
+function proposalCreateErrorMessage(error: unknown): string {
+  const responseData = (error as { response?: { data?: { detail?: unknown; msg?: unknown; message?: unknown } } })
+    ?.response?.data
+  const detail = responseData?.detail
+  if (typeof detail === 'string' && detail.trim()) return `创建失败：${detail}`
+  if (detail && typeof detail === 'object' && !Array.isArray(detail)) {
+    const message = (detail as { msg?: unknown }).msg
+    if (typeof message === 'string' && message.trim()) return `创建失败：${message}`
+  }
+  if (Array.isArray(detail)) {
+    const messages = detail
+      .map((entry) => {
+        if (!entry || typeof entry !== 'object') return ''
+        const validation = entry as { loc?: unknown[]; msg?: unknown }
+        const field = Array.isArray(validation.loc) ? validation.loc.slice(1).join('.') : ''
+        const message = typeof validation.msg === 'string' ? validation.msg : ''
+        return [field, message].filter(Boolean).join('：')
+      })
+      .filter(Boolean)
+    if (messages.length) return `创建失败：${messages.join('；')}`
+  }
+  for (const message of [responseData?.message, responseData?.msg]) {
+    if (typeof message === 'string' && message.trim()) return `创建失败：${message}`
+  }
+  const networkMessage = (error as { message?: unknown })?.message
+  if (!responseData && typeof networkMessage === 'string' && networkMessage.trim()) {
+    return `创建失败：${networkMessage}`
+  }
+  return '创建方案失败，请检查填写内容后重试'
+}
+
 const handleCreateSubmit = async () => {
-  if (!createFormRef.value) return
-  await createFormRef.value.validate(async (valid) => {
-    if (!valid) return
-    // Validate at least one item
+  if (createLoading.value) return
+  const form = createFormRef.value
+  if (!form) {
+    ElMessage.warning('方案表单尚未准备好，请稍后重试')
+    return
+  }
+
+  createLoading.value = true
+  try {
+    const valid = await form.validate().catch(() => false)
+    if (!valid) {
+      ElMessage.warning('请填写方案名称等必填信息')
+      return
+    }
+    if (!createForm.proposal_name.trim()) {
+      ElMessage.warning('请输入方案名称')
+      return
+    }
     if (createForm.items.length === 0) {
       ElMessage.warning('请至少添加一项商品')
       return
     }
-    // Validate quantities are positive integers
     for (const item of createForm.items) {
+      if (typeof item.product_id !== 'string' || !item.product_id.trim()) {
+        ElMessage.warning('商品信息缺少有效产品 ID，请重新选择商品')
+        return
+      }
       if (!Number.isInteger(item.quantity) || item.quantity < 1) {
         ElMessage.warning(`商品 "${item.product_name || item.product_id}" 的数量必须为正整数`)
         return
       }
     }
+
     await authStore.ensureUser()
     const creatorId = authStore.userId
     if (!creatorId) {
       ElMessage.warning('用户信息尚未加载，请稍后重试')
       return
     }
-    createLoading.value = true
-    try {
-      await proposalApi.create({
-        proposal_name: createForm.proposal_name,
-        customer_name: createForm.customer_name,
-        creator_id: creatorId,
-        items: createForm.items.map((item) => ({
-          product_id: item.product_id,
-          quantity: item.quantity,
-          remark: item.remark,
-        })),
-      })
-      ElMessage.success('创建成功')
-      showCreateDialog.value = false
-      createForm.proposal_name = ''
-      createForm.customer_name = ''
-      createForm.items = []
-      fetchProposals()
-    } catch {
-      // error handled by interceptor
-    } finally {
-      createLoading.value = false
-    }
-  })
+
+    await proposalApi.create({
+      proposal_name: createForm.proposal_name.trim(),
+      customer_name: createForm.customer_name.trim() || null,
+      customer_id: createForm.customer_id || undefined,
+      project_id: createForm.project_id || undefined,
+      creator_id: creatorId,
+      items: createForm.items.map((item) => ({
+        product_id: item.product_id.trim(),
+        quantity: item.quantity,
+        remark: item.remark?.trim() || undefined,
+        project_space_id: item.project_space_id || undefined,
+        floor_label: item.floor_label?.trim() || undefined,
+        space_label: item.space_label?.trim() || undefined,
+        material_desc: item.material_desc?.trim() || undefined,
+      })),
+    }, { suppressErrorMessage: true })
+
+    ElMessage.success('创建成功')
+    showCreateDialog.value = false
+    createForm.proposal_name = ''
+    createForm.customer_name = ''
+    createForm.customer_id = null
+    createForm.project_id = null
+    createForm.items = []
+    queryParams.page = 1
+    await fetchProposals()
+  } catch (error) {
+    ElMessage.error(proposalCreateErrorMessage(error))
+  } finally {
+    createLoading.value = false
+  }
 }
 
 const handleShareSubmit = async () => {
@@ -586,7 +737,10 @@ watch(
   { immediate: true },
 )
 
-onMounted(fetchProposals)
+onMounted(() => {
+  fetchProposals()
+  loadProjects()
+})
 </script>
 
 <style scoped>
@@ -877,6 +1031,21 @@ onMounted(fetchProposals)
   width: 100%;
 }
 
+/* 「新增方案」弹窗：两列栅格 + 明细块占满整行，避免字段互相挤压 */
+.proposal-form-dialog :deep(.el-form-item) {
+  margin-bottom: 14px;
+}
+
+.proposal-form-dialog :deep(.el-form-item__label) {
+  padding-bottom: 4px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.proposal-form-dialog :deep(.items-form-item > .el-form-item__content) {
+  display: block;
+}
+
 /* ===== Share ===== */
 .share-alert {
   border-radius: var(--radius-sm);
@@ -958,6 +1127,11 @@ onMounted(fetchProposals)
     width: 95vw !important;
     max-width: 95vw;
     margin: 8px auto;
+  }
+
+  .proposal-form-dialog :deep(.el-dialog__body) {
+    max-height: 82vh;
+    overflow-y: auto;
   }
 
   .glass-dialog :deep(.el-dialog__body) {

@@ -1,0 +1,33 @@
+{
+  "_comment": "产品属性回填 mapping。由业务确认后维护；解析器绝不从 material/description/specification 推断桌形。product_no 必须是 product 表里的真实编号。三个业务确认 SKU 的对应关系：EN74-2.320162=P-104300001、EN74-2.420200=P-104300002、EN74-2.540250=P-104300003（product_name 前缀为 EN74-2.x 系列号）。",
+  "_version": 1,
+  "mappings": [
+    {
+      "product_no": "P-104300001",
+      "attribute_code": "shape",
+      "option_code": "arc",
+      "source": "business_confirmed",
+      "verified": true,
+      "confidence": 1.0,
+      "note": "业务确认为弧形会议桌（EN74-2.320162，铝合金下脚弧型会议桌，3200x1620x760）"
+    },
+    {
+      "product_no": "P-104300002",
+      "attribute_code": "shape",
+      "option_code": "arc",
+      "source": "business_confirmed",
+      "verified": true,
+      "confidence": 1.0,
+      "note": "业务确认为弧形会议桌（EN74-2.420200，铝合金下脚弧型会议桌，4200x2000x760）"
+    },
+    {
+      "product_no": "P-104300003",
+      "attribute_code": "shape",
+      "option_code": "arc",
+      "source": "business_confirmed",
+      "verified": true,
+      "confidence": 1.0,
+      "note": "业务确认为弧形会议桌（EN74-2.540250，铝合金下脚弧型会议桌，5400x2500x760）"
+    }
+  ]
+}

@@ -20,6 +20,12 @@ class ContentGenerateRequest(BaseModel):
     platform: str = Field(..., pattern="^(xhs|douyin|moments|seo|other)$")
     tone: str | None = Field(None, max_length=32)
     requested_count: int = Field(default=3, ge=1, le=5)
+    # 未传时由服务端在两套已启用 DNA 中自动选择。
+    skill_code: str | None = Field(default=None, min_length=1, max_length=64)
+    # 未传时使用 CONTENT_AI_CHAT_MODEL；显式值必须命中服务端白名单。
+    model_name: str | None = Field(default=None, max_length=64)
+    # 来源选题（来自独立选题模块）：用于把选题条目推进到 used 并回写批次
+    topic_item_id: UUID | None = None
 
 
 class ContentItemResult(BaseModel):
@@ -27,6 +33,8 @@ class ContentItemResult(BaseModel):
     title: str | None = None
     body: str
     hashtags: list[str] = Field(default_factory=list)
+    verification_gaps: list[str] = Field(default_factory=list)
+    source_skill_code: str | None = None
     verified: bool = True
     warnings: list[str] = Field(default_factory=list)
 
@@ -136,6 +144,7 @@ class ContentBatchDetail(BaseModel):
     model_name: str | None = None
     prompt_version: str
     latency_ms: int | None = None
+    source_skill_code: str | None = None
     create_time: datetime
     model_config = {"from_attributes": True}
 
@@ -159,6 +168,7 @@ class ContentItemDetail(BaseModel):
     edited: bool = False
     verified_payload: dict[str, Any] | None = None
     warnings: list[str] = Field(default_factory=list)
+    verification_gaps: list[str] = Field(default_factory=list)
     external_ref: str | None = None
     model_provider: str | None = None
     model_name: str | None = None

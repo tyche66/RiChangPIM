@@ -9,6 +9,11 @@ class QuotationItemBase(BaseModel):
     quantity: int = Field(1, ge=1)
     unit_price: float = Field(ge=0)
     tax_rate: float = Field(0.0, ge=0, le=1)
+    # Track C：与方案明细同构的空间归属与材质说明（product_snapshot 由服务端生成）
+    project_space_id: UUID | None = None
+    floor_label: str | None = Field(None, max_length=128)
+    space_label: str | None = Field(None, max_length=128)
+    material_desc: str | None = Field(None, max_length=2000)
 
 
 class QuotationItemCreate(QuotationItemBase):

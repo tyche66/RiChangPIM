@@ -11,8 +11,12 @@ CRM-Lite 权限种子：16 个新权限码 + manager/designer/operator 三角色
 
 角色（HLD §6.2）：admin/manager/sales/designer/operator/purchaser/viewer
 
+注（迁移链重构 2026-10-23）：upgrade 与生产运行镜像逐字一致；downgrade 采用本地修复
+（先按权限码清全部 role_permission 引用再删权限），修复 HEAD/生产版在 seed 额外映射下
+的 FK 违例。生产禁止 downgrade，本改动不影响生产升级语义。
+
 Revision ID: 0020_crm_perms
-Revises: 0017_operation_log_username
+Revises: 0019_crm_base_tables
 Create Date: 2026-10-10
 """
 from typing import Sequence, Union
@@ -22,7 +26,7 @@ from alembic import op
 from sqlalchemy.sql import text
 
 revision: str = "0020_crm_perms"
-down_revision: Union[str, None] = "0017_operation_log_username"
+down_revision: Union[str, None] = "0019_crm_base_tables"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -163,35 +167,34 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    for role_code, perm_codes in ROLE_PERMISSION_MAP.items():
-        for pc in _expand(perm_codes):
-            op.get_bind().execute(
-                text("""
-                    DELETE FROM role_permission rp
-                    USING role r, permission p
-                    WHERE rp.role_id = r.id
-                      AND rp.permission_id = p.id
-                      AND r.role_code = :role_code
-                      AND p.perm_code = :perm_code
-                """),
-                {"role_code": role_code, "perm_code": pc},
-            )
-
-    for perm_code in ALL_NEW_CODES:
-        op.get_bind().execute(
-            text("""
-                DELETE FROM permission
-                WHERE perm_code = :perm_code AND is_deleted = false
-            """),
-            {"perm_code": perm_code},
-        )
-
+    codes = list(ALL_NEW_CODES)
+    # 1) 先删除任何仍引用这些权限的 role_permission 行。
+    #    只按 ROLE_PERMISSION_MAP 删会漏掉 seed/其他角色写入的映射，
+    #    导致下一步 DELETE FROM permission 触发 role_permission_permission_id_fkey。
+    op.get_bind().execute(
+        text("""
+            DELETE FROM role_permission rp
+            USING permission p
+            WHERE rp.permission_id = p.id
+              AND p.perm_code = ANY(:codes)
+        """),
+        {"codes": codes},
+    )
+    # 2) 删除权限本身。
+    op.get_bind().execute(
+        text("""
+            DELETE FROM permission
+            WHERE perm_code = ANY(:codes)
+              AND is_deleted = false
+        """),
+        {"codes": codes},
+    )
+    # 3) 删除本迁移新增的角色（仍被用户绑定的保留）。
     for code, _, _ in NEW_ROLES:
         op.get_bind().execute(
             text("""
                 DELETE FROM role
                 WHERE role_code = :code
-                  AND is_deleted = false
                   AND NOT EXISTS (
                       SELECT 1 FROM "user" u WHERE u.role_id = role.id
                   )

@@ -22,6 +22,24 @@
         label-width="88px"
         class="gen-form"
       >
+        <el-alert
+          v-if="topicItem"
+          type="success"
+          :closable="false"
+          class="crm-alert"
+        >
+          <template #title>
+            已带入选题：{{ topicItem.title }}
+          </template>
+          <div
+            v-if="topicItem.angle || topicItem.audience"
+            class="topic-banner__meta"
+          >
+            <span v-if="topicItem.angle">角度：{{ topicItem.angle }}</span>
+            <span v-if="topicItem.audience">人群：{{ topicItem.audience }}</span>
+          </div>
+        </el-alert>
+
         <el-row :gutter="16">
           <el-col :span="12">
             <el-form-item
@@ -35,7 +53,7 @@
               />
             </el-form-item>
           </el-col>
-          <el-col :span="6">
+          <el-col :span="4">
             <el-form-item label="平台">
               <el-select
                 v-model="genForm.platform"
@@ -50,7 +68,7 @@
               </el-select>
             </el-form-item>
           </el-col>
-          <el-col :span="6">
+          <el-col :span="4">
             <el-form-item label="语气">
               <el-select
                 v-model="genForm.tone"
@@ -67,7 +85,31 @@
               </el-select>
             </el-form-item>
           </el-col>
-          <el-col :span="18">
+          <el-col :span="4">
+            <el-form-item label="创作 Skills">
+              <el-select
+                v-model="genForm.skill_code"
+                class="crm-select"
+                clearable
+                placeholder="自动选择"
+              >
+                <el-option label="自动选择" :value="null" />
+                <el-option
+                  v-for="skill in contentSkills"
+                  :key="skill.code"
+                  :label="skill.name || skill.source_dna_label || skill.code"
+                  :value="skill.code"
+                >
+                  <span>{{ skill.name || skill.code }}</span>
+                  <span
+                    v-if="skill.source_dna_label"
+                    class="skill-option__dna"
+                  >{{ skill.source_dna_label }}</span>
+                </el-option>
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
             <el-form-item label="产品">
               <el-select
                 v-model="genForm.product_ids"
@@ -85,6 +127,27 @@
                   :key="p.id"
                   :label="`${p.product_name}（${p.product_no}）`"
                   :value="p.id"
+                />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="6">
+            <el-form-item label="模型">
+              <el-select
+                v-model="genForm.model_name"
+                class="crm-select"
+                clearable
+                placeholder="自动（服务端默认）"
+              >
+                <el-option
+                  label="自动（服务端默认）"
+                  :value="null"
+                />
+                <el-option
+                  v-for="model in modelOptions"
+                  :key="model"
+                  :label="model"
+                  :value="model"
                 />
               </el-select>
             </el-form-item>
@@ -159,6 +222,7 @@
             <div class="crm-list-item__meta">
               <span>{{ labelOf(CONTENT_PLATFORM_MAP, item.platform) }}</span>
               <span>{{ formatBeijingTime(item.create_time) }}</span>
+              <span v-if="item.source_skill_code">来源：{{ skillSourceLabel(item.source_skill_code) }}</span>
             </div>
             <div class="crm-content-card__body">
               {{ item.body }}
@@ -176,6 +240,12 @@
               >
                 #{{ tag }}
               </el-tag>
+            </div>
+            <div
+              v-if="item.verification_gaps.length"
+              class="crm-warning"
+            >
+              待核验：{{ item.verification_gaps.join('；') }}
             </div>
             <div
               v-if="item.warnings.length"
@@ -302,11 +372,11 @@
 
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { productApi } from '@/api'
 import type { ProductListItem } from '@/types/sales'
-import { contentApi, type ContentItem, type ContentItemResult } from '@/api/content'
+import { contentApi, type ContentItem, type ContentItemResult, type ContentSkill, type ContentTopicItemDetail } from '@/api/content'
 import { useAuthStore } from '@/stores/auth'
 import { hasPermission } from '@/types/permissions'
 import {
@@ -318,6 +388,7 @@ import {
 import { formatBeijingTime } from '@/utils/beijingTime'
 
 const router = useRouter()
+const route = useRoute()
 const authStore = useAuthStore()
 
 function hasPerm(perm: string): boolean {
@@ -330,6 +401,8 @@ const saving = ref(false)
 const productLoading = ref(false)
 const items = ref<ContentItem[]>([])
 const productOptions = ref<ProductListItem[]>([])
+const contentSkills = ref<ContentSkill[]>([])
+const modelOptions = ref<string[]>([])
 
 const genForm = reactive({
   title: '',
@@ -338,6 +411,11 @@ const genForm = reactive({
   tone: '' as string,
   product_ids: [] as string[],
   requested_count: 3,
+  skill_code: null as string | null,
+  model_name: null as string | null,
+  // 来自独立选题（?topic_id=）的上下文
+  topic_id: null as string | null,
+  content_batch_id: null as string | null,
 })
 
 const editVisible = ref(false)
@@ -353,6 +431,46 @@ function statusTagType(state: string): 'success' | 'danger' | 'warning' | 'info'
 
 function canEdit(item: ContentItem): boolean {
   return item.status !== 'rejected'
+}
+
+const topicItem = ref<ContentTopicItemDetail | null>(null)
+
+function skillSourceLabel(code: string): string {
+  const skill = contentSkills.value.find((item) => item.code === code)
+  if (skill?.source_dna_label) return skill.source_dna_label
+  if (code.startsWith('yuc-')) return '禹橙 DNA'
+  if (code.startsWith('yanye-')) return '言也 DNA'
+  if (code === 'content-default') return '禹橙 DNA（兼容回退）'
+  if (code === 'topic-basic') return '禹橙 DNA（兼容回退）'
+  return code
+}
+
+/**
+ * 读取 ?topic_id= 预填生成表单：选题的标题/角度/人群/建议平台/关联产品
+ * 都会带入，避免用户在工坊里重新抄一遍。
+ */
+async function loadTopicContext() {
+  const topicId = route.query.topic_id
+  if (typeof topicId !== 'string' || !topicId) return
+  genForm.topic_id = topicId
+  const batchId = route.query.batch_id
+  if (typeof batchId === 'string' && batchId) genForm.content_batch_id = batchId
+  try {
+    const res = await contentApi.getTopicItem(topicId)
+    topicItem.value = res.data
+    if (res.data.platform || res.data.suggested_platform) {
+      genForm.platform = res.data.platform || res.data.suggested_platform || genForm.platform
+    }
+    if (!genForm.title) genForm.title = res.data.title
+    if (!genForm.topic) genForm.topic = res.data.topic_context || res.data.title
+    if (!genForm.product_ids.length && res.data.related_product_ids?.length) {
+      genForm.product_ids = [...res.data.related_product_ids]
+    }
+    // 预填关联产品前先把它们加进候选项，否则多选框显示不出标签
+    await searchProducts(res.data.title)
+  } catch {
+    ElMessage.warning('未找到对应选题，已按普通批次处理')
+  }
 }
 
 function toContentItem(result: ContentItemResult, platform: string): ContentItem {
@@ -375,6 +493,8 @@ function toContentItem(result: ContentItemResult, platform: string): ContentItem
     edited: false,
     verified_payload: null,
     warnings: result.warnings,
+    verification_gaps: result.verification_gaps || [],
+    source_skill_code: result.source_skill_code || null,
     external_ref: null,
     model_provider: null,
     model_name: null,
@@ -407,6 +527,24 @@ async function loadItems() {
   }
 }
 
+async function loadContentSkills() {
+  try {
+    const res = await contentApi.listSkills({ skill_type: 'content' })
+    contentSkills.value = (res.data || []).filter((skill) => skill.selectable !== false)
+  } catch {
+    contentSkills.value = []
+  }
+}
+
+async function loadModelOptions() {
+  try {
+    const res = await contentApi.listModels()
+    modelOptions.value = res.data?.models || []
+  } catch {
+    modelOptions.value = []
+  }
+}
+
 async function handleGenerate() {
   if (!genForm.title.trim() || !genForm.topic.trim()) {
     ElMessage.warning('请填写批次标题与主题')
@@ -421,6 +559,9 @@ async function handleGenerate() {
       tone: genForm.tone || null,
       product_ids: genForm.product_ids,
       requested_count: genForm.requested_count,
+      skill_code: genForm.skill_code,
+      model_name: genForm.model_name,
+      ...(genForm.topic_id ? { topic_item_id: genForm.topic_id } : {}),
     })
     const created = res.data.items.map((it) => toContentItem(it, genForm.platform))
     const existing = new Set(items.value.map((i) => i.id))
@@ -543,13 +684,32 @@ async function saveEdit() {
 
 onMounted(() => {
   loadItems()
+  loadContentSkills()
+  loadModelOptions()
   searchProducts('')
+  loadTopicContext()
 })
 </script>
 
 <style scoped>
 .gen-form {
   margin-bottom: 8px;
+}
+
+.topic-banner__meta {
+  margin-top: 4px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--pim-text-secondary);
+}
+
+.skill-option__dna {
+  float: right;
+  margin-left: 12px;
+  font-size: 12px;
+  color: var(--pim-text-secondary);
 }
 
 .gen-hint {

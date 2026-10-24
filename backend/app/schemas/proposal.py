@@ -8,6 +8,11 @@ class ProposalItemBase(BaseModel):
     product_id: UUID
     quantity: int = Field(1, ge=1)
     remark: str | None = None
+    # Track C：空间归属与材质说明（product_snapshot 由服务端生成，不接受前端传入）
+    project_space_id: UUID | None = None
+    floor_label: str | None = Field(None, max_length=128)
+    space_label: str | None = Field(None, max_length=128)
+    material_desc: str | None = None
 
 
 class ProposalItemCreate(ProposalItemBase):
@@ -21,6 +26,8 @@ class ProposalItemResponse(ProposalItemBase):
     face_price: float
     line_total: float
     cover_image_url: str | None = None
+    # Track C：产品事实快照（旧方案为 None，读取时回落当前产品字段）
+    product_snapshot: dict | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -29,6 +36,9 @@ class ProposalBase(BaseModel):
     proposal_name: str
     customer_name: str | None = None
     creator_id: UUID
+    # Track C：客户与项目接通（可空，兼容旧方案）
+    customer_id: UUID | None = None
+    project_id: UUID | None = None
 
 
 class ProposalCreate(ProposalBase):
@@ -45,6 +55,8 @@ class ProposalCreate(ProposalBase):
 class ProposalUpdate(BaseModel):
     proposal_name: str | None = None
     customer_name: str | None = None
+    customer_id: UUID | None = None
+    project_id: UUID | None = None
     items: list[ProposalItemCreate] | None = None
 
 

@@ -46,6 +46,8 @@ class ContentBatch(CommonBase):
     model_name = Column(String(64), nullable=True)
     prompt_version = Column(String(16), nullable=False, default="v1")
     latency_ms = Column(Integer, nullable=True)
+    # Track B：生成批次使用的 Skill（可为空 = 默认模板）
+    source_skill_code = Column(String(64), nullable=True)
     created_by = Column(PGUUID(as_uuid=True), ForeignKey("user.id"), nullable=True)
     updated_by = Column(PGUUID(as_uuid=True), ForeignKey("user.id"), nullable=True)
 
@@ -95,10 +97,13 @@ class ContentItem(CommonBase):
     edited = Column(Boolean, nullable=False, default=False)
     verified_payload = Column(JSONB, nullable=True)
     warnings = Column(JSONB, nullable=False, default=list)  # 合规/事实守卫命中项（§9.3）
+    verification_gaps = Column(JSONB, nullable=False, default=list)
     external_ref = Column(String(128), nullable=True)
     model_provider = Column(String(32), nullable=True)
     model_name = Column(String(64), nullable=True)
     generation_version = Column(String(16), nullable=False, default="v1")
+    # Track B：内容条目使用的 Skill（可为空 = 默认模板）
+    source_skill_code = Column(String(64), nullable=True)
     created_by = Column(PGUUID(as_uuid=True), ForeignKey("user.id"), nullable=True)
     updated_by = Column(PGUUID(as_uuid=True), ForeignKey("user.id"), nullable=True)
 

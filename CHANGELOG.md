@@ -26,6 +26,40 @@
 
 **不要去改的历史记录**（改了就是篡改发布史）：`BUILD_LOG.md` 的构建记录、`PROJECT_MANAGEMENT.md` 的发布台账、`TODO.md` 的「已发布」条目、`docs/08-开发路线图.md` 的里程碑行。`RELEASE_GATE.md` 已改成版本无关，不需要跟着版本走。
 
+## v1.9.4 — 2026-10-23
+
+本版本合并三组能力：产品属性检索、内容 Skills/独立选题、方案空间与客户展示；同时把本地迁移链对齐到生产 `0024_attachment_biz_domain_compat` 基线，避免服务器升级时 revision 不识别。发布前并入一组界面修复：内容工坊改用「创作 Skills」口径、新增方案弹窗重排、分享页商品详情改为点击弹窗。
+
+### 产品属性检索
+- 引入受治理属性词典（类目、桌形、风格、材质、颜色、系列、尺寸、人数），支持中文别名、无空格组合、数值条件与否定条件。
+- `product.search` 按属性硬过滤：不同属性 AND，同一属性别名 OR；`shape` 只匹配桌形属性，描述/材质文本不能冒充桌形。
+- 三个业务确认的弧形会议桌（`P-104300001`/`P-104300002`/`P-104300003`）通过独立 mapping 回填 `shape=arc`；“弧形会议桌”精确命中且排除普通会议桌、弧形洽谈桌。
+- 无精确结果时返回“未找到符合指定桌形的产品”，不静默放宽硬条件。
+
+### 内容 Skills 与独立选题
+- 新增 Skills 管理中心（仅管理员）、独立选题模块和 Skills 选用开关。
+- 首批接入禹橙 DNA、言也 DNA 两套创作方法，各派生选题/内容 operational Skill；默认由模型自动选择，用户可手动覆盖。
+- 选题按办公空间解决方案 30%、真实项目案例 25%、产品知识 20%、交付安装 15%、本地服务 10% 的滚动窗口动态分配。
+- 内容域独立 `CONTENT_AI_*` 配置，模型白名单 `step-5-preview`/`sensenova-6.8-flash-lite`，不读取知识库 embedding 配置；缺少 key 时 fail-closed。
+- 内容生成与选题保留 JSON Schema 校验、合规过滤、产品事实回查和待核验清单。
+
+### 方案与客户展示
+- 方案明细支持业务员自由输入楼层/空间名称，后台按项目回填/复用空间编号；无项目也可保存名称快照。
+- 方案/报价保存产品快照、材质说明、楼层/空间标签；客户分享页按楼层/空间分组展示材质、颜色、材质说明。
+- 报价 PDF 增加楼层、空间、材质说明、颜色列；报价预填复制方案空间与快照。
+- 「新增方案」弹窗 640px → 920px，标签顶部对齐，名称/客户/关联客户/关联项目两列排布。
+- 方案明细编辑器新增 `compact` 模式：数量/备注/楼层/空间两列网格，材质说明跨整行；商品搜索与「添加商品」同行，窄屏改单列。
+
+### 界面对齐
+- 内容工坊生成表单的「DNA 来源」更名为「创作 Skills」，选项显示 Skill 名称并浅色标注所属 DNA，避免把创作方法与方法来源混为一谈。
+- 分享页商品列表只保留摘要列（商品/面价/数量/行合计）和「查看详情」，点击行弹出详情：规格、材质、颜色、材质说明、价格、数量与场景图缩略图网格，点缩略图从该图开始播放。
+- `ProductSceneCarousel` 监听 `initialIndex`，重复打开轮播可定位到所选场景图。
+
+### 数据库
+- 迁移链以生产运行镜像的 `0024_attachment_biz_domain_compat` 为唯一基线重建：0018-0024 采用生产运行镜像版本（`0018_qwen_embedding_hnsw` / `0019_crm_base_tables` / `0020_crm_perms` / `0021_content_tables` / `0022_reminders` / `0023_crm_sales_links_compat` / `0024_attachment_biz_domain_compat`）；本地旧分支 `0018_crm_core` / `0019_crm_detail` 弃用（移入 `backend/alembic/versions/回收站/`，不删除）。
+- 新增 `0025_crm_schema_compat`：在生产基线之后幂等补建 CRM 明细表（`project_members` / `entity_stage_logs` / `customer_dialogues` / `customer_dialogue_attachments` / `requirements` / `follow_ups` / `project_assets`），不再依赖 `create_all` 掩盖缺表；proposal/attachment 的 CRM 链接列仍由生产 0023/0024 负责，不重复加列。
+- 本地新功能迁移重编号续链：`0026_catalog_attributes` / `0027_content_skills` / `0028_project_spaces` / `0029_project_remark` / `0030_content_dna_fields`（head，单 head）。
+- 生产库（现 `0024`）沿 `0025 → 0026 → … → 0030` 连续链升级，全程幂等 DDL，不重复建表/列；`content:manage` 权限在生产 0024 库上由 `0027_content_skills` 补种。
 ## v1.9.3 — 2026-10-12
 
 本版本引入 CRM-Lite 模块：客户域、项目域、驾驶舱、新媒体工坊和提醒引擎，新增 16 个权限码与 manager/designer/operator 角色，前端新增 7 个视图与通知组件。向后兼容，生产升级按 `docs/云端更新包.md` 正常执行迁移并保留数据卷即可；需求设计见 `docs/10-客户项目与新媒体(CRM-Lite).md`（其 A9 条原目标 v1.10.0，实际以本节声明的 v1.9.3 为准）。

@@ -8,6 +8,7 @@ import type {
   ApiEnvelope,
   Paginated,
   ProductListItem,
+  ProjectSpace,
   Proposal,
   ProposalCreateRequest,
   ProposalUpdateRequest,
@@ -342,14 +343,42 @@ export interface QuotationListParams {
   size?: number
 }
 
+// ---------------------------------------------------------------------------
+// Track C: 项目空间（楼层/房间/区域）
+// ---------------------------------------------------------------------------
+
+export const projectSpaceApi = {
+  list: (projectId: string) =>
+    api.get(`/projects/${projectId}/spaces`) as Promise<ApiEnvelope<ProjectSpace[]>>,
+
+  create: (projectId: string, data: {
+    space_name: string
+    space_type?: string
+    parent_id?: string | null
+    sort?: number
+  }) => api.post(`/projects/${projectId}/spaces`, data) as Promise<ApiEnvelope<ProjectSpace>>,
+
+  update: (projectId: string, spaceId: string, data: {
+    space_name?: string
+    space_type?: string
+    parent_id?: string | null
+    sort?: number
+  }) => api.put(`/projects/${projectId}/spaces/${spaceId}`, data) as Promise<ApiEnvelope<ProjectSpace>>,
+
+  delete: (projectId: string, spaceId: string) =>
+    api.delete(`/projects/${projectId}/spaces/${spaceId}`) as Promise<
+      ApiEnvelope<{ id: string; deleted: number }>
+    >,
+}
+
 export const proposalApi = {
   list: (params?: ProposalListParams) =>
     api.get('/proposals', { params }) as Promise<ApiEnvelope<Paginated<Proposal>>>,
   get: (id: string) => normalizeProposalEnvelope(
     api.get(`/proposals/${id}`) as Promise<ApiEnvelope<Proposal>>,
   ),
-  create: (data: ProposalCreateRequest) => normalizeProposalEnvelope(
-    api.post('/proposals', data) as Promise<ApiEnvelope<Proposal>>,
+  create: (data: ProposalCreateRequest, options?: { suppressErrorMessage?: boolean }) => normalizeProposalEnvelope(
+    api.post('/proposals', data, options) as Promise<ApiEnvelope<Proposal>>,
   ),
   update: (id: string, data: ProposalUpdateRequest) => normalizeProposalEnvelope(
     api.put(`/proposals/${id}`, data) as Promise<ApiEnvelope<Proposal>>,

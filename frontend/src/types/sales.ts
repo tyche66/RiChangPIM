@@ -2,6 +2,28 @@
 
 // ============ Proposal ============
 
+export interface ProjectSpace {
+  id: string
+  project_id: string
+  parent_id: string | null
+  space_type: 'floor' | 'room' | 'zone' | 'other'
+  space_name: string
+  level: number
+  sort: number
+  create_time: string | null
+}
+
+export interface ProductSnapshot {
+  product_no: string | null
+  product_name: string | null
+  category_name: string | null
+  material: string | null
+  colors: string | null
+  material_description: string | null
+  specification: string | null
+  face_price: number | null
+}
+
 export interface ProposalItem {
   id?: string
   product_id: string
@@ -16,6 +38,17 @@ export interface ProposalItem {
   line_total?: number
   /** Image load error flag (UI only). */
   _imgError?: boolean
+  // Track C：空间归属、材质说明与服务端生成的产品快照
+  project_space_id?: string | null
+  floor_label?: string | null
+  space_label?: string | null
+  material_desc?: string | null
+  product_snapshot?: ProductSnapshot | null
+  category_name?: string | null
+  material?: string | null
+  colors?: string | null
+  material_description?: string | null
+  specification?: string | null
 }
 
 export interface Proposal {
@@ -23,6 +56,8 @@ export interface Proposal {
   proposal_no: string
   proposal_name: string
   customer_name: string | null
+  customer_id?: string | null
+  project_id?: string | null
   creator_id: string
   status: 'draft' | 'confirmed'
   ai_polished: boolean
@@ -48,6 +83,15 @@ export interface QuotationItem {
   product_no?: string
   face_price?: number | null
   cover_image_url?: string | null
+  // Track C：空间归属、材质说明与服务端生成的产品快照
+  project_space_id?: string | null
+  floor_label?: string | null
+  space_label?: string | null
+  material_desc?: string | null
+  material_description?: string | null
+  colors?: string | null
+  specification?: string | null
+  product_snapshot?: ProductSnapshot | null
 }
 
 export interface Quotation {
@@ -113,6 +157,17 @@ export interface ShareProductItem {
   tax_rate?: number
   subtotal?: number
   _imgError?: boolean
+  // Track C：空间位置与产品事实
+  project_space_id?: string | null
+  floor_label?: string | null
+  space_label?: string | null
+  material_desc?: string | null
+  material?: string | null
+  colors?: string | null
+  material_description?: string | null
+  specification?: string | null
+  category_name?: string | null
+  product_snapshot?: ProductSnapshot | null
 }
 
 export interface ShareProposalContent {
@@ -160,11 +215,17 @@ export interface ProposalItemRequest {
   product_id: string
   quantity: number
   remark?: string
+  project_space_id?: string | null
+  floor_label?: string | null
+  space_label?: string | null
+  material_desc?: string | null
 }
 
 export interface ProposalCreateRequest {
   proposal_name: string
-  customer_name?: string
+  customer_name?: string | null
+  customer_id?: string | null
+  project_id?: string | null
   creator_id: string
   items: ProposalItemRequest[]
 }
@@ -172,6 +233,8 @@ export interface ProposalCreateRequest {
 export interface ProposalUpdateRequest {
   proposal_name?: string
   customer_name?: string | null
+  customer_id?: string | null
+  project_id?: string | null
   items?: ProposalItemRequest[]
 }
 
@@ -180,6 +243,11 @@ export interface QuotationItemRequest {
   quantity: number
   unit_price: number
   tax_rate: number
+  // Track C：从方案预填时一并带上空间归属与材质说明
+  project_space_id?: string | null
+  floor_label?: string | null
+  space_label?: string | null
+  material_desc?: string | null
 }
 
 export interface QuotationCreateRequest {

@@ -11,14 +11,14 @@ import pytest
 from app.core.data_scope import (
     NotFoundError,
     ScopeNotDefined,
-    assert_object_scope,
     apply_data_scope,
+    assert_object_scope,
 )
 from app.models.content import ContentBatch, ContentItem, ContentMetricSnapshot, ContentPublication
+from app.models.content_skill import ContentTopicItem, ContentTopicRun
 from app.models.customer import Customer, CustomerDialogue, FollowUp, Requirement
 from app.models.project import Project, ProjectAsset, ProjectMember
 from app.models.reminder import Notification, Reminder
-
 
 # ---------------------------------------------------------------------------
 # Fake query objects that record .where() calls
@@ -235,7 +235,12 @@ class TestApplyDataScope:
         """ProjectAsset -> filtered by visible project ids."""
         user_id = uuid4()
         query = FakeQuery()
-        result = apply_data_scope(query, user_id=user_id, role_code="designer", model=ProjectAsset)
+        result = apply_data_scope(
+            query,
+            user_id=user_id,
+            role_code="designer",
+            model=ProjectAsset,
+        )
         assert result is query
         assert len(query.where_calls) == 1
 
@@ -257,14 +262,36 @@ class TestApplyDataScope:
     def test_content_publication_passthrough(self):
         """ContentPublication -> query unchanged."""
         query = FakeQuery()
-        result = apply_data_scope(query, user_id=uuid4(), role_code="operator", model=ContentPublication)
+        result = apply_data_scope(
+            query,
+            user_id=uuid4(),
+            role_code="operator",
+            model=ContentPublication,
+        )
         assert result is query
         assert len(query.where_calls) == 0
 
     def test_content_metric_snapshot_passthrough(self):
         """ContentMetricSnapshot -> query unchanged."""
         query = FakeQuery()
-        result = apply_data_scope(query, user_id=uuid4(), role_code="operator", model=ContentMetricSnapshot)
+        result = apply_data_scope(
+            query,
+            user_id=uuid4(),
+            role_code="operator",
+            model=ContentMetricSnapshot,
+        )
+        assert result is query
+        assert len(query.where_calls) == 0
+
+    @pytest.mark.parametrize("model", [ContentTopicItem, ContentTopicRun])
+    def test_content_topic_models_follow_full_content_scope(self, model):
+        query = FakeQuery()
+        result = apply_data_scope(
+            query,
+            user_id=uuid4(),
+            role_code="operator",
+            model=model,
+        )
         assert result is query
         assert len(query.where_calls) == 0
 

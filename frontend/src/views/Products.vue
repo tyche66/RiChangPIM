@@ -1489,19 +1489,53 @@ const toggleMobileSelection = (row: any) => {
   allSelectedProducts.value = nextProducts
 }
 
-const finishProposal = () => {
-  if (selectedIds.value.size === 0) return
+function createProposalSelectionTokenId(): string {
+  try {
+    if (typeof globalThis.crypto?.randomUUID === 'function') {
+      return globalThis.crypto.randomUUID()
+    }
+    if (typeof globalThis.crypto?.getRandomValues === 'function') {
+      const bytes = new Uint8Array(16)
+      globalThis.crypto.getRandomValues(bytes)
+      return Array.from(bytes, (value) => value.toString(16).padStart(2, '0')).join('')
+    }
+  } catch {
+    // Fall back to an in-memory identifier when browser crypto is unavailable.
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`
+}
+
+const finishProposal = async () => {
+  if (selectedIds.value.size === 0) {
+    ElMessage.warning('请至少选择一项商品')
+    return
+  }
+
   const token: ProposalToken = {
     productIds: [...selectedIds.value],
     options: allSelectedProducts.value,
   }
-  const tokenId = crypto.randomUUID()
-  sessionStorage.setItem(`proposal_token_${tokenId}`, JSON.stringify(token))
-  exitProposalMode()
-  router.push({
-    path: '/proposals',
-    query: { mode: 'create', selection_token: tokenId },
-  })
+  const tokenId = createProposalSelectionTokenId()
+  const storageKey = `proposal_token_${tokenId}`
+  try {
+    sessionStorage.setItem(storageKey, JSON.stringify(token))
+    const navigationFailure = await router.push({
+      path: '/proposals',
+      query: { mode: 'create', selection_token: tokenId },
+    })
+    if (navigationFailure || router.currentRoute.value.path !== '/proposals') {
+      throw navigationFailure || new Error('proposal route was not reached')
+    }
+    exitProposalMode()
+    ElMessage.success('已进入方案创建')
+  } catch {
+    try {
+      sessionStorage.removeItem(storageKey)
+    } catch {
+      // Storage can be unavailable in the same contexts that reject setItem.
+    }
+    ElMessage.error('无法打开方案创建页面，请重试')
+  }
 }
 
 onMounted(() => {

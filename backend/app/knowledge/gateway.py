@@ -9,6 +9,7 @@ from uuid import UUID, uuid4
 
 from app.adapters.base import AIServiceAdapter
 from app.core.config import settings
+from app.knowledge.attributes import await_load_dictionary
 from app.knowledge.citations import CitationValidator
 from app.knowledge.errors import KnowledgeErrorCode, KnowledgeGatewayError
 from app.knowledge.events import sse_event
@@ -317,6 +318,13 @@ class KnowledgeGateway:
 
     async def _plan(self, request, *, current_user: dict, pool, session_id: str) -> QueryPlan:
         planner = ModelToolPlanner(self.planner, self.registry)
+        try:
+            dictionary = await await_load_dictionary(self.db)
+            setter = getattr(self.planner, "set_dictionary", None)
+            if callable(setter):
+                setter(dictionary)
+        except Exception:  # noqa: BLE001 - 词典不可用时保持规则解析空约束（fail-closed）
+            logger.warning("attribute_dictionary_load_failed")
         return await planner.plan(
             request,
             db=self.db,
@@ -386,22 +394,30 @@ def _params_for_tool(
 ) -> dict[str, Any]:
     entities = plan.entities
     if tool_name == "product.search":
+        query = entities.query
         filters = dict(request.scope.filters)
-        if entities.price_max is not None:
-            filters["face_price_max"] = entities.price_max
-        if entities.price_min is not None:
-            filters["face_price_min"] = entities.price_min
+        for numeric in query.numeric_filters:
+            if numeric.attribute_code == "face_price":
+                if numeric.max_value is not None:
+                    filters["face_price_max"] = numeric.max_value
+                if numeric.min_value is not None:
+                    filters["face_price_min"] = numeric.min_value
         return {
             "keyword": (
                 None
-                if entities.keywords or entities.facets.has_constraints()
+                if entities.keywords or query.has_constraints()
                 else request.message[:80]
             ),
             "keywords": entities.keywords,
+            "soft_terms": list(query.soft_terms),
+            "unknown_terms": list(query.unknown_terms),
             "product_nos": entities.product_nos,
             "product_ids": entities.product_ids,
             "filters": filters,
-            "facets": entities.facets.model_dump(mode="json"),
+            "hard_facets": [f.model_dump(mode="json") for f in query.hard_facets],
+            "numeric_filters": [f.model_dump(mode="json") for f in query.numeric_filters],
+            "exclude_values": [f.model_dump(mode="json") for f in query.exclude_values],
+            "facets": {f.attribute_code: f.values for f in query.hard_facets},
             "sort_by": (
                 "face_price"
                 if entities.price_sort

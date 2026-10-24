@@ -8,8 +8,13 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.base import AIServiceAdapter
-from app.adapters.factory import get_ai_adapter
+from app.adapters.factory import get_content_ai_adapter
 from app.adapters.none import NoneAdapter
+from app.core.content_models import (
+    ContentModelNotAllowedError,
+    get_content_model_catalog,
+    resolve_content_model,
+)
 from app.core.database import get_db
 from app.core.permission import PermissionChecker
 from app.core.rate_limiter import get_rate_limiter
@@ -39,6 +44,19 @@ from app.services.content_service import (
 router = APIRouter(prefix="/api/v1/content", tags=["content"])
 
 _VALID_PLATFORMS = {"xhs", "douyin", "moments", "seo", "other"}
+
+
+def _require_admin(current_user: dict) -> None:
+    """Skills 管理中心的显式 admin 校验。
+
+    不能只依赖 PermissionChecker：当前 admin 会绕过普通权限码检查，
+    因此这里必须单独断言 role_code，保证非管理员一律 403。
+    """
+    if current_user.get("role_code") != "admin":
+        raise HTTPException(
+            status_code=403,
+            detail={"code": 40301, "msg": "无权限访问该资源"},
+        )
 
 
 def _envelope(data, code: int = 200) -> dict:
@@ -91,6 +109,8 @@ def _item_to_dict(item: ContentItem, display_state: str | None = None) -> dict:
         "edited": item.edited,
         "verified_payload": item.verified_payload,
         "warnings": item.warnings or [],
+        "verification_gaps": item.verification_gaps or [],
+        "source_skill_code": item.source_skill_code,
         "external_ref": item.external_ref,
         "model_provider": item.model_provider,
         "model_name": item.model_name,
@@ -114,6 +134,7 @@ def _batch_to_dict(batch: ContentBatch) -> dict:
         "error_msg": batch.error_msg,
         "model_provider": batch.model_provider,
         "model_name": batch.model_name,
+        "source_skill_code": batch.source_skill_code,
         "prompt_version": batch.prompt_version,
         "latency_ms": batch.latency_ms,
         "create_time": batch.create_time.isoformat() if batch.create_time else None,
@@ -150,6 +171,20 @@ def _metric_to_dict(metric: ContentMetricSnapshot) -> dict:
     }
 
 
+@router.get(
+    "/models",
+    response_model=dict,
+    dependencies=[Depends(PermissionChecker("content:view"))],
+)
+async def list_content_models():
+    """返回内容域可用模型与默认模型；绝不返回 API Key。"""
+    models, default_model = get_content_model_catalog()
+    return _envelope({
+        "models": models,
+        "default_model": default_model,
+    })
+
+
 @router.post(
     "/batches",
     response_model=dict,
@@ -159,10 +194,18 @@ def _metric_to_dict(metric: ContentMetricSnapshot) -> dict:
 async def generate_content(
     request: Request,
     body: ContentGenerateRequest,
-    adapter: AIServiceAdapter = Depends(get_ai_adapter),
+    adapter: AIServiceAdapter = Depends(get_content_ai_adapter),
     db: AsyncSession = Depends(get_db),
 ):
     """生成内容批次（§9）。"""
+    try:
+        model_name = resolve_content_model(body.model_name)
+    except ContentModelNotAllowedError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": 40010, "msg": str(exc)},
+        ) from exc
+
     if adapter is None or isinstance(adapter, NoneAdapter):
         raise HTTPException(
             status_code=503,
@@ -184,13 +227,47 @@ async def generate_content(
                 detail={"code": 42901, "msg": "请求过于频繁，请稍后重试"},
             )
 
-    service = ContentService(adapter, db, model="gpt-4o-mini")
+    from app.services.content_skill_router import SkillSelectionError, resolve_skill
 
     try:
-        result = await service.generate(body, {"sub": user_id_raw})
+        skill = await resolve_skill(
+            db,
+            skill_type="content",
+            requested_code=body.skill_code,
+            adapter=adapter,
+            model=model_name,
+            route_context=body.topic[:500],
+        )
+    except SkillSelectionError as exc:
+        raise HTTPException(status_code=400, detail={"code": 40010, "msg": str(exc)}) from exc
+
+    service = ContentService(
+        adapter,
+        db,
+        model=model_name,
+        skill=skill,
+    )
+
+    try:
+        result = await service.generate(
+            body,
+            {
+                "sub": user_id_raw,
+                "role_code": getattr(request.state, "role_code", None),
+            },
+        )
     except ContentGenerationError as exc:
+        # Keep a reused prebuilt batch retryable after an adapter/schema
+        # failure.  ContentService marks it failed before raising.
+        await db.commit()
+        status_code = {
+            40101: 401,
+            40401: 404,
+            40010: 400,
+            50302: 503,
+        }.get(exc.code, 422)
         raise HTTPException(
-            status_code=503 if exc.code == 50302 else 422,
+            status_code=status_code,
             detail={"code": exc.code, "msg": exc.msg},
         ) from exc
 
@@ -202,14 +279,18 @@ async def generate_content(
     return _envelope({
         "batch_id": str(batch.id),
         "status": batch.status,
+        "source_skill_code": batch.source_skill_code,
+        "model_name": batch.model_name,
         "items": [
             ContentItemResult(
                 id=item.id,
                 title=item.title,
                 body=item.body,
                 hashtags=item.hashtags or [],
-                verified=True,
+                verified=not bool(item.verification_gaps),
                 warnings=item.warnings or [],
+                verification_gaps=item.verification_gaps or [],
+                source_skill_code=item.source_skill_code,
             ).model_dump()
             for item in items
         ],

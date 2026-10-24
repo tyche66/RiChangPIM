@@ -32,6 +32,8 @@ export interface ContentItem {
   edited: boolean
   verified_payload: Record<string, unknown> | null
   warnings: string[]
+  verification_gaps: string[]
+  source_skill_code: string | null
   external_ref: string | null
   model_provider: string | null
   model_name: string | null
@@ -57,6 +59,7 @@ export interface ContentBatch {
   model_name: string | null
   prompt_version: string
   latency_ms: number | null
+  source_skill_code: string | null
   create_time: string | null
 }
 
@@ -69,6 +72,18 @@ export interface ContentGenerateRequest {
   customer_id?: string | null
   project_id?: string | null
   requested_count?: number
+  /** Manual operational Skill selection; omitted means server-side auto route. */
+  skill_code?: string | null
+  /** Explicit model from the server allowlist; omitted/null means server default. */
+  model_name?: string | null
+  /** 来源选题条目：生成成功后该选题会被标记为 used 并回写批次。 */
+  topic_item_id?: string | null
+}
+
+/** GET /content/models: server allowlist; never contains an API key. */
+export interface ContentModelCatalog {
+  models: string[]
+  default_model: string
 }
 
 export interface ContentItemResult {
@@ -78,11 +93,15 @@ export interface ContentItemResult {
   hashtags: string[]
   verified: boolean
   warnings: string[]
+  verification_gaps: string[]
+  source_skill_code: string | null
 }
 
 export interface ContentBatchResult {
   batch_id: string
   status: string
+  source_skill_code: string | null
+  model_name: string | null
   items: ContentItemResult[]
 }
 
@@ -99,6 +118,88 @@ export interface ContentPublication {
   /** 列表附带字段（后端可用时提供）。 */
   item_title?: string | null
   latest_metrics?: MetricSnapshot | null
+}
+
+// ---------------------------------------------------------------------------
+// Track B: Skills 与独立选题
+// ---------------------------------------------------------------------------
+
+export interface ContentSkill {
+  id: string
+  code: string
+  name: string
+  skill_type: 'topic' | 'content'
+  source_dna: string | null
+  source_dna_label: string | null
+  selectable: boolean
+  description: string | null
+  prompt_template: string | null
+  output_schema: Record<string, unknown> | null
+  prompt_version: string
+  supported_platforms: string[]
+  enabled: boolean
+  sort_order: number
+  create_time: string | null
+  update_time: string | null
+}
+
+export interface ContentSkillInput {
+  code: string
+  name: string
+  skill_type: 'topic' | 'content'
+  description?: string | null
+  prompt_template?: string | null
+  output_schema?: Record<string, unknown> | null
+  prompt_version?: string
+  supported_platforms?: string[]
+  enabled?: boolean
+  sort_order?: number
+}
+
+export interface ContentTopicItem {
+  id: string
+  run_id: string
+  title: string
+  angle: string | null
+  audience: string | null
+  reason: string | null
+  suggested_platform: string | null
+  related_product_ids: string[]
+  pillar_code: string | null
+  verification_gaps: string[]
+  source_skill_code: string
+  status: 'draft' | 'adopted' | 'rejected' | 'used'
+  adopted_at: string | null
+  rejected_reason: string | null
+  content_batch_id: string | null
+  create_time: string | null
+}
+
+export interface ContentTopicRun {
+  id: string
+  skill_id: string
+  skill_code: string
+  topic: string
+  platform: string | null
+  tone: string | null
+  product_ids: string[]
+  requested_count: number
+  status: string
+  error_msg: string | null
+  model_provider: string | null
+  model_name: string | null
+  prompt_version: string
+  latency_ms: number | null
+  create_time: string | null
+  items: ContentTopicItem[]
+}
+
+/** 选题条目详情（内容工坊用 topic_id 读取后预填生成表单）。 */
+export interface ContentTopicItemDetail extends ContentTopicItem {
+  topic_context: string
+  platform: string | null
+  skill_code: string | null
+  run_topic: string | null
 }
 
 export interface MetricSnapshot {
@@ -155,6 +256,11 @@ export interface PublishRequest {
 }
 
 export const contentApi = {
+  listModels: () =>
+    api.get('/content/models', { suppressErrorMessage: true }) as Promise<
+      ApiEnvelope<ContentModelCatalog>
+    >,
+
   generate: (data: ContentGenerateRequest) =>
     api.post('/content/batches', data) as Promise<ApiEnvelope<ContentBatchResult>>,
 
@@ -218,5 +324,58 @@ export const contentApi = {
   publicationMetrics: (id: string) =>
     api.get(`/content/publications/${id}/metrics`) as Promise<
       ApiEnvelope<{ list: MetricSnapshot[]; total: number }>
+    >,
+
+  listSkills: (params?: { skill_type?: 'topic' | 'content'; enabled_only?: boolean }) =>
+    api.get('/content/skills', { params, suppressErrorMessage: true }) as Promise<
+      ApiEnvelope<ContentSkill[]>
+    >,
+
+  listSkillsForManage: () =>
+    api.get('/content/skills/manage') as Promise<ApiEnvelope<ContentSkill[]>>,
+
+  createSkill: (data: ContentSkillInput) =>
+    api.post('/content/skills/manage', data) as Promise<ApiEnvelope<ContentSkill>>,
+
+  updateSkill: (id: string, data: Partial<ContentSkillInput>) =>
+    api.put(`/content/skills/manage/${id}`, data) as Promise<ApiEnvelope<ContentSkill>>,
+
+  toggleSkill: (id: string, enabled: boolean) =>
+    api.post(`/content/skills/manage/${id}/toggle`, { enabled }) as Promise<
+      ApiEnvelope<ContentSkill>
+    >,
+
+  deleteSkill: (id: string) =>
+    api.delete(`/content/skills/manage/${id}`) as Promise<ApiEnvelope<{ id: string }>>,
+
+  createTopicRun: (data: {
+    skill_code?: string | null
+    model_name?: string | null
+    topic: string
+    platform?: string | null
+    tone?: string | null
+    product_ids?: string[]
+    requested_count?: number
+  }) => api.post('/content/topics/runs', data) as Promise<ApiEnvelope<ContentTopicRun>>,
+
+  listTopicRuns: (params?: { page?: number; size?: number }) =>
+    api.get('/content/topics/runs', { params, suppressErrorMessage: true }) as Promise<
+      ApiEnvelope<{ list: ContentTopicRun[]; total: number; page: number; size: number }>
+    >,
+
+  getTopicRun: (id: string) =>
+    api.get(`/content/topics/runs/${id}`) as Promise<ApiEnvelope<ContentTopicRun>>,
+
+  getTopicItem: (id: string) =>
+    api.get(`/content/topics/items/${id}`) as Promise<ApiEnvelope<ContentTopicItemDetail>>,
+
+  adoptTopicItem: (id: string) =>
+    api.post(`/content/topics/items/${id}/adopt`) as Promise<
+      ApiEnvelope<ContentTopicItem>
+    >,
+
+  rejectTopicItem: (id: string, rejected_reason?: string) =>
+    api.post(`/content/topics/items/${id}/reject`, { rejected_reason }) as Promise<
+      ApiEnvelope<ContentTopicItem>
     >,
 }

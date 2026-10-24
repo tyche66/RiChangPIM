@@ -69,6 +69,24 @@ def test_production_requires_admin_password(compose_path: Path):
     assert backend_env["ADMIN_PASSWORD"] == "${ADMIN_PASSWORD:-}"
 
 
+def test_backend_entrypoint_seeds_attribute_dictionary_without_product_backfill():
+    entrypoint = ROOT / "backend" / "docker" / "backend-entrypoint.sh"
+    if not entrypoint.exists():
+        entrypoint = Path.cwd() / "docker" / "backend-entrypoint.sh"
+    source = entrypoint.read_text(encoding="utf-8")
+
+    migration = source.index("alembic -c \"$TMP_INI\" upgrade head")
+    admin_seed = source.index("python -m app.scripts.init_admin")
+    rbac_seed = source.index("python -m app.scripts.seed_data")
+    dictionary_seed = source.index(
+        "python -m app.scripts.seed_attribute_dictionary --apply"
+    )
+    server = source.index("exec uvicorn")
+
+    assert migration < admin_seed < rbac_seed < dictionary_seed < server
+    assert "python -m app.scripts.backfill_product_attributes" not in source
+
+
 def test_pgvector_uses_sqlalchemy_type_without_conflicting_asyncpg_codec():
     from app.core import database
 

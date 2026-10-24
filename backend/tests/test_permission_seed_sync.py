@@ -1,12 +1,11 @@
 """Unit tests for permission seed sync (HLD §6.3).
 
-Asserts that seed_data.py PERMISSIONS matches migration 0020_crm_perms seed.
+Asserts that seed_data.py contains every permission seeded by the CRM and
+Track B migrations.
 """
 
 import ast
 from pathlib import Path
-
-import pytest
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -18,12 +17,15 @@ import pytest
 BACKEND_ROOT = Path(__file__).parent.parent
 
 SEED_DATA_PATH = BACKEND_ROOT / "app" / "scripts" / "seed_data.py"
-MIGRATION_PATH = BACKEND_ROOT / "alembic" / "versions" / "0020_crm_perms.py"
+MIGRATION_PATHS = (
+    BACKEND_ROOT / "alembic" / "versions" / "0020_crm_perms.py",
+    BACKEND_ROOT / "alembic" / "versions" / "0027_content_skills.py",
+)
 
 
 def _import_seed_data():
     """Import seed_data.py PERMISSIONS without executing app imports."""
-    with open(SEED_DATA_PATH, "r") as f:
+    with open(SEED_DATA_PATH) as f:
         source = f.read()
 
     tree = ast.parse(source)
@@ -39,7 +41,7 @@ def _import_seed_data():
 
 def _import_seed_roles():
     """Import seed_data.py ROLES without executing app imports."""
-    with open(SEED_DATA_PATH, "r") as f:
+    with open(SEED_DATA_PATH) as f:
         source = f.read()
 
     tree = ast.parse(source)
@@ -53,20 +55,20 @@ def _import_seed_roles():
     raise ValueError("ROLES not found in seed_data.py")
 
 
-def _import_migration():
-    """Import migration 0020_crm_perms.py NEW_PERMISSIONS."""
-    with open(MIGRATION_PATH, "r") as f:
-        source = f.read()
+def _import_migrations():
+    """Import NEW_PERMISSIONS from all post-seed permission migrations."""
+    permissions = []
+    for migration_path in MIGRATION_PATHS:
+        with open(migration_path) as f:
+            source = f.read()
 
-    tree = ast.parse(source)
-
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Assign):
-            for target in node.targets:
-                if isinstance(target, ast.Name) and target.id == "NEW_PERMISSIONS":
-                    return ast.literal_eval(node.value)
-
-    raise ValueError("NEW_PERMISSIONS not found in 0020_crm_perms.py")
+        tree = ast.parse(source)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if isinstance(target, ast.Name) and target.id == "NEW_PERMISSIONS":
+                        permissions.extend(ast.literal_eval(node.value))
+    return permissions
 
 
 class TestPermissionSeedSync:
@@ -80,7 +82,7 @@ class TestPermissionSeedSync:
         So we verify that all migration permissions exist in seed_data.
         """
         seed_perms = _import_seed_data()
-        migration_perms = _import_migration()
+        migration_perms = _import_migrations()
 
         seed_codes = {p[0] for p in seed_perms}
         migration_codes = {p[0] for p in migration_perms}
@@ -101,7 +103,7 @@ class TestPermissionSeedSync:
             "project:view", "project:edit", "project:member", "project:asset",
             "dashboard:view",
             "content:view", "content:generate", "content:adopt",
-            "content:publish", "content:metric",
+            "content:publish", "content:metric", "content:manage",
             "reminder:edit",
         }
         assert crm_perms.issubset(seed_codes), (
@@ -126,14 +128,16 @@ class TestPermissionSeedSync:
         roles = _import_seed_roles()
         role_codes = {r[0] for r in roles}
 
-        expected_roles = {"admin", "manager", "sales", "designer", "operator", "purchaser", "viewer"}
+        expected_roles = {
+            "admin", "manager", "sales", "designer", "operator", "purchaser", "viewer"
+        }
         assert expected_roles.issubset(role_codes), (
             f"Missing roles in seed_data.py: {expected_roles - role_codes}"
         )
 
     def test_migration_has_crm_permissions(self):
         """Migration 0020_crm_perms includes all 16 CRM-Lite permissions."""
-        migration_perms = _import_migration()
+        migration_perms = _import_migrations()
         migration_codes = {p[0] for p in migration_perms}
 
         crm_perms = {
@@ -142,7 +146,7 @@ class TestPermissionSeedSync:
             "project:view", "project:edit", "project:member", "project:asset",
             "dashboard:view",
             "content:view", "content:generate", "content:adopt",
-            "content:publish", "content:metric",
+            "content:publish", "content:metric", "content:manage",
             "reminder:edit",
         }
         assert crm_perms.issubset(migration_codes), (
@@ -151,7 +155,8 @@ class TestPermissionSeedSync:
 
     def test_migration_has_new_roles(self):
         """Migration 0020_crm_perms includes manager/designer/operator roles."""
-        with open(MIGRATION_PATH, "r") as f:
+        migration_path = BACKEND_ROOT / "alembic" / "versions" / "0020_crm_perms.py"
+        with open(migration_path) as f:
             source = f.read()
 
         tree = ast.parse(source)
@@ -167,4 +172,21 @@ class TestPermissionSeedSync:
         expected_roles = {"manager", "designer", "operator"}
         assert expected_roles.issubset(role_codes), (
             f"Missing roles in migration: {expected_roles - role_codes}"
+        )
+
+    def test_content_manage_is_admin_only_in_seed_data(self):
+        source = SEED_DATA_PATH.read_text()
+        tree = ast.parse(source)
+        role_permissions = None
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if isinstance(target, ast.Name) and target.id == "ROLE_PERMISSIONS":
+                        role_permissions = ast.literal_eval(node.value)
+                        break
+        assert role_permissions is not None
+        assert role_permissions["admin"] == ["*"]
+        assert all(
+            "content:manage" not in role_permissions.get(role, [])
+            for role in ("purchaser", "sales", "viewer", "manager", "designer", "operator")
         )

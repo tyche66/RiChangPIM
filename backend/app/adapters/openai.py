@@ -67,10 +67,17 @@ class OpenAIConfig:
     # Optional separate embedding endpoint (e.g., OpenRouter)
     embedding_api_key: str | None = None
     embedding_api_url: str | None = None
+    allowed_chat_models: frozenset[str] | None = None
 
     def __post_init__(self):
         if not self.api_key:
             raise ValueError("OpenAIConfig.api_key is required")
+        if self.allowed_chat_models:
+            self.allowed_chat_models = frozenset(
+                model.strip() for model in self.allowed_chat_models if model.strip()
+            )
+            if self.chat_model not in self.allowed_chat_models:
+                raise ValueError("OpenAIConfig.chat_model is not in allowed_chat_models")
 
     def chat_path(self) -> str:
         return "/chat/completions"
@@ -182,11 +189,13 @@ class OpenAIAdapter(AIServiceAdapter):
         system: str | None = None,
         tools: list[dict[str, Any]] | None = None,
         temperature: float = 0.4,
+        model: str | None = None,
         **kwargs: Any,
     ) -> dict[str, Any]:
+        requested_model = self._resolve_chat_model(model)
         messages = self._build_messages(system, history, message)
         payload: dict[str, Any] = {
-            "model": self.cfg.chat_model,
+            "model": requested_model,
             "messages": messages,
             "temperature": temperature,
             "stream": False,
@@ -202,7 +211,7 @@ class OpenAIAdapter(AIServiceAdapter):
             "answer": answer,
             "sources": [],
             "tool_calls": _coerce_tool_calls(msg.get("tool_calls")),
-            "model": resp.get("model"),
+            "model": resp.get("model") or requested_model,
             "usage": resp.get("usage"),
         }
 
@@ -213,9 +222,10 @@ class OpenAIAdapter(AIServiceAdapter):
         history: list[dict[str, str]],
         **kwargs: Any,
     ) -> AsyncGenerator[dict[str, Any], None]:
+        requested_model = self._resolve_chat_model(kwargs.pop("model", None))
         messages = self._build_messages(None, history, message)
         payload: dict[str, Any] = {
-            "model": self.cfg.chat_model,
+            "model": requested_model,
             "messages": messages,
             "stream": True,
             "temperature": kwargs.pop("temperature", 0.4),
@@ -368,6 +378,12 @@ class OpenAIAdapter(AIServiceAdapter):
         return {"error": f"unknown action: {action}"}
 
     # ---------- internal helpers ----------
+    def _resolve_chat_model(self, model: str | None) -> str:
+        selected = model or self.cfg.chat_model
+        if self.cfg.allowed_chat_models and selected not in self.cfg.allowed_chat_models:
+            raise AIAdapterBadRequestError("requested model is not allowed")
+        return selected
+
     def _build_messages(
         self,
         system: str | None,
@@ -424,10 +440,10 @@ class OpenAIAdapter(AIServiceAdapter):
                 last_msg = _map_http_status_error(exc)
                 attempts += 1
                 logger.warning(
-                    "openai call failed (attempt %s/%s): %s",
+                    "openai call failed (attempt %s/%s) error_type=%s",
                     attempts,
                     self.cfg.max_retries + 1,
-                    last_msg,
+                    type(exc).__name__,
                 )
                 if attempts > self.cfg.max_retries:
                     raise
@@ -435,10 +451,10 @@ class OpenAIAdapter(AIServiceAdapter):
                 last_msg = "upstream connection failed"
                 attempts += 1
                 logger.warning(
-                    "openai transport error (attempt %s/%s): %s",
+                    "openai transport error (attempt %s/%s) error_type=%s",
                     attempts,
                     self.cfg.max_retries + 1,
-                    exc,
+                    type(exc).__name__,
                 )
                 if attempts > self.cfg.max_retries:
                     raise AIAdapterServerError(last_msg) from exc

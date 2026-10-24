@@ -106,6 +106,18 @@
           >
             发布与曝光
           </el-menu-item>
+          <el-menu-item
+            v-if="hasPerm('content:view')"
+            index="/content/topics"
+          >
+            独立选题
+          </el-menu-item>
+          <el-menu-item
+            v-if="isAdmin"
+            index="/content/skills"
+          >
+            Skills 管理
+          </el-menu-item>
         </el-sub-menu>
         <el-sub-menu index="m-admin">
           <template #title>
@@ -270,13 +282,17 @@ function hasPerm(perm: string): boolean {
   return hasPermission(authStore.permissions, perm)
 }
 
+// Skills 管理中心仅管理员可见（与后端 _require_admin 同源）。
+const isAdmin = computed(() => authStore.userRoleCode === 'admin')
+
 // 客户与项目分组：任一子项有权限才渲染整个分组。
 const showCrmMenu = computed(
   () =>
     hasPerm('dashboard:view') ||
     hasPerm('customer:view') ||
     hasPerm('project:view') ||
-    hasPerm('content:view'),
+    hasPerm('content:view') ||
+    isAdmin.value,
 )
 
 const activeMenu = computed(() => route.path)
@@ -349,6 +365,8 @@ const routeLabels: Record<string, [string, string]> = {
   projects: ['客户与项目', '项目管理'],
   'content/workshop': ['客户与项目', '内容工坊'],
   'content/publications': ['客户与项目', '发布与曝光'],
+  'content/topics': ['客户与项目', '独立选题'],
+  'content/skills': ['客户与项目', 'Skills 管理'],
   version: ['系统信息', '版本'],
 }
 // content 域有两个二级页面（工坊/发布），单段 key 无法区分，故优先按完整路径查表。

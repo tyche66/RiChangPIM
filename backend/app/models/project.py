@@ -37,6 +37,7 @@ class Project(CommonBase):
     budget = Column(Float, nullable=True)
     start_date = Column(Date, nullable=True)
     end_date = Column(Date, nullable=True)
+    remark = Column(Text, nullable=True)
     last_activity_at = Column(DateTime(timezone=True), nullable=True)
     created_by = Column(PGUUID(as_uuid=True), ForeignKey("user.id"), nullable=True)
     updated_by = Column(PGUUID(as_uuid=True), ForeignKey("user.id"), nullable=True)

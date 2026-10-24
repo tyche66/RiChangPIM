@@ -2,6 +2,7 @@ from app.api.v1.auth import router as auth_router
 from app.api.v1.brands import router as brands_router
 from app.api.v1.categories import router as categories_router
 from app.api.v1.content import router as content_router
+from app.api.v1.content_skills import router as content_skills_router
 from app.api.v1.customers import router as customers_router
 from app.api.v1.files import router as files_router
 from app.api.v1.health import router as health_router
@@ -32,6 +33,7 @@ __all__ = [
     "categories_router",
     "brands_router",
     "content_router",
+    "content_skills_router",
     "customers_router",
     "suppliers_router",
     "tags_router",

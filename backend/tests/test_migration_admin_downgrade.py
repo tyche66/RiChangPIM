@@ -120,7 +120,7 @@ def test_migration_owned_admin_deleted_on_downgrade():
     eng = create_engine(to_sync_url(url))
     try:
         assert _admin_count(eng) == 1  # 本迁移创建的 admin
-        assert _count(eng, "role") == 4
+        assert _count(eng, "role") == 7
         if EXPECTED_PERMISSION_COUNT is None:
             assert _count(eng, "permission") == _expected_permission_count(eng)
         else:
@@ -148,7 +148,7 @@ def test_preexisting_admin_preserved_on_downgrade():
     try:
         # 升级前已存在 admin -> 本迁移 NOT EXISTS 守卫不重复插入。
         assert _admin_count(eng) == 1
-        assert _count(eng, "role") == 4
+        assert _count(eng, "role") == 7
         assert _count(eng, "permission") == _expected_permission_count(eng)
         admin_rp, total_rp = _expected_role_permission_count(eng)
         assert admin_rp == _count(eng, "permission")
@@ -170,7 +170,7 @@ def test_downgrade_then_upgrade_recreates_admin():
         assert _admin_count(eng) == 0
         alembic_upgrade(url, "head")
         assert _admin_count(eng) == 1
-        assert _count(eng, "role") == 4
+        assert _count(eng, "role") == 7
         assert _count(eng, "permission") == _expected_permission_count(eng)
         admin_rp, total_rp = _expected_role_permission_count(eng)
         assert admin_rp == _count(eng, "permission")

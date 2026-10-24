@@ -15,11 +15,12 @@ from app.core.permission import PermissionChecker
 from app.core.security import create_access_token
 from app.middleware.audit import audit_action
 from app.models.product import Product, ProductImage
-from app.models.sales import Proposal, Quotation, QuotationItem
+from app.models.sales import ProjectSpace, Proposal, ProposalItem, Quotation, QuotationItem
 from app.schemas.quotation import (
     QuotationCreate,
     QuotationUpdate,
 )
+from app.services.product_snapshot import build_product_snapshot
 
 router = APIRouter()
 
@@ -80,22 +81,113 @@ def _compute_totals(items: list[QuotationItem], discount: float) -> tuple[float,
     return subtotal_total, total_amount
 
 
+async def _quotation_snapshot(
+    db: AsyncSession,
+    product_id: UUID,
+    project_space_id: UUID | None,
+    proposal_id: UUID,
+) -> dict | None:
+    """报价明细的产品快照。
+
+    优先沿用方案明细里的快照（保证方案与报价口径一致），
+    方案里没有这条产品时才现取一份。
+    """
+
+    proposal_item = (
+        await db.execute(
+            select(ProposalItem)
+            .where(
+                ProposalItem.proposal_id == proposal_id,
+                ProposalItem.product_id == product_id,
+                ProposalItem.is_deleted.is_(False),
+            )
+            .order_by(ProposalItem.sort, ProposalItem.create_time)
+        )
+    ).scalars().first()
+    if proposal_item is not None and proposal_item.product_snapshot:
+        return dict(proposal_item.product_snapshot)
+    if proposal_item is not None:
+        # 方案里存在但快照缺失（旧数据）：补齐快照并落库
+        snapshot = await build_product_snapshot(db, product_id)
+        if snapshot is not None:
+            proposal_item.product_snapshot = snapshot
+        return snapshot
+    return await build_product_snapshot(db, product_id)
+
+
+async def _validate_quotation_spaces(
+    db: AsyncSession, project_id: UUID | None, items
+) -> None:
+    space_ids = {item.project_space_id for item in items if item.project_space_id}
+    if not space_ids:
+        return
+    if project_id is None:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": 42201, "msg": "方案未关联项目，不能指定项目空间"},
+        )
+    result = await db.execute(
+        select(ProjectSpace.id).where(
+            ProjectSpace.id.in_(space_ids),
+            ProjectSpace.project_id == project_id,
+            ProjectSpace.is_deleted.is_(False),
+        )
+    )
+    if space_ids - set(result.scalars().all()):
+        raise HTTPException(
+            status_code=422,
+            detail={"code": 42201, "msg": "项目空间不存在或不属于方案关联项目"},
+        )
+
+
+async def _proposal_item_map(
+    db: AsyncSession, proposal_id: UUID, product_ids: list[UUID]
+) -> dict[UUID, ProposalItem]:
+    if not product_ids:
+        return {}
+    result = await db.execute(
+        select(ProposalItem)
+        .where(
+            ProposalItem.proposal_id == proposal_id,
+            ProposalItem.product_id.in_(set(product_ids)),
+            ProposalItem.is_deleted.is_(False),
+        )
+        .order_by(ProposalItem.sort, ProposalItem.create_time)
+    )
+    items = result.scalars().all()
+    return {item.product_id: item for item in reversed(items)}
+
+
 def _enrich_quotation_item(
     item: QuotationItem,
     product: Product | None,
     cover_url: str | None,
 ) -> dict:
+    snapshot = item.product_snapshot or {}
     return {
         "id": str(item.id),
         "product_id": str(item.product_id),
-        "product_no": product.product_no if product else None,
-        "product_name": product.product_name if product else None,
+        "product_no": (
+            snapshot.get("product_no") if snapshot else None
+        ) or (product.product_no if product else None),
+        "product_name": (
+            snapshot.get("product_name") if snapshot else None
+        ) or (product.product_name if product else None),
         "face_price": product.face_price if product else None,
         "quantity": item.quantity,
         "unit_price": item.unit_price,
         "tax_rate": item.tax_rate,
         "subtotal": item.subtotal,
         "cover_image_url": cover_url,
+        # Track C：空间归属与产品快照
+        "project_space_id": str(item.project_space_id) if item.project_space_id else None,
+        "floor_label": item.floor_label,
+        "space_label": item.space_label,
+        "material_desc": item.material_desc,
+        "material_description": snapshot.get("material_description"),
+        "colors": snapshot.get("colors"),
+        "specification": snapshot.get("specification"),
+        "product_snapshot": item.product_snapshot,
     }
 
 
@@ -245,56 +337,40 @@ async def list_quotations(
     }
 
 
-@router.get(
-    "/{quotation_id}/pdf",
-    dependencies=[Depends(PermissionChecker("quotation:view"))],
-    responses={200: {"content": {"application/pdf": {}}}},
-)
-@audit_action("quotation_pdf_export", module="quotations", target_id_kwarg="quotation_id")
-async def export_quotation_pdf(
-    request: Request, quotation_id: UUID, db: AsyncSession = Depends(get_db)
-):
-    result = await db.execute(
-        select(Quotation)
-        .options(selectinload(Quotation.items))
-        .where(Quotation.id == quotation_id, Quotation.is_deleted.is_(False))
-    )
-    quotation = result.scalar_one_or_none()
-    if not quotation:
-        raise HTTPException(status_code=404, detail={"code": 40401, "msg": "报价单不存在"})
+def _build_quotation_html(quotation: Quotation, prod_map: dict[UUID, Product]) -> str:
+    """报价单 HTML（PDF 渲染前的中间产物，单独成函数便于测试列结构）。"""
 
-    # 富化产品字段
-    product_ids = [it.product_id for it in quotation.items]
-    prod_map: dict[UUID, Product] = {}
-    if product_ids:
-        prod_result = await db.execute(
-            select(Product).where(
-                Product.id.in_(product_ids), Product.is_deleted.is_(False)
-            )
-        )
-        prod_map = {p.id: p for p in prod_result.scalars().all()}
-
-    gotenberg_url = settings.GOTENBERG_URL.rstrip("/")
-    if not gotenberg_url:
-        raise HTTPException(status_code=503, detail={"code": 50301, "msg": "PDF 服务未配置"})
-
-    def _row_cells(item):
+    def _row_cells(item: QuotationItem):
         prod = prod_map.get(item.product_id)
-        if prod and prod.product_no:
-            p_no = escape(str(prod.product_no))
+        snapshot = item.product_snapshot or {}
+        if snapshot.get("product_no") or (prod and prod.product_no):
+            p_no = escape(str(snapshot.get("product_no") or (prod and prod.product_no)))
         else:
             p_no = escape(str(item.product_id))
-        if prod and prod.product_name:
-            p_name = escape(str(prod.product_name))
+        if snapshot.get("product_name") or (prod and prod.product_name):
+            p_name = escape(
+                str(snapshot.get("product_name") or (prod and prod.product_name))
+            )
         else:
             p_name = "-"
-        return p_no, p_name
+        # 楼层 / 空间：明细优先，快照兜底，都没有就显示 "-"
+        floor = item.floor_label or snapshot.get("floor_label") or "-"
+        space = item.space_label or snapshot.get("space_label") or "-"
+        material = item.material_desc or snapshot.get("material_description") or "-"
+        colors = snapshot.get("colors") or snapshot.get("color") or "-"
+        return p_no, p_name, escape(str(floor)), escape(str(space)), escape(
+            str(material)
+        ), escape(str(colors))
 
     rows_html = "".join(
         f"""
         <tr>
           <td>{_row_cells(item)[0]}</td>
           <td>{_row_cells(item)[1]}</td>
+          <td>{_row_cells(item)[2]}</td>
+          <td>{_row_cells(item)[3]}</td>
+          <td>{_row_cells(item)[4]}</td>
+          <td>{_row_cells(item)[5]}</td>
           <td class="num">{item.quantity}</td>
           <td class="num">{_round(item.unit_price):.2f}</td>
           <td class="num">{_round(item.tax_rate * 100):.2f}%</td>
@@ -305,7 +381,7 @@ async def export_quotation_pdf(
     )
     valid_until = quotation.valid_until.strftime("%Y-%m-%d") if quotation.valid_until else "-"
     _pre_tax_total = _round(sum(it.subtotal * (1 + it.tax_rate) for it in quotation.items))
-    html = f"""<!doctype html>
+    return f"""<!doctype html>
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8" />
@@ -334,6 +410,10 @@ async def export_quotation_pdf(
       <tr>
         <th>产品编号</th>
         <th>产品名称</th>
+        <th>楼层</th>
+        <th>空间</th>
+        <th>材质说明</th>
+        <th>颜色</th>
         <th class="num">数量</th>
         <th class="num">单价</th>
         <th class="num">税率</th>
@@ -349,6 +429,45 @@ async def export_quotation_pdf(
   </div>
 </body>
 </html>"""
+
+
+@router.get(
+    "/{quotation_id}/pdf",
+    dependencies=[Depends(PermissionChecker("quotation:view"))],
+    responses={200: {"content": {"application/pdf": {}}}},
+)
+@audit_action("quotation_pdf_export", module="quotations", target_id_kwarg="quotation_id")
+async def export_quotation_pdf(
+    request: Request, quotation_id: UUID, db: AsyncSession = Depends(get_db)
+):
+    result = await db.execute(
+        select(Quotation)
+        .options(
+            selectinload(Quotation.items),
+            selectinload(Quotation.proposal),
+        )
+        .where(Quotation.id == quotation_id, Quotation.is_deleted.is_(False))
+    )
+    quotation = result.scalar_one_or_none()
+    if not quotation:
+        raise HTTPException(status_code=404, detail={"code": 40401, "msg": "报价单不存在"})
+
+    # 富化产品字段
+    product_ids = [it.product_id for it in quotation.items]
+    prod_map: dict[UUID, Product] = {}
+    if product_ids:
+        prod_result = await db.execute(
+            select(Product).where(
+                Product.id.in_(product_ids), Product.is_deleted.is_(False)
+            )
+        )
+        prod_map = {p.id: p for p in prod_result.scalars().all()}
+
+    gotenberg_url = settings.GOTENBERG_URL.rstrip("/")
+    if not gotenberg_url:
+        raise HTTPException(status_code=503, detail={"code": 50301, "msg": "PDF 服务未配置"})
+
+    html = _build_quotation_html(quotation, prod_map)
     files = {"files": ("index.html", html.encode("utf-8"), "text/html")}
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
@@ -416,6 +535,12 @@ async def create_quotation(
     if not proposal:
         raise HTTPException(status_code=404, detail={"code": 40401, "msg": "关联方案不存在"})
 
+    proposal_items = await _proposal_item_map(
+        db, proposal.id, [item.product_id for item in quotation_data.items]
+    )
+    await _validate_quotation_spaces(
+        db, proposal.project_id, [*quotation_data.items, *proposal_items.values()]
+    )
     await _validate_quotation_items([i.product_id for i in quotation_data.items], db)
 
     quotation = Quotation(
@@ -439,6 +564,30 @@ async def create_quotation(
             unit_price=item_data.unit_price,
             tax_rate=item_data.tax_rate,
             subtotal=0.0,
+            # Track C：空间归属 + 产品快照（快照取方案明细的，缺失时现取一份）
+            project_space_id=(
+                item_data.project_space_id
+                if "project_space_id" in item_data.model_fields_set
+                else getattr(proposal_items.get(item_data.product_id), "project_space_id", None)
+            ),
+            floor_label=(
+                item_data.floor_label
+                if "floor_label" in item_data.model_fields_set
+                else getattr(proposal_items.get(item_data.product_id), "floor_label", None)
+            ),
+            space_label=(
+                item_data.space_label
+                if "space_label" in item_data.model_fields_set
+                else getattr(proposal_items.get(item_data.product_id), "space_label", None)
+            ),
+            material_desc=(
+                item_data.material_desc
+                if "material_desc" in item_data.model_fields_set
+                else getattr(proposal_items.get(item_data.product_id), "material_desc", None)
+            ),
+            product_snapshot=await _quotation_snapshot(
+                db, item_data.product_id, item_data.project_space_id, proposal.id
+            ),
         )
         items.append(item)
         db.add(item)
@@ -501,6 +650,22 @@ async def update_quotation(
                 status_code=422, detail={"code": 42201, "msg": "报价明细不可为空"}
             )
         if new_items is not None:
+            proposal = (
+                await db.execute(
+                    select(Proposal).where(
+                        Proposal.id == quotation.proposal_id,
+                        Proposal.is_deleted.is_(False),
+                    )
+                )
+            ).scalar_one_or_none()
+            proposal_items = await _proposal_item_map(
+                db, quotation.proposal_id, [item.product_id for item in new_items]
+            )
+            await _validate_quotation_spaces(
+                db,
+                proposal.project_id if proposal else None,
+                [*new_items, *proposal_items.values()],
+            )
             await _validate_quotation_items([i.product_id for i in new_items], db)
             old_items = await db.execute(
                 select(QuotationItem).where(QuotationItem.quotation_id == quotation.id)
@@ -516,6 +681,34 @@ async def update_quotation(
                     unit_price=item_data.unit_price,
                     tax_rate=item_data.tax_rate,
                     subtotal=0.0,
+                    project_space_id=(
+                        item_data.project_space_id
+                        if "project_space_id" in item_data.model_fields_set
+                        else getattr(
+                            proposal_items.get(item_data.product_id), "project_space_id", None
+                        )
+                    ),
+                    floor_label=(
+                        item_data.floor_label
+                        if "floor_label" in item_data.model_fields_set
+                        else getattr(proposal_items.get(item_data.product_id), "floor_label", None)
+                    ),
+                    space_label=(
+                        item_data.space_label
+                        if "space_label" in item_data.model_fields_set
+                        else getattr(proposal_items.get(item_data.product_id), "space_label", None)
+                    ),
+                    material_desc=(
+                        item_data.material_desc
+                        if "material_desc" in item_data.model_fields_set
+                        else getattr(
+                            proposal_items.get(item_data.product_id), "material_desc", None
+                        )
+                    ),
+                    product_snapshot=await _quotation_snapshot(
+                        db, item_data.product_id, item_data.project_space_id,
+                        quotation.proposal_id,
+                    ),
                 )
                 items.append(item)
                 db.add(item)

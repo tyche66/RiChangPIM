@@ -1,10 +1,12 @@
 from datetime import UTC, datetime, timedelta
+from functools import partial
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import or_, select
 from sqlalchemy import update as sa_update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
 from app.core.security import create_access_token
@@ -12,7 +14,7 @@ from app.core.serializers import filter_sensitive_fields
 from app.middleware.audit import audit_action
 from app.models.audit import Share, ShareLog, ShareToken, Visitor
 from app.models.product import Attachment, Product, ProductImage, SceneImage, product_scene_image
-from app.models.sales import Proposal, ProposalItem, Quotation, QuotationItem
+from app.models.sales import ProjectSpace, Proposal, ProposalItem, Quotation, QuotationItem
 
 router = APIRouter()
 
@@ -98,6 +100,34 @@ def _create_share_content_url(attachment_id: UUID) -> str:
     return f"/api/v1/files/{attachment_id}/content?token={token}"
 
 
+def _snapshot_field(snapshot: dict | None, product, key: str):
+    """展示字段取值：快照优先，其次当前产品，最后 None。"""
+    value = (snapshot or {}).get(key)
+    if value in (None, "", []):
+        value = getattr(product, key, None)
+    return value
+
+
+def _space_labels(item) -> tuple[str | None, str | None]:
+    """Return saved labels, echoing an existing bound space for legacy rows."""
+    floor_label = item.floor_label
+    space_label = item.space_label
+    bound_space = item.__dict__.get("space")
+    if bound_space is None:
+        return floor_label, space_label
+    if floor_label is None:
+        if bound_space.space_type == "floor":
+            floor_label = bound_space.space_name
+        else:
+            parent = getattr(bound_space, "parent", None)
+            if parent is not None and parent.space_type == "floor":
+                floor_label = parent.space_name
+    if space_label is None and bound_space.space_type != "floor":
+        space_label = bound_space.space_name
+    return floor_label, space_label
+
+
+
 async def _fetch_content_urls(
     db: AsyncSession, attachment_ids: list[UUID]
 ) -> dict[UUID, str]:
@@ -130,7 +160,13 @@ async def _build_content(db: AsyncSession, share_type: str, target_id: UUID) -> 
         if prop is None:
             return None
         rows = (
-            (await db.execute(select(ProposalItem).where(ProposalItem.proposal_id == prop.id)))
+            (
+                await db.execute(
+                    select(ProposalItem)
+                    .options(selectinload(ProposalItem.space).selectinload(ProjectSpace.parent))
+                    .where(ProposalItem.proposal_id == prop.id)
+                )
+            )
             .scalars()
             .all()
         )
@@ -147,7 +183,9 @@ async def _build_content(db: AsyncSession, share_type: str, target_id: UUID) -> 
 
         # 批量加载产品
         prod_result = await db.execute(
-            select(Product).where(Product.id.in_(product_ids), Product.is_deleted.is_(False))
+            select(Product)
+                .options(selectinload(Product.category))
+                .where(Product.id.in_(product_ids), Product.is_deleted.is_(False))
         )
         products_map = {p.id: p for p in prod_result.scalars().all()}
 
@@ -246,19 +284,44 @@ async def _build_content(db: AsyncSession, share_type: str, target_id: UUID) -> 
                     }
                 )
 
-            line_total = round(prod.face_price * it.quantity, 2) if prod else 0.0
+            snapshot = it.product_snapshot
+            snapshot_face_price = (snapshot or {}).get("face_price")
+            face_price = (
+                snapshot_face_price
+                if snapshot_face_price not in (None, "")
+                else (prod.face_price if prod else None)
+            )
+            line_total = round(face_price * it.quantity, 2) if face_price is not None else 0.0
             total_face_value += line_total
+
+            # 展示事实按"快照优先、当前产品其次"合并，保证历史方案不漂移
+            _field = partial(_snapshot_field, snapshot, prod)
+            floor_label, space_label = _space_labels(it)
 
             items.append(
                 {
                     "product_id": str(it.product_id),
-                    "product_no": prod.product_no if prod else None,
-                    "product_name": prod.product_name if prod else None,
-                    "face_price": prod.face_price if prod else None,
+                    "product_no": _field("product_no"),
+                    "product_name": _field("product_name"),
+                    "category_name": _field("category_name")
+                    or (prod.category.category_name if prod and prod.category else None),
+                    "face_price": face_price,
                     "quantity": it.quantity,
                     "line_total": line_total,
                     "cover_image_url": cover_image_url,
                     "scene_images": scenes,
+                    # Track C：空间位置与产品事实快照
+                    "project_space_id": (
+                        str(it.project_space_id) if it.project_space_id else None
+                    ),
+                    "floor_label": floor_label,
+                    "space_label": space_label,
+                    "material_desc": it.material_desc,
+                    "material": _field("material"),
+                    "colors": _field("colors"),
+                    "material_description": _field("material_description"),
+                    "specification": _field("specification"),
+                    "product_snapshot": snapshot or None,
                 }
             )
         return {
@@ -279,7 +342,13 @@ async def _build_content(db: AsyncSession, share_type: str, target_id: UUID) -> 
         if quo is None:
             return None
         rows = (
-            (await db.execute(select(QuotationItem).where(QuotationItem.quotation_id == quo.id)))
+            (
+                await db.execute(
+                    select(QuotationItem)
+                    .options(selectinload(QuotationItem.space).selectinload(ProjectSpace.parent))
+                    .where(QuotationItem.quotation_id == quo.id)
+                )
+            )
             .scalars()
             .all()
         )
@@ -295,7 +364,9 @@ async def _build_content(db: AsyncSession, share_type: str, target_id: UUID) -> 
 
         # 批量加载产品
         prod_result = await db.execute(
-            select(Product).where(Product.id.in_(product_ids), Product.is_deleted.is_(False))
+            select(Product)
+                .options(selectinload(Product.category))
+                .where(Product.id.in_(product_ids), Product.is_deleted.is_(False))
         )
         products_map = {p.id: p for p in prod_result.scalars().all()}
 
@@ -394,11 +465,18 @@ async def _build_content(db: AsyncSession, share_type: str, target_id: UUID) -> 
                 )
 
             subtotal = round(it.unit_price * it.quantity, 2)
+            # 展示事实按"快照优先、当前产品其次"合并，保证历史报价不漂移
+            snapshot = it.product_snapshot
+            _field = partial(_snapshot_field, snapshot, prod)
+            floor_label, space_label = _space_labels(it)
+
             items.append(
                 {
                     "product_id": str(it.product_id),
-                    "product_no": prod.product_no if prod else None,
-                    "product_name": prod.product_name if prod else None,
+                    "product_no": _field("product_no"),
+                    "product_name": _field("product_name"),
+                    "category_name": _field("category_name")
+                    or (prod.category.category_name if prod and prod.category else None),
                     "face_price": prod.face_price if prod else None,
                     "quantity": it.quantity,
                     "unit_price": it.unit_price,
@@ -406,6 +484,18 @@ async def _build_content(db: AsyncSession, share_type: str, target_id: UUID) -> 
                     "subtotal": subtotal,
                     "cover_image_url": cover_image_url,
                     "scene_images": scenes,
+                    # Track C：空间位置与产品事实快照
+                    "project_space_id": (
+                        str(it.project_space_id) if it.project_space_id else None
+                    ),
+                    "floor_label": floor_label,
+                    "space_label": space_label,
+                    "material_desc": it.material_desc,
+                    "material": _field("material"),
+                    "colors": _field("colors"),
+                    "material_description": _field("material_description"),
+                    "specification": _field("specification"),
+                    "product_snapshot": snapshot or None,
                 }
             )
         return {

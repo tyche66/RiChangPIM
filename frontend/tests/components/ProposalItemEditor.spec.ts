@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import ElementPlus from 'element-plus'
-import { ElSelect } from 'element-plus'
+import { ElInput, ElSelect } from 'element-plus'
 import { createPinia, setActivePinia } from 'pinia'
 
 vi.mock('@/api', () => ({
@@ -160,5 +160,77 @@ describe('ProposalItemEditor.vue', () => {
     const emitted = wrapper.emitted('update:modelValue')
     expect(emitted![emitted!.length - 1][0]).toHaveLength(1)
     expect(emitted![emitted!.length - 1][0][0].product_id).toBe('p2')
+  })
+
+  it('renders free-form location inputs and echoes an existing binding', async () => {
+    const wrapper = mount(ProposalItemEditor, {
+      props: {
+        modelValue: [{
+          product_id: 'p3',
+          product_name: '已有商品',
+          quantity: 1,
+          floor_label: '3F',
+          space_label: '会议室',
+          project_space_id: 'space-3',
+          material_desc: '胡桃木台面',
+        }],
+      },
+      global: {
+        plugins: [createPinia(), ElementPlus],
+        renderStubDefaultSlot: true,
+      },
+    })
+
+    const floorInput = wrapper.find('input[placeholder="请输入楼层名称（可选）"]')
+    const spaceInput = wrapper.find('input[placeholder="请输入空间名称（可选）"]')
+    expect(floorInput.exists()).toBe(true)
+    expect(spaceInput.exists()).toBe(true)
+    expect((floorInput.element as HTMLInputElement).value).toBe('3F')
+    expect((spaceInput.element as HTMLInputElement).value).toBe('会议室')
+    expect(wrapper.text()).toContain('已绑定空间 ID：space-3')
+    // 材质说明是可编辑的 textarea，值不会出现在 wrapper.text() 里。
+    const materialInput = wrapper.find('textarea[placeholder="该明细的材质说明（可选）"]')
+    expect(materialInput.exists()).toBe(true)
+    expect((materialInput.element as HTMLTextAreaElement).value).toBe('胡桃木台面')
+  })
+
+  it('emits free-form floor and space labels without requiring a space tree', async () => {
+    const wrapper = mount(ProposalItemEditor, {
+      props: {
+        modelValue: [{ product_id: 'p1', quantity: 1, project_space_id: 'old-space' }],
+      },
+      global: {
+        plugins: [createPinia(), ElementPlus],
+        renderStubDefaultSlot: true,
+      },
+    })
+    const floorInput = wrapper.findAllComponents(ElInput).find(
+      (input) => input.props('placeholder') === '请输入楼层名称（可选）',
+    )
+    const spaceInput = wrapper.findAllComponents(ElInput).find(
+      (input) => input.props('placeholder') === '请输入空间名称（可选）',
+    )
+    expect(floorInput).toBeDefined()
+    expect(spaceInput).toBeDefined()
+
+    await floorInput!.setValue('  4F ')
+    await flushPromises()
+
+    // 组件是受控的：真实使用由父级 v-model 回写，连续编辑才能拿到上一次的值。
+    const afterFloor = wrapper.emitted('update:modelValue')
+    await wrapper.setProps({
+      modelValue: afterFloor![afterFloor!.length - 1][0],
+    })
+    const spaceInputAfterUpdate = wrapper.findAllComponents(ElInput).find(
+      (input) => input.props('placeholder') === '请输入空间名称（可选）',
+    )
+    await spaceInputAfterUpdate!.setValue('  新会议室 ')
+    await flushPromises()
+
+    const emitted = wrapper.emitted('update:modelValue')
+    const latest = emitted![emitted!.length - 1][0][0]
+    expect(latest.floor_label).toBe('4F')
+    expect(latest.space_label).toBe('新会议室')
+    expect(latest.project_space_id).toBeUndefined()
   })
 })

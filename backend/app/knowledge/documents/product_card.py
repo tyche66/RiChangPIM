@@ -12,6 +12,7 @@ from app.knowledge.documents.base import (
     ProductFactProvider,
     stable_content_hash,
 )
+from app.models.catalog_attribute import ProductAttributeValue
 from app.models.product import Product
 
 SENSITIVE_PRODUCT_FIELDS = {
@@ -35,6 +36,12 @@ class DatabaseProductFactProvider(ProductFactProvider):
                 selectinload(Product.brand),
                 selectinload(Product.category),
                 selectinload(Product.tags),
+                selectinload(Product.attribute_values).selectinload(
+                    ProductAttributeValue.definition
+                ),
+                selectinload(Product.attribute_values).selectinload(
+                    ProductAttributeValue.option
+                ),
             )
             .where(Product.id == product_id, Product.is_deleted.is_(False))
         )
@@ -48,11 +55,29 @@ class DatabaseProductFactProvider(ProductFactProvider):
             "brand": product.brand.brand_name if product.brand else None,
             "category": product.category.category_name if product.category else None,
             "material": product.material or None,
+            "material_description": product.material_description or None,
             "specification": product.specification or None,
             "colors": product.colors or None,
             "tags": sorted(tag.tag_name for tag in product.tags if not tag.is_deleted),
             "description": product.description or None,
         }
+        # 受治理属性（Track A）：桌形/风格/系列等以"属性: 取值"进入卡片文本，
+        # 使向量/关键词召回能命中，"弧形"不再只出现在 material 自由文本里。
+        attribute_lines: list[str] = []
+        for value in getattr(product, "attribute_values", []) or []:
+            definition = getattr(value, "definition", None)
+            option = getattr(value, "option", None)
+            if definition is None:
+                continue
+            if option is not None:
+                attribute_lines.append(f"{definition.name}: {option.label}")
+            elif value.value_text:
+                attribute_lines.append(f"{definition.name}: {value.value_text}")
+            elif value.value_num is not None:
+                attribute_lines.append(
+                    f"{definition.name}: {value.value_num}{value.unit or ''}"
+                )
+        facts["attributes"] = sorted(attribute_lines)
         # Drop empty values so content hash and chunk text stay stable.
         facts = {key: value for key, value in facts.items() if value not in (None, "", [])}
 
@@ -96,9 +121,11 @@ class DatabaseProductFactProvider(ProductFactProvider):
             "brand": "品牌",
             "category": "类目",
             "material": "材质",
+            "material_description": "材质说明",
             "specification": "规格",
             "colors": "颜色",
             "tags": "标签",
+            "attributes": "属性",
             "description": "产品描述",
             "applicable_scene": "适用场景",
         }
@@ -108,7 +135,9 @@ class DatabaseProductFactProvider(ProductFactProvider):
             "product_no",
             "brand",
             "category",
+            "attributes",
             "material",
+            "material_description",
             "specification",
             "colors",
             "tags",

@@ -97,6 +97,11 @@ const emit = defineEmits<{
 
 const currentIndex = ref(props.initialIndex)
 
+// 分享页每次点击不同缩略图都会重新打开轮播，需要跟随外部传入的起始下标
+watch(() => props.initialIndex, (val) => {
+  if (val !== undefined) currentIndex.value = val
+})
+
 const currentImage = computed(() => props.images[currentIndex.value])
 
 const close = () => {

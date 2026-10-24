@@ -203,6 +203,7 @@ async def create_project(
         budget=data.budget,
         start_date=data.start_date,
         end_date=data.end_date,
+        remark=data.remark,
         created_by=user_id,
         updated_by=user_id,
     )

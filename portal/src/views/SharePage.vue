@@ -126,6 +126,80 @@ function sceneImagesOf(item: ShareProductItem): ShareSceneImage[] {
   return (item.scene_images || []).filter((image) => Boolean(image.image_url))
 }
 
+// ---------------------------------------------------------------------------
+// Track C：按楼层/空间分组展示
+// ---------------------------------------------------------------------------
+
+interface SpaceGroup {
+  key: string
+  floor: string
+  space: string
+  items: ShareProductItem[]
+}
+
+/** 楼层/空间分组标题：优先 floor_label + space_label，缺失时归入"未指定位置"。 */
+const spaceGroups = computed<SpaceGroup[]>(() => {
+  const map = new Map<string, SpaceGroup>()
+  for (const item of items.value) {
+    const floor = (item.floor_label || '').trim()
+    const space = (item.space_label || '').trim()
+    const key = `${floor}||${space}`
+    if (!map.has(key)) {
+      map.set(key, {
+        key,
+        floor: floor || MISSING_TEXT,
+        space: space || MISSING_TEXT,
+        items: [],
+      })
+    }
+    map.get(key)!.items.push(item)
+  }
+  return [...map.values()]
+})
+
+function groupTitle(group: SpaceGroup): string {
+  if (group.floor !== MISSING_TEXT && group.space !== MISSING_TEXT) {
+    return `${group.floor} · ${group.space}`
+  }
+  if (group.floor !== MISSING_TEXT) return group.floor
+  if (group.space !== MISSING_TEXT) return group.space
+  return '未指定位置'
+}
+
+/** 材质/颜色/材质说明：快照优先，其次当前字段，缺失显示资料未提供。 */
+function materialText(item: ShareProductItem): string {
+  const snapshot = item.product_snapshot
+  const value = snapshot?.material ?? item.material
+  return value || MISSING_TEXT
+}
+
+function colorsText(item: ShareProductItem): string {
+  const snapshot = item.product_snapshot
+  const value = snapshot?.colors ?? item.colors
+  if (!value) return MISSING_TEXT
+  return String(value)
+}
+
+function materialDescText(item: ShareProductItem): string {
+  const snapshot = item.product_snapshot
+  // The salesperson's line-level note is the customer-facing source of truth.
+  // Keep the product snapshot as a fallback for legacy rows without a note.
+  const value = item.material_desc || snapshot?.material_description || item.material_description
+  return value || MISSING_TEXT
+}
+
+function specText(item: ShareProductItem): string {
+  const snapshot = item.product_snapshot
+  const value = snapshot?.specification ?? item.specification
+  return value || MISSING_TEXT
+}
+
+function categoryText(item: ShareProductItem): string {
+  const snapshot = item.product_snapshot
+  const value = snapshot?.category_name ?? item.category_name
+  return value || MISSING_TEXT
+}
+
 function openScenes(item: ShareProductItem) {
   const available = sceneImagesOf(item)
   if (!available.length) return
@@ -228,62 +302,85 @@ onMounted(load)
 
         <p v-if="!items.length" class="muted-text">这份分享暂无商品明细。</p>
 
-        <div v-else class="table-scroll">
-          <table class="compare-table share-table">
-            <thead>
-              <tr>
-                <th scope="col">商品</th>
-                <th scope="col" class="is-numeric">面价</th>
-                <th v-if="!isProposal" scope="col" class="is-numeric">单价</th>
-                <th scope="col" class="is-numeric">数量</th>
-                <th v-if="!isProposal" scope="col" class="is-numeric">税率</th>
-                <th v-if="!isProposal" scope="col" class="is-numeric">未税小计</th>
-                <th scope="col" class="is-numeric">{{ isProposal ? '行合计' : '含税小计' }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(item, index) in items" :key="item.product_id || index">
-                <td>
-                  <button
-                    type="button"
-                    class="share-product"
-                    :class="{ 'share-product--static': !sceneImagesOf(item).length }"
-                    :disabled="!sceneImagesOf(item).length"
-                    @click="openScenes(item)"
-                  >
-                    <span class="share-product__thumb">
-                      <img
-                        v-if="coverUrl(item, index)"
-                        :src="coverUrl(item, index) as string"
-                        alt=""
-                        loading="lazy"
-                        decoding="async"
-                        width="56"
-                        height="56"
-                        @error="onImageError(item, index)"
-                      />
-                      <span v-else class="share-product__fallback">{{ placeholderText(item.product_name) }}</span>
-                    </span>
-                    <span class="share-product__text">
-                      <span class="share-product__name">{{ item.product_name || MISSING_TEXT }}</span>
-                      <span class="product-code">{{ item.product_no || MISSING_TEXT }}</span>
-                      <span v-if="sceneImagesOf(item).length" class="share-product__hint">
-                        {{ sceneImagesOf(item).length }} 张场景图 · 点击查看
-                      </span>
-                    </span>
-                  </button>
-                </td>
-                <td class="is-numeric">{{ formatPrice(item.face_price) }}</td>
-                <td v-if="!isProposal" class="is-numeric">{{ formatPrice(item.unit_price) }}</td>
-                <td class="is-numeric">{{ item.quantity ?? MISSING_TEXT }}</td>
-                <td v-if="!isProposal" class="is-numeric">{{ taxRateText(item.tax_rate) }}</td>
-                <td v-if="!isProposal" class="is-numeric">{{ formatPrice(item.subtotal) }}</td>
-                <td class="is-numeric">
-                  <strong>{{ isProposal ? lineTotal(item) : taxedSubtotal(item) }}</strong>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+        <div v-else class="space-groups">
+          <section
+            v-for="group in spaceGroups"
+            :key="group.key"
+            class="space-group"
+          >
+            <header class="space-group__head">
+              <h3>{{ groupTitle(group) }}</h3>
+              <span class="section-head__count">{{ group.items.length }} 项</span>
+            </header>
+
+            <div class="table-scroll">
+              <table class="compare-table share-table">
+                <thead>
+                  <tr>
+                    <th scope="col">商品</th>
+                    <th scope="col">分类</th>
+                    <th scope="col">材质</th>
+                    <th scope="col">颜色</th>
+                    <th scope="col">材质说明</th>
+                    <th scope="col">规格</th>
+                    <th scope="col" class="is-numeric">面价</th>
+                    <th v-if="!isProposal" scope="col" class="is-numeric">单价</th>
+                    <th scope="col" class="is-numeric">数量</th>
+                    <th v-if="!isProposal" scope="col" class="is-numeric">税率</th>
+                    <th v-if="!isProposal" scope="col" class="is-numeric">未税小计</th>
+                    <th scope="col" class="is-numeric">{{ isProposal ? '行合计' : '含税小计' }}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(item, index) in group.items" :key="item.product_id || index">
+                    <td>
+                      <button
+                        type="button"
+                        class="share-product"
+                        :class="{ 'share-product--static': !sceneImagesOf(item).length }"
+                        :disabled="!sceneImagesOf(item).length"
+                        @click="openScenes(item)"
+                      >
+                        <span class="share-product__thumb">
+                          <img
+                            v-if="coverUrl(item, index)"
+                            :src="coverUrl(item, index) as string"
+                            alt=""
+                            loading="lazy"
+                            decoding="async"
+                            width="56"
+                            height="56"
+                            @error="onImageError(item, index)"
+                          />
+                          <span v-else class="share-product__fallback">{{ placeholderText(item.product_name) }}</span>
+                        </span>
+                        <span class="share-product__text">
+                          <span class="share-product__name">{{ item.product_name || MISSING_TEXT }}</span>
+                          <span class="product-code">{{ item.product_no || MISSING_TEXT }}</span>
+                          <span v-if="sceneImagesOf(item).length" class="share-product__hint">
+                            {{ sceneImagesOf(item).length }} 张场景图 · 点击查看
+                          </span>
+                        </span>
+                      </button>
+                    </td>
+                    <td>{{ categoryText(item) }}</td>
+                    <td>{{ materialText(item) }}</td>
+                    <td>{{ colorsText(item) }}</td>
+                    <td class="share-cell--wrap">{{ materialDescText(item) }}</td>
+                    <td>{{ specText(item) }}</td>
+                    <td class="is-numeric">{{ formatPrice(item.face_price) }}</td>
+                    <td v-if="!isProposal" class="is-numeric">{{ formatPrice(item.unit_price) }}</td>
+                    <td class="is-numeric">{{ item.quantity ?? MISSING_TEXT }}</td>
+                    <td v-if="!isProposal" class="is-numeric">{{ taxRateText(item.tax_rate) }}</td>
+                    <td v-if="!isProposal" class="is-numeric">{{ formatPrice(item.subtotal) }}</td>
+                    <td class="is-numeric">
+                      <strong>{{ isProposal ? lineTotal(item) : taxedSubtotal(item) }}</strong>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
         </div>
       </section>
 
@@ -296,3 +393,41 @@ onMounted(load)
     <ShareSceneDialog :images="sceneOpen ? scenes : null" @close="sceneOpen = false" />
   </main>
 </template>
+
+<style scoped>
+.space-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.space-group {
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.space-group__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--color-muted, #f5f5f5);
+  border-bottom: 1px solid var(--color-border, #e5e7eb);
+}
+
+.space-group__head h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.share-cell--wrap {
+  max-width: 260px;
+  white-space: normal;
+  word-break: break-word;
+  font-size: 13px;
+  color: var(--color-muted-foreground, #6b7280);
+}
+</style>

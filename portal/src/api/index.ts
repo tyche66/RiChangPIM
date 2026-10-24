@@ -178,6 +178,17 @@ export type ShareSceneImage = {
   sort?: number | null
 }
 
+export type ProductSnapshot = {
+  product_no?: string | null
+  product_name?: string | null
+  category_name?: string | null
+  material?: string | null
+  colors?: string | null
+  material_description?: string | null
+  specification?: string | null
+  face_price?: number | null
+}
+
 export type ShareProductItem = {
   product_id?: string
   product_no?: string | null
@@ -190,6 +201,17 @@ export type ShareProductItem = {
   subtotal?: number | null
   cover_image_url?: string | null
   scene_images?: ShareSceneImage[]
+  // Track C：空间位置与产品事实（快照优先，缺失时回落当前产品字段）
+  project_space_id?: string | null
+  floor_label?: string | null
+  space_label?: string | null
+  material_desc?: string | null
+  material?: string | null
+  colors?: string | null
+  material_description?: string | null
+  specification?: string | null
+  category_name?: string | null
+  product_snapshot?: ProductSnapshot | null
 }
 
 export type ShareProposalContent = {

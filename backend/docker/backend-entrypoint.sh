@@ -53,6 +53,13 @@ echo "[entrypoint] 写入 RBAC 种子数据（幂等，已存在则跳过）..."
 # 真实异常会由 set -e 终止容器；仅“已存在”返回 0。
 python -m app.scripts.seed_data
 
+echo "[entrypoint] 初始化内容 DNA operational Skills（幂等，旧 Skill 仅兼容回退）..."
+python -m app.scripts.seed_default_skills --apply
+
+echo "[entrypoint] 初始化属性词典种子（幂等；不回填产品属性）..."
+# SKU 属性 mapping 仍由 backfill_product_attributes --apply 单独执行。
+python -m app.scripts.seed_attribute_dictionary --apply
+
 # 启动前清理临时文件；exec 替换进程，EXIT trap 不再触发。
 cleanup
 

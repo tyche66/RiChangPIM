@@ -7,7 +7,9 @@ from app.knowledge.tools import product as product_tools
 
 def test_product_card_includes_signed_cover_image_without_exposing_it_to_model(monkeypatch):
     attachment_id = uuid4()
-    monkeypatch.setattr(product_tools, "create_access_token", lambda *_args, **_kwargs: "signed-token")
+    monkeypatch.setattr(
+        product_tools, "create_access_token", lambda *_args, **_kwargs: "signed-token"
+    )
     product = SimpleNamespace(
         id=uuid4(),
         product_no="MEET-001",
@@ -21,6 +23,7 @@ def test_product_card_includes_signed_cover_image_without_exposing_it_to_model(m
         face_price=6800,
         cost_price=4200,
         material="木饰面",
+        material_description="台面为 40mm 中纤板，封边为天然木皮",
         stock_status="in_stock",
         status="published",
         completeness_status="complete",

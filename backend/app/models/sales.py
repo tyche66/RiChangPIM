@@ -1,9 +1,56 @@
-from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    Column,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    text,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import relationship
 
 from app.models.base import CommonBase
+
+
+class ProjectSpace(CommonBase):
+    """项目空间节点（Track C）：楼层 / 房间 / 区域。
+
+    空间必须属于某个项目；没有选择项目时不可选择项目空间。
+    """
+
+    __tablename__ = "project_spaces"
+
+    project_id = Column(
+        PGUUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
+    )
+    parent_id = Column(
+        PGUUID(as_uuid=True), ForeignKey("project_spaces.id", ondelete="CASCADE"), nullable=True
+    )
+    space_type = Column(String(16), nullable=False, default="other")
+    space_name = Column(String(128), nullable=False)
+    level = Column(Integer, nullable=False, default=1)
+    sort = Column(Integer, nullable=False, default=0)
+
+    project = relationship("Project")
+    parent = relationship("ProjectSpace", remote_side="ProjectSpace.id", backref="children")
+
+    __table_args__ = (
+        CheckConstraint("space_type IN ('floor','room','zone','other')", name="ck_ps_type"),
+        CheckConstraint("level >= 1", name="ck_ps_level"),
+        Index(
+            "ix_ps_project",
+            "project_id",
+            "sort",
+            postgresql_where=text("is_deleted = false"),
+        ),
+        Index("ix_ps_parent", "parent_id", postgresql_where=text("is_deleted = false")),
+    )
 
 
 class Proposal(CommonBase):
@@ -41,9 +88,18 @@ class ProposalItem(CommonBase):
     quantity = Column(Integer, nullable=False, default=1)
     sort = Column(Integer, default=0)
     remark = Column(Text)
+    # Track C：与报价明细同构的空间字段与产品快照（可空，旧方案无需回填）
+    project_space_id = Column(
+        PGUUID(as_uuid=True), ForeignKey("project_spaces.id", ondelete="SET NULL"), nullable=True
+    )
+    floor_label = Column(String(128), nullable=True)
+    space_label = Column(String(128), nullable=True)
+    material_desc = Column(Text, nullable=True)
+    product_snapshot = Column(JSONB, nullable=True)
 
     proposal = relationship("Proposal", back_populates="items")
     product = relationship("Product")
+    space = relationship("ProjectSpace")
 
 
 class Quotation(CommonBase):
@@ -75,6 +131,15 @@ class QuotationItem(CommonBase):
     unit_price = Column(Float, nullable=False)
     tax_rate = Column(Float, default=0.13)
     subtotal = Column(Float, nullable=False)
+    # Track C：与方案明细同构的空间字段与产品快照（可空，旧报价无需回填）
+    project_space_id = Column(
+        PGUUID(as_uuid=True), ForeignKey("project_spaces.id", ondelete="SET NULL"), nullable=True
+    )
+    floor_label = Column(String(128), nullable=True)
+    space_label = Column(String(128), nullable=True)
+    material_desc = Column(Text, nullable=True)
+    product_snapshot = Column(JSONB, nullable=True)
 
     quotation = relationship("Quotation", back_populates="items")
     product = relationship("Product")
+    space = relationship("ProjectSpace")

@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     # 这个值是 APP_VERSION 没被注入时的兜底：原来写死 "0.1.0"，于是任何忘记传
     # 构建参数的部署（以及全部开发环境）都会在 /api/v1/version、/health、
     # OpenAPI 文档里报 0.1.0，和真实产品版本差了 8 个 MINOR。兜底值必须是真话。
-    VERSION: str = "1.9.3"
+    VERSION: str = "1.9.4"
     APP_VERSION: str | None = None
     BUILD_ID: str = "dev-local"
     GIT_COMMIT: str = "unknown"
@@ -95,6 +95,16 @@ class Settings(BaseSettings):
     AI_ESTIMATED_PRICE_TABLE_PATH: str | None = None
     AI_PRICING_BACKEND: str | None = None
 
+    # 内容域独立 AI 配置。内容服务只使用 chat，不使用该适配器做 embeddings。
+    CONTENT_AI_API_URL: str = "https://api.hcnsec.cn/v1"
+    CONTENT_AI_API_KEY: str | None = None
+    CONTENT_AI_API_KEY_FILE: str | None = None
+    CONTENT_AI_CHAT_MODEL: str = "step-5-preview"
+    CONTENT_AI_CHAT_MODELS: str = "step-5-preview,sensenova-6.8-flash-lite"
+    CONTENT_AI_TIMEOUT: float = 180.0
+    CONTENT_AI_ROUTE_TIMEOUT: float = 3.0
+    CONTENT_AI_MAX_RETRIES: int = 0
+
     SHARE_IMAGE_URL_EXPIRE_HOURS: int = 24
 
     # 批量导入产品（POST /api/v1/products/import）。带图导入的上传体积比纯表格大
@@ -130,6 +140,14 @@ class Settings(BaseSettings):
     def model_post_init(self, __context) -> None:
         if self.AI_API_KEY_FILE:
             self.AI_API_KEY = Path(self.AI_API_KEY_FILE).read_text(encoding="utf-8").strip()
+        if self.CONTENT_AI_API_KEY_FILE:
+            try:
+                self.CONTENT_AI_API_KEY = Path(self.CONTENT_AI_API_KEY_FILE).read_text(
+                    encoding="utf-8"
+                ).strip()
+            except (OSError, UnicodeError):
+                # 内容域缺少 key/file 时由 factory 回落 NoneAdapter，保持 fail-closed。
+                self.CONTENT_AI_API_KEY = None
 
 
 settings = Settings()

@@ -277,6 +277,18 @@
               <span class="quote-product-name">{{ item.product_name || '-' }}</span>
               <span class="quote-product-no">{{ item.product_no || '-' }}</span>
               <span class="quote-face-price">面价 ¥{{ item.face_price?.toFixed(2) ?? '-' }}</span>
+              <span
+                v-if="item.floor_label || item.space_label"
+                class="quote-space-label"
+              >
+                位置：{{ [item.floor_label, item.space_label].filter(Boolean).join(' / ') }}
+              </span>
+              <span
+                v-if="item.material_desc"
+                class="quote-material-label"
+              >
+                材质：{{ item.material_desc }}
+              </span>
             </div>
           </div>
           <div class="quote-col-qty">
@@ -407,6 +419,19 @@
                 <div>
                   <span class="product-cell-name">{{ row.product_name || '-' }}</span>
                   <span class="product-cell-no">{{ row.product_no || '-' }}</span>
+                  <span
+                    v-if="row.floor_label || row.space_label"
+                    class="product-cell-space"
+                  >
+                    {{ [row.floor_label, row.space_label].filter(Boolean).join(' / ') }}
+                  </span>
+                  <span
+                    v-if="row.material_desc || row.material_description"
+                    class="product-cell-material"
+                  >
+                    {{ row.material_desc || row.material_description }}
+                    <template v-if="row.colors"> · {{ row.colors }}</template>
+                  </span>
                 </div>
               </div>
             </template>
@@ -717,6 +742,11 @@ const handleQuotationSubmit = async () => {
         quantity: item.quantity,
         unit_price: item.unit_price,
         tax_rate: item.tax_rate,
+        // Track C：楼层/空间/材质说明随明细一起提交
+        project_space_id: item.project_space_id ?? null,
+        floor_label: item.floor_label ?? null,
+        space_label: item.space_label ?? null,
+        material_desc: item.material_desc ?? null,
       }))
       const commonPayload: QuotationUpdateRequest = {
         tax_rate: quotationForm.tax_rate,
@@ -803,6 +833,14 @@ onMounted(() => {
           product_no: item.product_no,
           face_price: item.face_price,
           cover_image_url: item.cover_image_url,
+          // Track C：楼层/空间/材质说明与产品快照一起带入报价
+          project_space_id: item.project_space_id ?? null,
+          floor_label: item.floor_label ?? null,
+          space_label: item.space_label ?? null,
+          material_desc: item.material_desc ?? null,
+          material_description: item.material_description ?? item.product_snapshot?.material_description ?? null,
+          colors: item.colors ?? item.product_snapshot?.colors ?? null,
+          specification: item.specification ?? item.product_snapshot?.specification ?? null,
         }))
         showQuotationDialog.value = true
       } catch {
@@ -816,6 +854,24 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.quote-space-label,
+.quote-material-label {
+  display: block;
+  font-size: 12px;
+  color: var(--pim-text-secondary);
+}
+
+.product-cell-space,
+.product-cell-material {
+  display: block;
+  font-size: 12px;
+  color: var(--pim-text-secondary);
+}
+
+.product-cell-material {
+  color: var(--pim-text-muted, var(--pim-text-secondary));
+}
+
 /* ===== CSS Variables ===== */
 .quotations-page {
   /* 以下别名全部指向 design-system.css 的全局语义 Token：

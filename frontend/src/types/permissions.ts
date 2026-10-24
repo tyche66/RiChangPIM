@@ -71,6 +71,7 @@ export const PERMISSIONS = [
   'content:adopt',
   'content:publish',
   'content:metric',
+  'content:manage',
   'reminder:edit',
 ] as const
 
@@ -107,7 +108,14 @@ export const RESOURCE_PERMISSIONS: Record<string, PermissionCode[]> = {
   customer: ['customer:view', 'customer:edit', 'customer:pii', 'customer:export', 'customer:transfer'],
   project: ['project:view', 'project:edit', 'project:member', 'project:asset'],
   dashboard: ['dashboard:view'],
-  content: ['content:view', 'content:generate', 'content:adopt', 'content:publish', 'content:metric'],
+  content: [
+    'content:view',
+    'content:generate',
+    'content:adopt',
+    'content:publish',
+    'content:metric',
+    'content:manage',
+  ],
   reminder: ['reminder:edit'],
 }
 
@@ -184,5 +192,6 @@ export const PERMISSION_NAMES: Record<PermissionCode, string> = {
   'content:adopt': '内容采纳',
   'content:publish': '内容发布',
   'content:metric': '内容指标',
+  'content:manage': '内容Skill管理',
   'reminder:edit': '提醒编辑',
 }

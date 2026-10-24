@@ -78,6 +78,9 @@ class Product(CommonBase):
     face_price = Column(Float, nullable=False)
     cost_price = Column(Float)
     material = Column(String(128))
+    # 材质说明：独立于 description 的受治理字段。产品"材质"与"材质说明"
+    # 不是一回事，不得把 description 当作材质说明。
+    material_description = Column(Text, nullable=True)
     stock_status = Column(String(20), default="in_stock")
     status = Column(String(20), default="draft")
     description = Column(Text)
@@ -132,6 +135,15 @@ class Product(CommonBase):
     )
     scene_images = relationship(
         "SceneImage", secondary="product_scene_image", back_populates="products"
+    )
+    attribute_values = relationship(
+        "ProductAttributeValue",
+        back_populates="product",
+        cascade="all, delete-orphan",
+        primaryjoin=(
+            "and_(Product.id == ProductAttributeValue.product_id, "
+            "ProductAttributeValue.is_deleted.is_(False))"
+        ),
     )
 
     @property

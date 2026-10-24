@@ -31,6 +31,7 @@ from app.models.content import (
     ContentMetricSnapshot,
     ContentPublication,
 )
+from app.models.content_skill import ContentTopicItem, ContentTopicRun
 from app.models.customer import Customer, CustomerDialogue, FollowUp, Requirement
 from app.models.project import Project, ProjectAsset, ProjectMember
 from app.models.reminder import Notification, Reminder
@@ -147,7 +148,14 @@ def apply_data_scope(query, *, user_id, role_code, model):
         return query.where(model.customer_id.in_(_visible_customer_ids(user_id, role_code)))
     if model in (ProjectAsset, ProjectMember):
         return query.where(model.project_id.in_(_visible_project_ids(user_id, role_code)))
-    if model in (ContentBatch, ContentItem, ContentPublication, ContentMetricSnapshot):
+    if model in (
+        ContentBatch,
+        ContentItem,
+        ContentPublication,
+        ContentMetricSnapshot,
+        ContentTopicItem,
+        ContentTopicRun,
+    ):
         return query
     if model is Reminder:
         return query.where(model.assignee_id == user_id)

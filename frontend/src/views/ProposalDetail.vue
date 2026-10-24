@@ -127,6 +127,19 @@
                 <div class="product-cell-info">
                   <span class="product-cell-name cell-strong">{{ row.product_name || '-' }}</span>
                   <span class="cell-code">{{ row.product_no || '-' }}</span>
+                  <span
+                    v-if="row.floor_label || row.space_label"
+                    class="cell-space"
+                  >
+                    {{ [row.floor_label, row.space_label].filter(Boolean).join(' / ') }}
+                  </span>
+                  <span
+                    v-if="row.material_desc || row.material_description"
+                    class="cell-material"
+                  >
+                    {{ row.material_desc || row.material_description }}
+                    <template v-if="row.colors"> · {{ row.colors }}</template>
+                  </span>
                 </div>
               </div>
             </template>
@@ -467,9 +480,13 @@ const handleEditSubmit = async () => {
         proposal_name: editForm.proposal_name,
         customer_name: editForm.customer_name,
         items: editForm.items.map((item) => ({
-          product_id: item.product_id,
+          product_id: item.product_id.trim(),
           quantity: item.quantity,
-          remark: item.remark,
+          remark: item.remark?.trim() || undefined,
+          project_space_id: item.project_space_id || undefined,
+          floor_label: item.floor_label?.trim() || undefined,
+          space_label: item.space_label?.trim() || undefined,
+          material_desc: item.material_desc?.trim() || undefined,
         })),
       })
       ElMessage.success('更新成功')
@@ -749,6 +766,18 @@ onMounted(fetchProposal)
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Track C：楼层/空间与材质说明（商品信息单元格内的次级行） */
+.cell-space,
+.cell-material {
+  display: block;
+  font-size: 12px;
+  color: var(--pim-text-secondary);
+}
+
+.cell-material {
+  color: var(--pim-text-faint);
 }
 
 /* ===== Polish Section ===== */

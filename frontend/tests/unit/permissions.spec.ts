@@ -9,7 +9,7 @@ import {
 
 describe('PERMISSIONS constant', () => {
   it('contains exactly 73 permission codes', () => {
-    expect(PERMISSIONS).toHaveLength(73)
+    expect(PERMISSIONS).toHaveLength(74)
   })
 
   it('has no duplicate codes', () => {
