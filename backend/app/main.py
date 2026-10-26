@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1 import (
     ai,
+    ai_config,
     audit,
     auth,
     categories,
@@ -167,6 +168,14 @@ def _volume_status() -> dict[str, dict[str, int | bool]]:
 async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
     # Record startup timestamp for readiness / ops-status reporting.
     _app.state.started_at = time.time()
+    # Warm the AI config cache (DB override layer) before serving traffic so the
+    # first request already resolves provider settings instead of env-only.
+    from app.services.ai_config import refresh_cache
+
+    try:
+        await refresh_cache()
+    except Exception:
+        pass
     yield
     # Release adapter-held HTTP clients (e.g. OpenAIAdapter's httpx.AsyncClient).
     from app.adapters.factory import _cached_adapter, _cached_content_adapter
@@ -210,6 +219,7 @@ app.include_router(proposals.router, prefix="/api/v1/proposals", tags=["proposal
 app.include_router(shares.router, prefix="/api/v1/shares", tags=["shares"])
 app.include_router(share_token.router, prefix="/api/v1", tags=["shares"])
 app.include_router(ai.router, prefix="/api/v1/ai", tags=["ai"])
+app.include_router(ai_config.router, tags=["ai-config"])
 app.include_router(knowledge.router, prefix="/api/v1/knowledge", tags=["knowledge"])
 app.include_router(knowledge_sources.router, prefix="/api/v1/knowledge", tags=["knowledge"])
 app.include_router(pending_actions.router, prefix="/api/v1/ai/actions", tags=["ai"])

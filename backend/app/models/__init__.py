@@ -1,4 +1,5 @@
 from app.models.ai_action import PendingAction
+from app.models.ai_config import AiProviderConfig
 from app.models.audit import AIConversation, OperationLog, Share, ShareLog, ShareToken, Visitor
 from app.models.catalog_attribute import (
     CatalogAttributeAlias,
@@ -49,6 +50,7 @@ from app.models.user import Permission, Role, RolePermission, User
 
 __all__ = [
     "AIConversation",
+    "AiProviderConfig",
     "Attachment",
     "Brand",
     "CatalogAttributeAlias",

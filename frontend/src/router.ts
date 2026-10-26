@@ -92,6 +92,16 @@ const routes = [
         meta: { permissions: ['ai:use'], permission: 'ai:use' },
       },
       {
+        path: 'ai/config',
+        name: 'AIConfigCenter',
+        component: () => import('@/views/AIConfigCenter.vue'),
+        meta: {
+          permissions: ['ai:config'],
+          permission: 'ai:config',
+          adminOnly: true,
+        },
+      },
+      {
         path: 'manuals',
         name: 'Manuals',
         component: () => import('@/views/Manuals.vue'),

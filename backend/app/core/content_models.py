@@ -9,6 +9,7 @@ the API key or any other credential.
 from __future__ import annotations
 
 from app.core.config import settings
+from app.services.ai_config import get_config
 
 
 class ContentModelNotAllowedError(ValueError):
@@ -28,9 +29,18 @@ def parse_model_allowlist(raw: str | None) -> list[str]:
 
 
 def get_content_model_catalog() -> tuple[list[str], str]:
-    """Return ``(allowed_models, default_model)`` for the content domain."""
-    allowed = parse_model_allowlist(settings.CONTENT_AI_CHAT_MODELS)
-    default_model = (settings.CONTENT_AI_CHAT_MODEL or "").strip()
+    """Return ``(allowed_models, default_model)`` for the content domain.
+
+    Resolution order: AI 配置中心的 DB 覆盖 -> 环境变量。
+    """
+    config = get_config("content")
+    allowed = list(config.chat_models)
+    default_model = (config.chat_model or "").strip()
+    if not allowed:
+        # DB 覆盖未提供白名单时回落 env，保持 fail-open。
+        allowed = parse_model_allowlist(settings.CONTENT_AI_CHAT_MODELS)
+    if not default_model:
+        default_model = (settings.CONTENT_AI_CHAT_MODEL or "").strip()
     return allowed, default_model
 
 

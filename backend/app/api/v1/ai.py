@@ -38,7 +38,9 @@ from app.schemas.ai import (
     RagSearchRequest,
     RecommendRequest,
 )
+from app.services.ai_config import get_config
 from app.services.polish import PolishService
+from app.services.ai_config import get_config
 from app.services.rag_index import RagIndexer, RagSearcher
 from app.services.recommend import RecommendService
 
@@ -504,11 +506,12 @@ async def polish_proposal(
     request_id = str(uuid.uuid4())[:8]
     start = time.perf_counter()
     adapter_type = getattr(settings, "AI_ADAPTER", None)
+    chat_model = get_config("knowledge").chat_model or settings.AI_CHAT_MODEL
     try:
-        service = PolishService(adapter, db, model=settings.AI_CHAT_MODEL)
+        service = PolishService(adapter, db, model=chat_model)
         result = await service.polish_proposal(proposal_id, current_user)
         latency_ms = int((time.perf_counter() - start) * 1000)
-        _log_ai_event("polish", adapter_type, settings.AI_CHAT_MODEL, latency_ms, "ok", request_id)
+        _log_ai_event("polish", adapter_type, chat_model, latency_ms, "ok", request_id)
         return _envelope(result)
     except AIAdapterError as exc:
         latency_ms = int((time.perf_counter() - start) * 1000)
@@ -537,8 +540,9 @@ async def recommend(
     request_id = str(uuid.uuid4())[:8]
     start = time.perf_counter()
     adapter_type = getattr(settings, "AI_ADAPTER", None)
+    chat_model = get_config("knowledge").chat_model or settings.AI_CHAT_MODEL
     try:
-        service = RecommendService(adapter, db, model=settings.AI_CHAT_MODEL)
+        service = RecommendService(adapter, db, model=chat_model)
         result = await service.recommend(
             body.requirement,
             current_user,
@@ -546,9 +550,7 @@ async def recommend(
             role_code=current_user.get("role_code"),
         )
         latency_ms = int((time.perf_counter() - start) * 1000)
-        _log_ai_event(
-            "recommend", adapter_type, settings.AI_CHAT_MODEL, latency_ms, "ok", request_id
-        )
+        _log_ai_event("recommend", adapter_type, chat_model, latency_ms, "ok", request_id)
         return _envelope(result)
     except AIAdapterError as exc:
         latency_ms = int((time.perf_counter() - start) * 1000)

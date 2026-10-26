@@ -1,4 +1,5 @@
-from app.api.v1.auth import router as auth_router
+from app.api.v1.ai import router as ai_router
+from app.api.v1.ai_config import router as ai_config_router
 from app.api.v1.brands import router as brands_router
 from app.api.v1.categories import router as categories_router
 from app.api.v1.content import router as content_router
@@ -26,6 +27,8 @@ from app.api.v1.version import router as version_router
 
 __all__ = [
     "auth_router",
+    "ai_router",
+    "ai_config_router",
     "users_router",
     "roles_router",
     "products_router",

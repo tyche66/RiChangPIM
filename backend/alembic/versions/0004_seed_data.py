@@ -116,6 +116,7 @@ PERMISSIONS = [
     ("stats:view", "统计查看", "stats", "view", "read"),
     # AI
     ("ai:use", "AI 能力使用", "ai", "use", "write"),
+    ("ai:config", "AI 配置管理", "ai", "config", "write"),
 ]
 
 # 角色 -> 权限映射；"*" 表示全部权限点

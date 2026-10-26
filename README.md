@@ -35,8 +35,8 @@ RiChangPIM 是当前这套 AI-PIM 项目的工作快照，面向产品信息管�
 | OCR 服务 | `docker/ocr/` 容器内独立服务 |
 | AI 默认状态 | `AI_ADAPTER=openai`，`AI_CHAT_MODEL=agnes-2.5-flash` |
 | Knowledge Gateway | 默认启用（`KNOWLEDGE_GATEWAY_ENABLED=1`）|
-| 当前正式版本 | v1.9.4（版本号声明位置见 [CHANGELOG.md](CHANGELOG.md)） |
-| 当前迁移 head | `0030_content_dna_fields`（链基线：生产 `0024_attachment_biz_domain_compat`）|
+| 当前正式版本 | v1.9.5（版本号声明位置见 [CHANGELOG.md](CHANGELOG.md)） |
+| 当前迁移 head | `0031_ai_provider_config`（链基线：生产 `0024_attachment_biz_domain_compat`）|
 | 生产入口 | `http://127.0.0.1:888/`（Docker nginx `888:80`；门户 / 分享页 `/share/{token}` / `/admin/` / `/api/v1/*`） |
 | 管理后台入口 | `http://127.0.0.1:888/admin/`（生产 nginx；`:888/admin` 会 301 到带尾斜杠的） |
 | 环境体检 | `bash scripts/where-am-i.sh`（**每次开工第一条命令**） |

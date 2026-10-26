@@ -12,6 +12,7 @@ from app.core.config import settings
 from app.knowledge.documents.base import KnowledgeDocumentPayload, KnowledgeDocumentUpserter
 from app.knowledge.documents.manual_provider import ProductManualKnowledgeProvider
 from app.knowledge.documents.product_card import DatabaseProductFactProvider
+from app.services.ai_config import get_config
 from app.knowledge.indexing.chunker import chunk_text
 from app.knowledge.indexing.embedder import embed_chunks
 from app.knowledge.indexing.status import KnowledgeIndexErrorCode
@@ -83,11 +84,12 @@ class KnowledgeIndexingPipeline:
     async def _embed_payload(self, payload: KnowledgeDocumentPayload) -> KnowledgeDocumentPayload:
         if isinstance(self.adapter, NoneAdapter):
             raise AIAdapterUnavailableError(KnowledgeIndexErrorCode.ADAPTER_UNAVAILABLE.value)
+        embedding_model = get_config("knowledge").embedding_model or settings.AI_EMBEDDING_MODEL
         payload.chunks = await embed_chunks(
             self.adapter,
             [chunk.finalized() for chunk in payload.chunks],
-            model_name=settings.AI_EMBEDDING_MODEL,
-            model_version=settings.AI_EMBEDDING_VERSION or settings.AI_EMBEDDING_MODEL,
+            model_name=embedding_model,
+            model_version=settings.AI_EMBEDDING_VERSION or embedding_model,
         )
         payload.index_status = "indexed"
         payload.last_indexed_at = datetime.now(UTC)

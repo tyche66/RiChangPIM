@@ -27,6 +27,10 @@ from app.models.project import Project
 from app.models.reminder import Reminder
 from app.schemas.content import MetricEntry
 from app.services.content_dna import CONTENT_OUTPUT_SCHEMA
+from app.services.content_facts import (
+    PRODUCT_FACT_OPTIONS,
+    product_fact_payload,
+)
 from app.services.content_state import derive_display_state
 from app.services.topic_service import validate_against_schema
 
@@ -53,6 +57,14 @@ _CLOSED_DAYS = 14
 
 PROMPT_VERSION = "v1"
 
+# 生成侧人格：只负责“写成像真人分享的社媒内容”。
+# 事实与合规规则由 prompt 内“只在后台执行”条款和后置守卫承担，
+# 不再借 system 角色把模型按成审核员。
+SYSTEM_PERSONA = (
+    "你是办公家具品牌内容编辑：懂办公空间，会写具体、可信、像真人分享的社媒短文案；"
+    "事实与合规规则只在后台执行，绝不写成正文口吻。"
+)
+
 OUTPUT_SCHEMA = CONTENT_OUTPUT_SCHEMA
 
 
@@ -62,16 +74,26 @@ def _build_generation_prompt(
     tone: str | None,
     products: list[dict],
 ) -> str:
-    product_facts = []
-    for p in products:
-        fact = {
-            "name": p.get("product_name", ""),
-            "specs": p.get("specs", ""),
-            "series": p.get("series", ""),
-        }
-        product_facts.append(fact)
+    """内置回退提示词：给未配置模板的 Skill 用，写作规则与 DNA Skill 保持一致。"""
+    product_facts = [dict(p) for p in products]
 
-    prompt = f"""你是新媒体内容创作助手。请根据以下信息生成内容。
+    prompt = f"""你是「办公家具」的品牌内容编辑：懂办公空间，也会写让用户愿意看完、收藏和互动的社媒内容。
+把已提供的产品事实写成有场景、有判断、像真人分享的内容；不要写成产品说明书、白皮书、企业新闻稿或合规报告。
+写作方式：
+1. 每条只讲一个最值得展开的角度；标题从场景、反差、痛点或选择判断切入，避免标题党。
+2. 正文前两句必须直接抓住人：写一个具体时刻、需求、反差观察或值得停下来看的细节。
+3. 正文使用短段，每段一至三句；优先用画面、动词、选择理由和已确认的细节，不堆砌形容词或参数。
+4. 只展开一至两个明确卖点或场景，不罗列所有资料；结尾用自然、低压力的 CTA。
+5. 平台按 platform 决定体裁，语气按 tone 调整语言；平台优先于语气。
+事实规则只在后台执行，绝不能变成正文的口吻：
+1. 规格、型号和数值必须原样准确，不可推导出未提供的性能承诺。
+2. 缺少某项事实时，删除该主张，或改写为不依赖该事实的场景、选择问题或行动建议；不要在正文解释资料不足。
+3. 不得输出价格/折扣/交期/库存承诺，不得输出客户/项目/对话等隐私信息。
+4. title、body 和 hashtags 中不得出现或变相出现“待核验”“资料不足”“免责声明”“仅供参考”“以实际为准”“需要明确的是”“无法确认”等审校或免责话术。
+输出要求：
+1. 严格只输出符合 JSON Schema 的 JSON（items 数组，每条含 title/body/hashtags），不要输出 Markdown 或解释。
+2. mentioned_products 只能引用上述产品事实中的产品名称。
+3. hashtags 只保留真正相关的话题标签，不适合时使用空数组。
 
 主题：{topic}
 平台：{platform}
@@ -79,13 +101,6 @@ def _build_generation_prompt(
 
 可引用的产品事实（仅限以下信息，禁止编造）：
 {json.dumps(product_facts, ensure_ascii=False, indent=2)}
-
-要求：
-1. 输出严格符合 JSON Schema（items 数组，每条含 title/body/hashtags）
-2. 禁止输出价格/折扣/交期/库存承诺
-3. 禁止输出客户/项目/对话等隐私信息
-4. 内容需符合广告法，避免极限词
-5. mentioned_products 只能引用上述产品事实中的产品名称
 
 输出格式：
 {json.dumps(OUTPUT_SCHEMA, ensure_ascii=False, indent=2)}"""
@@ -108,14 +123,7 @@ def build_content_prompt(
 ) -> str:
     """Render the selected content Skill without treating DNA as business facts."""
     product_facts = json.dumps(
-        [
-            {
-                "name": p.get("product_name", ""),
-                "specs": p.get("specs", ""),
-                "series": p.get("series", ""),
-            }
-            for p in products
-        ],
+        [dict(p) for p in products],
         ensure_ascii=False,
         indent=2,
     )
@@ -244,6 +252,11 @@ def _find_unverified_product_parameters(body: str, products: list[dict]) -> list
             product.get("product_no"),
             product.get("specs"),
             product.get("series"),
+            product.get("material"),
+            product.get("material_description"),
+            product.get("colors"),
+            product.get("description"),
+            *(product.get("attributes") or {}).values(),
         )
     ).casefold()
     matches = _PRODUCT_PARAMETER_PATTERN.findall(body)
@@ -365,19 +378,17 @@ class ContentService:
 
         products: list[dict] = []
         if generation_product_ids:
-            stmt = select(Product).where(
-                Product.id.in_(generation_product_ids),
-                Product.is_deleted.is_(False),
+            stmt = (
+                select(Product)
+                .where(
+                    Product.id.in_(generation_product_ids),
+                    Product.is_deleted.is_(False),
+                )
+                .options(*PRODUCT_FACT_OPTIONS)
             )
             result = await self.db.execute(stmt)
             for p in result.scalars():
-                products.append({
-                    "id": str(p.id),
-                    "product_name": p.product_name,
-                    "specs": getattr(p, "specification", None)
-                    or getattr(p, "specs", None),
-                    "series": getattr(p, "series", None),
-                })
+                products.append(product_fact_payload(p))
 
         project_facts: list[dict[str, Any]] = []
         project_fact_gap = False
@@ -464,7 +475,7 @@ class ContentService:
                 resp = await self.adapter.chat(
                     session_id=f"content_gen:{batch.id}",
                     message=prompt,
-                    history=[{"role": "system", "content": "你是新媒体内容创作助手。"}],
+                    history=[{"role": "system", "content": SYSTEM_PERSONA}],
                     stream=False,
                     model=self.model,
                 )
@@ -476,7 +487,7 @@ class ContentService:
                 resp = await self.adapter.chat(
                     session_id=f"content_gen:{batch.id}",
                     message=prompt,
-                    history=[{"role": "system", "content": "你是新媒体内容创作助手。"}],
+                    history=[{"role": "system", "content": SYSTEM_PERSONA}],
                     stream=False,
                 )
         except Exception as exc:

@@ -145,6 +145,12 @@
           <el-menu-item index="/ai-select">
             AI 选品
           </el-menu-item>
+          <el-menu-item
+            v-if="hasPerm('ai:config')"
+            index="/ai/config"
+          >
+            AI 配置中心
+          </el-menu-item>
           <el-menu-item index="/manuals">
             产品知识库
           </el-menu-item>
@@ -358,6 +364,7 @@ const routeLabels: Record<string, [string, string]> = {
   shares: ['系统管理', '分享管理'],
   logs: ['系统管理', '操作日志'],
   'ai-select': ['AI 功能', 'AI 选品'],
+  'ai/config': ['AI 功能', 'AI 配置中心'],
   manuals: ['AI 功能', '产品知识库'],
   import: ['AI 功能', '批量导入'],
   dashboard: ['客户与项目', '驾驶舱'],

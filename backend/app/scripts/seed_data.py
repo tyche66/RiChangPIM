@@ -128,6 +128,7 @@ PERMISSIONS = [
     ("content:publish", "内容发布", "content", "publish", "write"),
     ("content:metric", "内容曝光", "content", "metric", "write"),
     ("content:manage", "内容Skill管理", "content", "manage", "write"),
+    ("ai:config", "AI 配置管理", "ai", "config", "write"),
     ("reminder:edit", "提醒管理", "reminder", "edit", "write"),
 ]
 

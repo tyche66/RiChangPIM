@@ -8,6 +8,7 @@ from app.knowledge.errors import KnowledgeErrorCode, KnowledgeGatewayError
 from app.knowledge.indexing.embedding_cache import embed_one_cached
 from app.knowledge.retrieval.filters import apply_document_filters
 from app.models.knowledge import KnowledgeChunk, KnowledgeDocument
+from app.services.ai_config import get_config
 
 
 async def vector_search(
@@ -22,11 +23,12 @@ async def vector_search(
     if isinstance(adapter, NoneAdapter):
         return []
     try:
+        embedding_model = get_config("knowledge").embedding_model or settings.AI_EMBEDDING_MODEL
         vec = await embed_one_cached(
             adapter,
             query,
-            model_name=settings.AI_EMBEDDING_MODEL,
-            model_version=settings.AI_EMBEDDING_VERSION or settings.AI_EMBEDDING_MODEL,
+            model_name=embedding_model,
+            model_version=settings.AI_EMBEDDING_VERSION or embedding_model,
         )
     except Exception as exc:  # noqa: BLE001
         raise KnowledgeGatewayError(

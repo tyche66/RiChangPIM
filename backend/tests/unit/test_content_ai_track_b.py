@@ -275,7 +275,7 @@ def test_operational_schemas_and_prompts_are_local_and_fact_bounded():
     all_prompts = "\n".join(item["prompt_template"] for item in OPERATIONAL_SKILLS)
     assert "CONTENT_AI_API_KEY" not in all_prompts
     assert "sk-" not in all_prompts
-    assert "只使用给出的 PIM" in all_prompts
+    assert "事实规则只在后台执行，绝不能变成正文的口吻" in all_prompts
 
 
 @pytest.mark.asyncio

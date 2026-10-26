@@ -151,8 +151,8 @@ def test_default_content_skill_matches_builtin_prompt():
     )
     assert PROMPT_VERSION == "v1"
     assert "可引用的产品事实" in builtin
-    assert "禁止输出价格/折扣/交期/库存承诺" in builtin
-    assert "内容需符合广告法" in builtin
+    assert "事实规则只在后台执行，绝不能变成正文的口吻" in builtin
+    assert "不得输出价格/折扣/交期/库存承诺" in builtin
 
 
 def test_default_output_schema_is_preserved():

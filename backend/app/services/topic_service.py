@@ -29,26 +29,33 @@ from app.adapters.base import AIServiceAdapter
 from app.models.content_skill import ContentSkill, ContentTopicItem, ContentTopicRun
 from app.models.product import Product
 from app.services.content_dna import PILLAR_CODES
+from app.services.content_facts import PRODUCT_FACT_OPTIONS, product_fact_payload
 
 logger = logging.getLogger(__name__)
 
 # 与服务层提示词同一套占位符：{topic}/{platform}/{tone}/{product_facts}/
 # {output_schema}/{requested_count}
-DEFAULT_TOPIC_PROMPT = """你是新媒体选题助手。请根据以下信息生成可执行的选题清单。
+DEFAULT_TOPIC_PROMPT = """你是办公家具品牌的选题助手：挑出具体、可执行、值得做的内容角度，生成可执行的选题清单。
+不要写成行业报告、产品说明或参数罗列。
+选题判断标准：
+1. 每条选题只聚焦一个具体办公场景问题、选择判断、常见误解或细节发现。
+2. title 要像一个内容标题：带场景、人群或反差，让人想点进来；不要堆型号和参数。
+3. angle 写清这条内容具体讲什么、给读者一个什么可执行的判断；不要写抽象概念或口号。
+4. audience 写具体人群和处境；reason 说明为什么现在值得做；suggested_platform 只从给定平台里选。
+5. related_product_ids 只能引用上面给出的产品 ID；标题不超过 30 字。
+事实规则只在后台执行，绝不能变成选题的口吻：
+1. 只使用给出的产品事实；规格、型号和数值必须原样准确，不可推导出未提供的性能承诺。
+2. 缺少某项事实时，把该角度改成不依赖该事实的问题或行动建议；不要在 title/angle/audience/reason 里写“待核验”“资料不足”“无法确认”等字样，核验缺口只写 verification_gaps。
+3. 不得编造产品不存在的能力，不得编造价格、折扣、库存、交期、材质、认证、排名、客户评价、案例、功效或售后；不得使用绝对化、夸大化承诺。
+4. 严格只输出符合 output_schema 的 JSON，不要输出 Markdown、代码围栏或解释。
 
 主题：{topic}
 平台：{platform}
 风格：{tone}
+数量：{requested_count}
 
 可参考的产品事实（仅限以下信息，禁止编造）：
 {product_facts}
-
-要求：
-1. 输出严格符合 JSON Schema（items 数组，每条含 title/angle/audience）
-2. 每个选题必须给出差异化角度与目标人群
-3. 禁止编造产品不存在的能力
-4. related_product_ids 只能引用上面给出的产品 ID
-5. 标题不超过 30 字
 
 输出格式：
 {output_schema}
@@ -257,16 +264,7 @@ def build_topic_prompt(
     template = (skill.prompt_template or "").strip() or DEFAULT_TOPIC_PROMPT
     output_schema = skill.output_schema or TOPIC_OUTPUT_SCHEMA
     product_facts = json.dumps(
-        [
-            {
-                "id": p.get("id"),
-                "name": p.get("product_name"),
-                "product_no": p.get("product_no"),
-                "specs": p.get("specification"),
-                "series": p.get("series"),
-            }
-            for p in products
-        ],
+        [dict(p) for p in products],
         ensure_ascii=False,
         indent=2,
     )
@@ -441,20 +439,13 @@ class TopicService:
     async def _load_products(self, product_ids: list[Any]) -> list[dict[str, Any]]:
         if not product_ids:
             return []
-        stmt = select(Product).where(
-            Product.id.in_(product_ids), Product.is_deleted.is_(False)
+        stmt = (
+            select(Product)
+            .where(Product.id.in_(product_ids), Product.is_deleted.is_(False))
+            .options(*PRODUCT_FACT_OPTIONS)
         )
         result = await self.db.execute(stmt)
-        return [
-            {
-                "id": str(p.id),
-                "product_name": p.product_name,
-                "product_no": p.product_no,
-                "specification": getattr(p, "specification", None),
-                "series": getattr(p, "series", None),
-            }
-            for p in result.scalars()
-        ]
+        return [product_fact_payload(p) for p in result.scalars()]
 
     async def generate(
         self,
