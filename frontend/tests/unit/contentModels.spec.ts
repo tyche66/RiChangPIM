@@ -47,9 +47,11 @@ describe('content model API contract', () => {
       model_name: 'sensenova-6.8-flash-lite',
     })
 
+    // 第三个参数是内容生成的 305s 超时配置，一并锁定防止回归。
     expect(mocks.post).toHaveBeenCalledWith(
       '/content/batches',
       expect.objectContaining({ model_name: 'sensenova-6.8-flash-lite' }),
+      { timeout: 305000 },
     )
   })
 
@@ -62,6 +64,7 @@ describe('content model API contract', () => {
     expect(mocks.post).toHaveBeenCalledWith(
       '/content/topics/runs',
       expect.objectContaining({ model_name: 'sensenova-6.8-flash-lite' }),
+      { timeout: 305000 },
     )
   })
 
@@ -75,6 +78,7 @@ describe('content model API contract', () => {
     expect(mocks.post).toHaveBeenCalledWith(
       '/content/batches',
       expect.not.objectContaining({ model_name: expect.anything() }),
+      { timeout: 305000 },
     )
   })
 })
