@@ -9,12 +9,12 @@
 1.9.2-V-Log.md[SV4T]: F:v1.9.2版本日志：AI门户查询区三缺陷修复、双端暗色语义token化、非Docker本地一键栈 | R:code:CHANGELOG.md | A:- | S:annotated tag指向发布commit而非其后两个main提交；主题键升级后老用户会回亮色一次
 1.9.3-V-Log.md[SV6T]: F:v1.9.3版本日志：CRM-Lite全模块（客户/项目/看板/内容工坊/提醒）、16权限码与7个管理视图 | R:code:CHANGELOG.md | A:- | S:customers/projects表由启动入口create_all创建而非迁移；无worker或FEATURE_REMINDER=false则提醒不触发
 AGENTS.md[SG6S]: F:AOCI受管AGENTS区块：仓库认知接入规则、rules/overview/maintain入口、维护收尾与结构化状态处理 | R:- | A:- | S:本区块只定接入原则，机器判据以工具Schema/Guide/Validator为准；Entry语义禁止按文件名或AST推导
-CHANGELOG.md[SV6L]: F:版本日志与版本号唯一现值来源：7处发版锚点、自动派生项、v1.0.1至v1.9.5各版变更与验证记录 | R:code:README.md,code:AI-Docs/README.md | A:- | S:改版本号必须7处全改并以本文件为现值；BUILD_LOG/PROJECT_MANAGEMENT/TODO已发布条目属历史记录不得改写
+CHANGELOG.md[SV6L]: F:版本日志与版本号唯一现值来源：7处发版锚点、自动派生项、v1.0.1至v1.9.5各版变更与验证记录（v1.9.5含发布后修复段） | R:code:README.md,code:AI-Docs/README.md | A:- | S:改版本号必须7处全改并以本文件为现值；BUILD_LOG/PROJECT_MANAGEMENT/TODO已发布条目属历史记录不得改写
 README.md[SG6L]: F:项目总览：三部分结构与端口、快速开始、配置说明、数据存储、产品信息索引、测试与文档地图，头部表格声明当前版本与迁移head | R:code:CHANGELOG.md,code:README-OPS.md,code:HANDOFF.md | A:- | S:生产后台入口是:888/admin/而非/dev；当前迁移head随版本走必须与CHANGELOG一致
 RELEASE_GATE.md[SV6S]: F:发布门禁：工程质量、功能数据、浏览器、运行恢复、性能阈值、安全、生产回归与GO判定流程 | R:code:CHANGELOG.md,code:scripts/release_gate.sh | A:- | S:任一门禁失败即NO-GO不接受条件式发布；0001-0009历史迁移哈希锁定不得改；最终GO需协调人书面签字
 BUILD_LOG.md[SV5M]: F:构建日志：v1.9.1当前状态、V1.8.0与V1-AI Pilot阶段任务完成表、MVP-RC验收记录与前后端测试统计 | R:code:CHANGELOG.md,code:PROJECT_MANAGEMENT.md | A:- | S:BUILD_LOG只在大版本更新，当前版本以CHANGELOG.md为准；V1-AI Pilot判定NO-GO，MVP-RC的GO结论不变
 HANDOFF.md[SG5M]: F:交接文档：三部分结构与端口、WSL环境启动、后台代码地图、设计规范、质量门禁基线与部署红线 | R:code:README.md,code:RELEASE_GATE.md | A:- | S:后台生产入口是/admin/不是根路径；真正的stores目录是src/stores/而非src/store/；生产库应为用户7/商品15量级，本机空同名ai_pim库会致口令全部判错
-MIGRATION_BUNDLE.md[SO5M]: F:全量备份迁移包文档：包内结构、打包八步、恢复顺序、sha256校验、保密要求与已知限制 | R:code:README-OPS.md,code:README.md | A:- | S:迁移包放仓库外/home/AI-PIM/绝不入git；v1.9.1起包根必须含<version>-V-Log.md；数据与凭据不进包
+MIGRATION_BUNDLE.md[SO5M]: F:全量备份迁移包文档：历史包与当前包表、包内结构、打包步骤、恢复顺序、sha256校验、保密要求与已知限制 | R:code:README-OPS.md,code:README.md | A:- | S:迁移包放仓库外/home/AI-PIM/绝不入git；恢复以包内MIGRATION_README为准；权威数据源是data/db/*.dump而非卷归档
 PROJECT_MANAGEMENT.md[SV4M]: F:项目管理：MVP-RC至V1.8.0阶段结论、任务分配表、MVP-RC验证快照、Git与代码规范、部署清单 | R:code:BUILD_LOG.md,code:TODO.md | A:- | S:容器启动自动执行migrate→init_admin→seed_data→uvicorn，任一步失败即非零退出不提供服务
 TODO.md[SV4T]: F:开发TODO：当前版本状态、V1.2工作包M1-M4进度、V1-AI Pilot未完成项与P1/P2改进项 | R:code:PROJECT_MANAGEMENT.md,code:BUILD_LOG.md | A:- | S:RC全量门禁与35-40项生产回归扩展未完成；seed_scale.py强制URL含seed/test标记永不写生产
 README_EN.md[SG4S]: F:英文项目总览：v1.9.1快照、三部分栈与端口、快速开始、存储、API文档、测试与安全约定 | R:code:README.md,code:RELEASE_GATE.md | A:- | S:英文版版本与迁移head停在v1.9.1/0017已过期，以CHANGELOG.md与README.md为准
@@ -24,7 +24,7 @@ docker-compose.dev.yml[OD4T]: F:开发依赖编排：postgres(发布5432)/redis/
 docker-compose.worker.yml[OW4T]: F:worker覆盖编排：与backend同镜像跑app.scripts.worker，提醒引擎参数全env化，健康检查看/tmp/worker_heartbeat 180s内 | R:code:backend/app/scripts/worker.py,code:docker-compose.yml | A:- | S:与生产compose叠加使用；DB池默认5；心跳mtime<180s才健康
 版本控制规范和Git.md[SG5S]: F:版本控制规范：语义化版本、单一事实来源(CHANGELOG顶部加7处手改清单)、分支策略(feature/fix/hotfix/release)、Conventional Commits与日常工作流 | R:code:CHANGELOG.md,code:scripts/build_frontends.sh | A:- | S:派生值不许手写；BUILD_TIME必须TZ=Asia/Shanghai而备份脚本继续用UTC；compose的默认APP_VERSION会压掉config兜底；脚本口令必须与生产不同组
 1.9.4-V-Log.md[SV6T]: F:v1.9.4版本日志：属性检索、内容Skills与独立选题、方案空间与客户展示三组能力及三项验收期界面修复 | R:code:CHANGELOG.md | A:- | S:自v1.9.1起全量迁移包根目录必须包含<version>-V-Log.md；只记录已发布内容，目标能力不得写入
-UPDATE_README.md[SV5T]: F:v1.9.5增量升级包说明：本版改动、迁移head前进到0031、五步升级命令与升级后AI配置行为 | R:code:CHANGELOG.md,code:MIGRATION_BUNDLE.md | A:- | S:只描述单版增量升级，区别于全量迁移包；升级前必须pg_dump备份；包内不含数据与凭据
+UPDATE_README.md[SV5M]: F:v1.9.5增量升级包说明：本版改动、发布后修复段、迁移head前进到0031、五步升级命令与升级后AI配置行为 | R:code:CHANGELOG.md,code:MIGRATION_BUNDLE.md | A:- | S:只描述单版增量升级，区别于全量迁移包；升级前必须pg_dump备份；包内不含数据与凭据
 check_len.sh[XZ1T]: F:调试脚本：对5个后端文件输出超100字符的行及行号 | R:code:backend/app/knowledge/tools/product.py | A:- | S:硬编码文件清单与100字符阈值对齐ruff；cd backend失败即exit 9
 dump_lines.sh[XZ1T]: F:调试脚本：按硬编码行号dump约20个后端源码片段 | R:code:backend/app/api/v1/files.py | A:- | S:行号是快照会随代码漂移；cd backend失败即exit 9
 e2e_round.sh[XQ1T]: F:E2E基线脚本：chromium加Mobile Chrome跑3轮，记录失败与耗时到/tmp/e2e-baseline.log | R:code:frontend/playwright.config.ts | A:- | S:E2E_PORT=5199避开占用；nvm node路径硬编码只在本机有效
@@ -40,6 +40,7 @@ v_check.sh[XZ1T]: F:验证脚本：V-01~V-12加G0若干项的grep/psql抽查(JWT
 v_db.sh[XZ1T]: F:数据库核查脚本：经生产postgres容器查pending_action CHECK、alembic_version长度、扩展与版本 | R:code:backend/app/models/ai_action.py | A:- | S:连生产容器但只读查询；无set -e容错继续；DOCKER_HOST需先导出
 回收站_tmp_baseline_fe.sh[XQ1T]: F:回收的临时基线脚本：顺序跑vue-tsc/vitest/eslint写/tmp/fe-baseline.log并汇总退出码 | R:code:frontend/package.json | A:- | S:注释自述跑完即弃；tee让退出码混入日志；nvm路径硬编码
 回收站_tmp_baseline_portal.sh[XQ1T]: F:回收的临时基线脚本：portal vite build写/tmp/portal-build.log并打印退出码 | R:code:portal/package.json | A:- | S:注释自述跑完即弃；无版本注入属裸构建；日志在/tmp重启即失
+1.9.5-V-Log.md[SV5M]: F:v1.9.5版本日志：AI配置中心、内容生成质量改造、发布后三项修复、兼容性与升级注意事项、全量包与更新包边界 | R:code:CHANGELOG.md,code:MIGRATION_BUNDLE.md | A:- | S:自v1.9.1起全量迁移包根目录必须含<version>-V-Log.md；只记录已发布内容，目标能力不得写入
 
 ===/home/AI-PIM/RiChangPIM/.github/workflows/===
 ci.yml[OV7M]: F:CI流水线：构建元数据派生、后端ruff/compileall/pytest/pip-audit、迁移0001-0009哈希锁定、前端typecheck/lint/vitest/build/audit、portal与backend镜像构建、compose校验 | R:code:scripts/gate.sh | A:- | S:版本派生链tag>describe>frontend/package.json禁止写死；BUILD_TIME强制Asia/Shanghai；集成测试凭据只来自service容器
@@ -116,7 +117,7 @@ env.py[PD5T]: F:Alembic迁移环境：导入全部模型作为target_metadata，
 0028_project_spaces.py[PD6S]: F:Track C方案空间：project_spaces空间树，proposal_item/quotation_item加空间归属与产品快照列 | R:code:backend/alembic/versions/0027_content_skills.py | A:- | S:新增列全部可空旧数据无需回填；material_description已在0026引入不重复
 0029_project_remark.py[PD4T]: F:补齐projects.remark列，修复POST /projects因缺列在_project_to_dict上AttributeError | R:code:backend/app/models/project.py | A:- | S:纯增量可空不回填；ORM已序列化remark但迁移遗漏属于模型-迁移漂移
 0030_content_dna_fields.py[PD5T]: F:给content_skills/topic_items/content_items补source_dna、pillar_code与verification_gaps列的增量迁移 | R:code:backend/app/services/content_dna.py | A:- | S:_add只在缺列时执行保证幂等；verification_gaps用JSONB默认'[]'旧行不回填
-0031_ai_provider_config.py[PD6T]: F:AI配置中心：新建ai_provider_config表并用NOT EXISTS插入ai:config权限码 | R:code:backend/app/services/ai_config.py | A:- | S:表是覆盖层，行缺失或字段为空即回落环境变量；downgrade先删权限再删表；权限码须与seed_data和0004三处一致
+0031_ai_provider_config.py[PD6T]: F:AI配置中心：新建ai_provider_config表并用NOT EXISTS插入ai:config权限码（列名为perm_code/perm_name） | R:code:backend/app/services/ai_config.py | A:- | S:表是覆盖层，行缺失或字段为空即回落环境变量；downgrade先删权限再删表；权限码须与seed_data和0004三处一致
 
 ===/home/AI-PIM/RiChangPIM/backend/app/adapters/===
 base.py[IA6S]: F:AI适配器抽象基类：chat/chat_stream/embed/embed_one/parse_tool_calls/manage_session/aclose七契约，统一响应六字段与五种流事件 | R:code:backend/app/adapters/openai.py,code:backend/app/adapters/none.py | A:- | S:chat()必须返回全部六键即使值为空；流事件error为终态不再有后续帧；适配器不做权限与业务校验
@@ -347,7 +348,7 @@ Dockerfile[FV1T]: F:nginx镜像：COPY default.conf、portal/dist→portal目录
 nginx.conf[ON4S]: F:nginx主配置(双server)：80端口HTTP全套路由加443 SSL(自签证书/TLS1.2加1.3)，share仍alias后台目录(旧配置) | R:code:docker/nginx/conf.d/default.conf,code:docker/nginx/Dockerfile | A:- | S:未被Dockerfile引用，default.conf才是现役；share alias指admin是过时补丁
 
 ===/home/AI-PIM/RiChangPIM/docker/nginx/conf.d/===
-default.conf[ON5S]: F:生产路由：/→门户SPA、/admin/→后台产物(alias加301补斜杠)、/api/与/health反代backend、AI chat与knowledge query关buffering | R:code:docker-compose.yml | A:- | S:产品导入location的client_max_body_size必须与后端512MB上限一致否则413；反代不回显上游错误体
+default.conf[ON5S]: F:生产路由：/→门户SPA、/admin/→后台产物(alias加301补斜杠)、/api/与/health反代backend、AI chat与knowledge query关buffering；map按URI发SPA缓存头 | R:code:docker-compose.yml | A:- | S:入口HTML一律no-cache重新校验，/admin/assets/与/assets/长缓存immutable，否则发版后旧index.html引用失效chunk致白屏；产品导入location须与后端512MB上限一致
 
 ===/home/AI-PIM/RiChangPIM/docker/ocr/===
 app.py[OL3T]: F:本地OCR服务：/health报tesseract版本、/ocr/pdf用pdftoppm 200dpi转图加tesseract chi_sim+eng识别，限50MB/50页，临时目录落盘 | R:code:backend/app/services/ocr.py,code:docker/ocr/Dockerfile | A:- | S:单页识别超时60s整体300s；超限422带原因；chi_sim语言包必须装在镜像里
@@ -442,7 +443,7 @@ p2-rag-report.json[OO2T]: F:P2-RAG评测报告：suite/total/product_entity_prec
 package.json[FV4T]: F:前端依赖与脚本：vue3加element-plus加pinia加router加axios加echarts加qrcode，dev/build/test脚本；version=1.9.5是版本锚点 | R:code:CHANGELOG.md,code:frontend/src/config/version.ts | A:- | S:version是版本号唯一锚点，发版须与CHANGELOG/portal/backend VERSION四处一致
 index.html[FU1T]: F:后台SPA入口：zh-CN、#app挂载、/src/main.ts模块脚本、图标public/RiChangPIM.png | R:code:frontend/src/main.ts,code:scripts/build_frontends.sh | A:- | S:base由VITE_BASE_PATH构建期决定；无内联样式
 playwright.config.ts[FQ3T]: F:E2E配置：testDir=tests/e2e、fullyParallel=false、chromium加Mobile Chrome双项目、webServer起npm run dev、E2E_PORT可换端口 | R:code:frontend/tests/e2e/helpers.ts,code:HANDOFF.md | A:- | S:reuseExistingServer非CI复用错误服务；strictPort必须带
-package-lock.json[FV3L]: F:前端依赖锁文件(npm lockfile v3)：钉死全部直接/传递依赖版本与完整性哈希，保证npm ci可复现构建 | R:code:frontend/package.json,code:portal/package-lock.json | A:- | S:改dependencies后必须同步重生成锁文件否则npm ci失败
+package-lock.json[FV3L]: F:前端依赖锁文件(npm lockfile v3)：钉死全部直接/传递依赖版本与完整性哈希，保证npm ci可复现构建 | R:code:frontend/package.json,code:portal/package-lock.json | A:- | S:顶层version必须与package.json一致，否则npm ci因版本不一致失败
 vite.config.ts[FV4T]: F:Vite配置：base取VITE_BASE_PATH、@别名、dev端口5173与/api代理(目标可覆盖)、preview allowedHosts含tailscale域名、manualChunks五分包(vue/element-plus/vendor/echarts) | R:code:scripts/build_frontends.sh,code:frontend/package.json | A:- | S:版本四元组从env补齐；代理默认8000本机不可用；allowedHosts写死tailscale域名
 vitest.config.ts[FQ2T]: F:Vitest配置：jsdom环境，只收tests/unit与tests/components的spec | R:code:frontend/tsconfig.json,code:frontend/package.json | A:- | S:不收e2e目录；无coverage配置；别名与vite一致
 tsconfig.json[FV3T]: F:TS配置：strict加noUnusedLocals/Parameters、bundler解析、@别名、只include src下的ts/tsx/vue | R:code:frontend/tsconfig.node.json,code:frontend/vite.config.ts | A:- | S:tests目录不在include内，vue-tsc不检查spec；noEmit纯类型检查
@@ -475,7 +476,7 @@ project.ts[IB4S]: F:项目域API：CRUD、成员、图纸资产(两步上传：�
 dashboard.ts[IB3S]: F:驾驶舱API：overview/funnel/sales/todos/content五端点，MetricValue带value可null加empty_reason、ConfirmedAmount带visible开关 | R:code:backend/app/api/v1/dashboard.ts,code:frontend/src/components/EmptyMetric.vue | A:- | S:无数据必须null加empty_reason禁0占位；金额visible=false不渲染
 reminder.ts[IB3T]: F:提醒/通知API：列表、done/snooze(until参数)/cancel、通知列表与批量已读(ids或all) | R:code:backend/app/api/v1/reminders.ts,code:frontend/src/components/TodoDrawer.vue | A:- | S:列表是list/total非分页；snooze的until走query；需reminder:edit
 content.ts[IB4M]: F:内容工坊API：批次生成/详情、条目详情/编辑、adopt/reject/produce/duplicate/publish动作、指标录入与Excel导入；对齐后端content.py端点 | R:code:frontend/src/views/ContentWorkshop.vue | A:- | S:生成与选题创建带305s超时配置；列表/编辑端点后端未提供时落空态；display_state是派生字段
-aiConfig.ts[IB4S]: F:AI配置中心前端API：读取两个scope配置、局部更新、连通性探测，类型含掩码字段 | R:code:frontend/src/api/index.ts | A:- | S:仅admin可用，非admin会吃到403统一toast；密钥只读掩码不得在本地缓存明文
+aiConfig.ts[IB4S]: F:AI配置中心前端API：读取两个scope配置、局部更新、连通性探测，类型含掩码字段 | R:code:frontend/src/api/index.ts | A:- | S:拦截器已剥一层，resp即envelope勿写resp.data.data；密钥只读掩码
 
 ===/home/AI-PIM/RiChangPIM/frontend/src/types/===
 sales.ts[IB3M]: F:销售域类型：Proposal/ProposalItem、Quotation/QuotationItem、Share请求与结果；富化字段(product_name/line_total/cover_image)与分页封装 | R:code:frontend/src/api/index.ts | A:- | S:富化字段可能缺失必须可空；分页结构与后端envelope一致
@@ -550,7 +551,7 @@ package.json[FV3T]: F:门户依赖：vue/router/pinia三件(无UI库)、dev/buil
 playwright.config.ts[FQ2T]: F:门户E2E配置：testDir=tests/e2e、baseURL 127.0.0.1:5174、desktop加mobile双项目、webServer起dev | R:code:portal/tests/e2e/portal.spec.ts,code:HANDOFF.md | A:- | S:固定5174与后台错开；reuseExistingServer=true
 vite.config.ts[FV2T]: F:门户Vite配置：@别名、dev端口5174、/api代理(目标可覆盖)、outDir dist | R:code:portal/package.json,code:docker/nginx/conf.d/default.conf | A:- | S:无manualChunks门户体量小；无版本元数据注入；代理默认8000
 tsconfig.json[FV2T]: F:门户TS配置：strict、bundler解析、@别名、include src的ts/vue、noEmit | R:code:portal/vite.config.ts,code:frontend/tsconfig.json | A:- | S:无noUnusedLocals比后台宽松；tests不在include
-package-lock.json[FV3L]: F:门户依赖锁文件(npm lockfile)：钉死vue/router/pinia与dev依赖版本，保证npm ci可复现 | R:code:portal/package.json,code:frontend/package-lock.json | A:- | S:改dependencies后必须同步重生成锁文件否则npm ci失败
+package-lock.json[FV3L]: F:门户依赖锁文件(npm lockfile)：钉死vue/router/pinia与dev依赖版本，保证npm ci可复现 | R:code:portal/package.json,code:frontend/package-lock.json | A:- | S:顶层version必须与portal/package.json一致，两处版本锚点必须同号
 tsconfig.node.json[FV1T]: F:配置文件TS工程：覆盖vite/playwright等config文件的类型检查 | R:code:portal/tsconfig.json,code:portal/vite.config.ts | A:- | S:与主tsconfig拆分；composite供references
 
 ===/home/AI-PIM/RiChangPIM/portal/src/===
@@ -660,13 +661,6 @@ security_eval.py[IS2T]: F:P2安全离线评测：只跑expected_reject样本，R
 product_attribute_mapping.json[FD4T]: F:业务确认的产品属性回填mapping：三个弧形会议桌SKU到shape=arc的对应关系与来源标记 | R:code:backend/app/scripts/backfill_product_attributes.py | A:- | S:必须由业务确认后维护；解析器不从这里之外推断桌形；_version变更需同步回填脚本
 
 ===/home/AI-PIM/RiChangPIM/回收站/===
-1.9.5-V-Log.md[SV4T]: F:已回收的v1.9.5版本日志草稿：AI配置中心与内容质量改造的记录 | R:code:CHANGELOG.md | A:- | S:回收站内为草稿不参与发布；正式记录以CHANGELOG的v1.9.5节为准
-UPDATE_README-1.9.5.md[SV4T]: F:已回收的v1.9.5更新包说明草稿 | R:code:UPDATE_README.md | A:- | S:回收站内为草稿；正式更新包说明以仓库根UPDATE_README.md为准
-ai_config_smoke.py[XZ1T]: F:临时冒烟脚本：验证AI配置中心导入、路由注册、content模型目录与密钥掩码 | R:code:backend/app/services/ai_config.py | A:- | S:一次性调试产物已弃用；正式覆盖见tests/unit/test_ai_config.py
 build-frontends.sh[XV3S]: F:已回收的前端构建脚本草稿：构建后台与门户并输出版本元数据 | R:code:scripts/build_frontends.sh | A:- | S:回收站内为草稿；正式构建以scripts/build_frontends.sh为准
-fe_gate.sh[XQ1T]: F:临时门禁脚本：前端vue-tsc加eslint全量校验并写日志 | R:code:frontend/package.json | A:- | S:一次性调试产物已弃用；结论以正式gate为准
-fe_mine.sh[XQ1T]: F:临时门禁脚本：只校验本次改动的5个前端文件 | R:code:frontend/src/views/AIConfigCenter.vue | A:- | S:一次性调试产物已弃用
-fe_vitest.sh[XQ1T]: F:临时门禁脚本：前端unit目录vitest全量运行 | R:code:frontend/package.json | A:- | S:一次性调试产物已弃用
 node-in-container.sh[XZ1T]: F:一次性脚本：在容器内定位node可执行路径 | R:code:docker-compose.yml | A:- | S:调试产物已弃用；nvm路径随环境变化
-prompt_render_smoke.py[XZ1T]: F:临时冒烟脚本：渲染内容工坊新模板并核对占位符替换与合规条款命中 | R:code:backend/app/services/content_dna.py | A:- | S:一次性调试产物已弃用；正式覆盖见tests/unit/test_content_facts.py
 
