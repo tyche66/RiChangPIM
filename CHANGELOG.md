@@ -43,6 +43,11 @@
 - 产品事实扩展到 12 字段（品类/品牌/材质/材质说明/颜色/描述/受治理属性），仅保留可信来源属性值，`ai_inferred` 未确认的丢弃；`face_price`/`stock_status`/`data_source` 等一律不进提示词。
 - `--refresh` 种子模式：用代码模板原地刷新已存在的运营 Skill（原模式对已存在行只跳过）。
 
+### 发布后修复（并入 v1.9.5）
+- **迁移 0031 列名错误**：向 `permission` 插 `ai:config` 时用了不存在的 `code`/`name` 列，backend 启动即崩；已改为真实的 `perm_code`/`perm_name`，与 `0020_crm_perms` 写法对齐。
+- **AI 配置中心页面空白**：前端 `src/api/aiConfig.ts` 多读了一层 envelope（`resp.data.data`），恒取到空数组；已改为仓库约定的 `resp.data`。
+- **发布后白屏（须刷新才好）**：nginx 原本完全不发 `Cache-Control`，浏览器 heuristic 缓存旧 `index.html`，代码更新后旧入口 chunk 名 404。现入口 HTML 一律 `no-cache` 重新校验，带内容哈希的 `/admin/assets/` 与 `/assets/` 为 `public, max-age=31536000, immutable`。
+
 ## v1.9.4 — 2026-10-23
 
 本版本合并三组能力：产品属性检索、内容 Skills/独立选题、方案空间与客户展示；同时把本地迁移链对齐到生产 `0024_attachment_biz_domain_compat` 基线，避免服务器升级时 revision 不识别。发布前并入一组界面修复：内容工坊改用「创作 Skills」口径、新增方案弹窗重排、分享页商品详情改为点击弹窗。

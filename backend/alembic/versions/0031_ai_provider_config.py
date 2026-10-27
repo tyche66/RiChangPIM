@@ -52,11 +52,11 @@ def upgrade() -> None:
     for code, name, resource, action, ptype in NEW_PERMISSIONS:
         bind.execute(
             sa.text(
-                "INSERT INTO permission (id, code, name, resource, action, type, "
+                "INSERT INTO permission (id, perm_code, perm_name, resource, action, type, "
                 "create_time, update_time, is_deleted) "
                 "SELECT gen_random_uuid(), :code, :name, :resource, :action, :type, "
                 "now(), now(), false "
-                "WHERE NOT EXISTS (SELECT 1 FROM permission WHERE code = :code)"
+                "WHERE NOT EXISTS (SELECT 1 FROM permission WHERE perm_code = :code)"
             ),
             {"code": code, "name": name, "resource": resource, "action": action, "type": ptype},
         )
@@ -64,5 +64,5 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     bind = op.get_bind()
-    bind.execute(sa.text("DELETE FROM permission WHERE code = 'ai:config'"))
+    bind.execute(sa.text("DELETE FROM permission WHERE perm_code = 'ai:config'"))
     op.drop_table("ai_provider_config")

@@ -50,20 +50,28 @@ export interface AiConfigTestResult {
   detail: string | null
 }
 
+/**
+ * 约定：`@/api` 的响应拦截器已经做了 `response => response.data`，
+ * 所以运行时拿到的就是后端 envelope `{code, data}`，业务字段在 `.data` 下。
+ * 类型上沿用 api/content.ts 的做法显式 as 一次（axios 的泛型是 AxiosResponse<T>）。
+ */
+
 export async function fetchAiConfig(): Promise<AiConfigItem[]> {
-  const resp = await api.get<ApiEnvelope<{ items: AiConfigItem[] }>>('/ai/config')
-  return resp.data.data?.items ?? []
+  const resp = (await api.get('/ai/config')) as unknown as ApiEnvelope<{
+    items: AiConfigItem[]
+  }>
+  return resp.data?.items ?? []
 }
 
 export async function updateAiConfig(
   scope: AiConfigScope,
   payload: AiConfigUpdatePayload,
 ): Promise<AiConfigItem> {
-  const resp = await api.put<ApiEnvelope<AiConfigItem>>(`/ai/config/${scope}`, payload)
-  return resp.data.data
+  const resp = (await api.put(`/ai/config/${scope}`, payload)) as unknown as ApiEnvelope<AiConfigItem>
+  return resp.data
 }
 
 export async function testAiConfig(scope: AiConfigScope): Promise<AiConfigTestResult> {
-  const resp = await api.post<ApiEnvelope<AiConfigTestResult>>(`/ai/config/${scope}/test`)
-  return resp.data.data
+  const resp = (await api.post(`/ai/config/${scope}/test`)) as unknown as ApiEnvelope<AiConfigTestResult>
+  return resp.data
 }
