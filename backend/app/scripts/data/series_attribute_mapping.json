@@ -1,0 +1,2002 @@
+{
+ "_comment": "系列单位属性 mapping（2026-10-27 首批20系列）。条目用 series(+可选category_name) 定位，由 backfill_product_attributes.py 展开到 product_tag 成员。business_confirmed=官方教材/产品地图明文；ai_inferred=视觉+图册AI候选，全部 verified=false 待人工确认（系列自身条目为事实数据 verified=true）。人工确认后把对应条目 verified 改 true 并更新 note 注明确认人与日期。",
+ "_version": 1,
+ "_batch": "2026-10-27 首批20系列（品类混合采样）",
+ "mappings": [
+  {
+   "series": "灵多",
+   "attribute_code": "series",
+   "option_code": "灵多",
+   "source": "business_confirmed",
+   "verified": true,
+   "confidence": 1.0,
+   "note": "系列归属：product_tag 现有 series 标签（事实回填）"
+  },
+  {
+   "series": "灵多",
+   "attribute_code": "style",
+   "option_code": "modern",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.9,
+   "note": "视觉modern(0.9)+图册modern:11；灰白配色、π字钢脚、模块化职员桌系统"
+  },
+  {
+   "series": "灵多",
+   "category_name": "职员桌",
+   "attribute_code": "shape",
+   "option_code": "rect",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉样图判定"
+  },
+  {
+   "series": "灵多",
+   "category_name": "会议桌",
+   "attribute_code": "shape",
+   "option_code": "rect",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉样图判定"
+  },
+  {
+   "series": "灵多",
+   "category_name": "挡板",
+   "attribute_code": "shape",
+   "option_code": "rect",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉样图判定"
+  },
+  {
+   "series": "灵多",
+   "category_name": "桌上屏",
+   "attribute_code": "shape",
+   "option_code": "rect",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉样图判定"
+  },
+  {
+   "series": "灵多",
+   "attribute_code": "material",
+   "option_code": "board",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "灵多",
+   "attribute_code": "material",
+   "option_code": "fabric",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "灵多",
+   "attribute_code": "material",
+   "option_code": "steel",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "灵多",
+   "attribute_code": "material",
+   "option_code": "aluminium",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "灵多",
+   "attribute_code": "color",
+   "option_code": "grey",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "灵多",
+   "attribute_code": "color",
+   "option_code": "white",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "灵多Pro",
+   "attribute_code": "series",
+   "option_code": "灵多Pro",
+   "source": "business_confirmed",
+   "verified": true,
+   "confidence": 1.0,
+   "note": "系列归属：product_tag 现有 series 标签（事实回填）"
+  },
+  {
+   "series": "灵多Pro",
+   "attribute_code": "style",
+   "option_code": "modern",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.9,
+   "note": "视觉modern(0.9)；深灰流星灰哑光、口字型闭环钢脚、毛毡矮屏"
+  },
+  {
+   "series": "灵多Pro",
+   "category_name": "职员桌",
+   "attribute_code": "shape",
+   "option_code": "rect",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉样图判定"
+  },
+  {
+   "series": "灵多Pro",
+   "category_name": "挡板",
+   "attribute_code": "shape",
+   "option_code": "rect",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉样图判定"
+  },
+  {
+   "series": "灵多Pro",
+   "attribute_code": "material",
+   "option_code": "steel",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "灵多Pro",
+   "attribute_code": "material",
+   "option_code": "fabric",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "灵多Pro",
+   "attribute_code": "material",
+   "option_code": "board",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "灵多Pro",
+   "attribute_code": "color",
+   "option_code": "grey",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "灵多Pro",
+   "attribute_code": "color",
+   "option_code": "white",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "花立 Ⅲ",
+   "attribute_code": "series",
+   "option_code": "花立 Ⅲ",
+   "source": "business_confirmed",
+   "verified": true,
+   "confidence": 1.0,
+   "note": "系列归属：product_tag 现有 series 标签（事实回填）"
+  },
+  {
+   "series": "花立 Ⅲ",
+   "attribute_code": "style",
+   "option_code": "modern",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.88,
+   "note": "视觉modern(0.88)+图册modern:4；公共区布艺沙发模块化系统"
+  },
+  {
+   "series": "花立 Ⅲ",
+   "category_name": "公共直排沙发",
+   "attribute_code": "shape",
+   "option_code": "rect",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉样图判定手册：常规矩形为主，三期新增异形模块（120°/45°）"
+  },
+  {
+   "series": "花立 Ⅲ",
+   "category_name": "茶几",
+   "attribute_code": "shape",
+   "option_code": "rect",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉样图判定"
+  },
+  {
+   "series": "花立 Ⅲ",
+   "attribute_code": "material",
+   "option_code": "fabric",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "花立 Ⅲ",
+   "attribute_code": "material",
+   "option_code": "leather",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "花立 Ⅲ",
+   "attribute_code": "material",
+   "option_code": "steel",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "花立 Ⅲ",
+   "attribute_code": "material",
+   "option_code": "board",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "花立 Ⅲ",
+   "attribute_code": "color",
+   "option_code": "grey",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "花立 Ⅲ",
+   "attribute_code": "color",
+   "option_code": "white",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "花立 Ⅲ",
+   "attribute_code": "color",
+   "option_code": "black",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "花立 Ⅲ",
+   "attribute_code": "color",
+   "option_code": "white_oak",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "通用茶几（油漆）",
+   "attribute_code": "series",
+   "option_code": "通用茶几（油漆）",
+   "source": "business_confirmed",
+   "verified": true,
+   "confidence": 1.0,
+   "note": "系列归属：product_tag 现有 series 标签（事实回填）"
+  },
+  {
+   "series": "通用茶几（油漆）",
+   "category_name": "茶几",
+   "attribute_code": "shape",
+   "option_code": "rect",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉样图判定"
+  },
+  {
+   "series": "通用茶几（油漆）",
+   "category_name": "茶桌",
+   "attribute_code": "shape",
+   "option_code": "rect",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉样图判定"
+  },
+  {
+   "series": "通用茶几（油漆）",
+   "attribute_code": "material",
+   "option_code": "board",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "通用茶几（油漆）",
+   "attribute_code": "material",
+   "option_code": "solid_wood",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "通用茶几（油漆）",
+   "attribute_code": "material",
+   "option_code": "steel",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "通用茶几（油漆）",
+   "attribute_code": "material",
+   "option_code": "glass",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "通用茶几（油漆）",
+   "attribute_code": "material",
+   "option_code": "leather",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "通用茶几（油漆）",
+   "attribute_code": "color",
+   "option_code": "walnut",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "通用茶几（油漆）",
+   "attribute_code": "color",
+   "option_code": "black",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "通用茶几（油漆）",
+   "attribute_code": "color",
+   "option_code": "grey",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "通用茶几（油漆）",
+   "attribute_code": "color",
+   "option_code": "white",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "通用茶几（油漆）",
+   "attribute_code": "color",
+   "option_code": "white_oak",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "M型文件柜",
+   "attribute_code": "series",
+   "option_code": "M型文件柜",
+   "source": "business_confirmed",
+   "verified": true,
+   "confidence": 1.0,
+   "note": "系列归属：product_tag 现有 series 标签（事实回填）"
+  },
+  {
+   "series": "M型文件柜",
+   "attribute_code": "style",
+   "option_code": "modern",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.9,
+   "note": "视觉modern(0.9)+图册modern:6；浅灰木纹板式钢制储物"
+  },
+  {
+   "series": "M型文件柜",
+   "category_name": "文件柜",
+   "attribute_code": "shape",
+   "option_code": "rect",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉样图判定"
+  },
+  {
+   "series": "M型文件柜",
+   "category_name": "门板",
+   "attribute_code": "shape",
+   "option_code": "rect",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉样图判定"
+  },
+  {
+   "series": "M型文件柜",
+   "category_name": "挡板",
+   "attribute_code": "shape",
+   "option_code": "rect",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉样图判定"
+  },
+  {
+   "series": "M型文件柜",
+   "attribute_code": "material",
+   "option_code": "board",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "M型文件柜",
+   "attribute_code": "material",
+   "option_code": "glass",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "M型文件柜",
+   "attribute_code": "material",
+   "option_code": "steel",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "M型文件柜",
+   "attribute_code": "material",
+   "option_code": "fabric",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "M型文件柜",
+   "attribute_code": "color",
+   "option_code": "grey",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "M型文件柜",
+   "attribute_code": "color",
+   "option_code": "white",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "大都会",
+   "attribute_code": "series",
+   "option_code": "大都会",
+   "source": "business_confirmed",
+   "verified": true,
+   "confidence": 1.0,
+   "note": "系列归属：product_tag 现有 series 标签（事实回填）"
+  },
+  {
+   "series": "大都会",
+   "attribute_code": "style",
+   "option_code": "new_chinese",
+   "source": "business_confirmed",
+   "verified": false,
+   "confidence": 0.95,
+   "note": "官方培训教材：国潮元素/中式风雅/士大夫文化气韵，红黑国风配色；产品地图归入传统风格区"
+  },
+  {
+   "series": "大都会",
+   "category_name": "主管桌",
+   "attribute_code": "shape",
+   "option_code": "arc",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉样图判定"
+  },
+  {
+   "series": "大都会",
+   "category_name": "培训桌",
+   "attribute_code": "shape",
+   "option_code": "rect",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉样图判定"
+  },
+  {
+   "series": "大都会",
+   "category_name": "会议桌",
+   "attribute_code": "shape",
+   "option_code": "oval",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉样图判定"
+  },
+  {
+   "series": "大都会",
+   "attribute_code": "material",
+   "option_code": "board",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "大都会",
+   "attribute_code": "material",
+   "option_code": "solid_wood",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "大都会",
+   "attribute_code": "material",
+   "option_code": "steel",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "大都会",
+   "attribute_code": "color",
+   "option_code": "walnut",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "大都会",
+   "attribute_code": "color",
+   "option_code": "black",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "然之趣 Ⅱ",
+   "attribute_code": "series",
+   "option_code": "然之趣 Ⅱ",
+   "source": "business_confirmed",
+   "verified": true,
+   "confidence": 1.0,
+   "note": "系列归属：product_tag 现有 series 标签（事实回填）"
+  },
+  {
+   "series": "然之趣 Ⅱ",
+   "attribute_code": "style",
+   "option_code": "modern",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.92,
+   "note": "视觉modern(0.92)+图册modern:11；白橡木纹+白色柜体板式系统"
+  },
+  {
+   "series": "然之趣 Ⅱ",
+   "category_name": "职员桌",
+   "attribute_code": "shape",
+   "option_code": "rect",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉样图判定"
+  },
+  {
+   "series": "然之趣 Ⅱ",
+   "category_name": "主管桌",
+   "attribute_code": "shape",
+   "option_code": "rect",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉样图判定"
+  },
+  {
+   "series": "然之趣 Ⅱ",
+   "category_name": "会议桌",
+   "attribute_code": "shape",
+   "option_code": "rect",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉样图判定"
+  },
+  {
+   "series": "然之趣 Ⅱ",
+   "attribute_code": "material",
+   "option_code": "board",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "然之趣 Ⅱ",
+   "attribute_code": "material",
+   "option_code": "fabric",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "然之趣 Ⅱ",
+   "attribute_code": "material",
+   "option_code": "steel",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "然之趣 Ⅱ",
+   "attribute_code": "color",
+   "option_code": "white",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "然之趣 Ⅱ",
+   "attribute_code": "color",
+   "option_code": "white_oak",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "然之趣 Ⅱ",
+   "attribute_code": "color",
+   "option_code": "walnut",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "然之趣 Ⅱ",
+   "attribute_code": "color",
+   "option_code": "grey",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "斯蒂博格",
+   "attribute_code": "series",
+   "option_code": "斯蒂博格",
+   "source": "business_confirmed",
+   "verified": true,
+   "confidence": 1.0,
+   "note": "系列归属：product_tag 现有 series 标签（事实回填）"
+  },
+  {
+   "series": "斯蒂博格",
+   "attribute_code": "style",
+   "option_code": "modern",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.9,
+   "note": "视觉modern(0.9)+图册modern:5；白色钢制智能柜（钢制:82次）"
+  },
+  {
+   "series": "斯蒂博格",
+   "category_name": "衣柜",
+   "attribute_code": "shape",
+   "option_code": "rect",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉样图判定"
+  },
+  {
+   "series": "斯蒂博格",
+   "category_name": "开门柜",
+   "attribute_code": "shape",
+   "option_code": "rect",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉样图判定"
+  },
+  {
+   "series": "斯蒂博格",
+   "attribute_code": "material",
+   "option_code": "steel",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "斯蒂博格",
+   "attribute_code": "material",
+   "option_code": "glass",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "斯蒂博格",
+   "attribute_code": "material",
+   "option_code": "board",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "斯蒂博格",
+   "attribute_code": "color",
+   "option_code": "white",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "斯蒂博格",
+   "attribute_code": "color",
+   "option_code": "grey",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "I-瓦尔纳 Ⅱ",
+   "attribute_code": "series",
+   "option_code": "I-瓦尔纳 Ⅱ",
+   "source": "business_confirmed",
+   "verified": true,
+   "confidence": 1.0,
+   "note": "系列归属：product_tag 现有 series 标签（事实回填）"
+  },
+  {
+   "series": "I-瓦尔纳 Ⅱ",
+   "attribute_code": "style",
+   "option_code": "modern",
+   "source": "business_confirmed",
+   "verified": false,
+   "confidence": 0.95,
+   "note": "官方产品地图：Varna二代归入现代风格区（10个现代系列之一）"
+  },
+  {
+   "series": "I-瓦尔纳 Ⅱ",
+   "category_name": "职员桌",
+   "attribute_code": "shape",
+   "option_code": "rect",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉样图判定"
+  },
+  {
+   "series": "I-瓦尔纳 Ⅱ",
+   "category_name": "主管桌",
+   "attribute_code": "shape",
+   "option_code": "rect",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉样图判定"
+  },
+  {
+   "series": "I-瓦尔纳 Ⅱ",
+   "category_name": "会议桌",
+   "attribute_code": "shape",
+   "option_code": "rect",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉样图判定"
+  },
+  {
+   "series": "I-瓦尔纳 Ⅱ",
+   "attribute_code": "material",
+   "option_code": "board",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "I-瓦尔纳 Ⅱ",
+   "attribute_code": "material",
+   "option_code": "steel",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "I-瓦尔纳 Ⅱ",
+   "attribute_code": "material",
+   "option_code": "aluminium",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "I-瓦尔纳 Ⅱ",
+   "attribute_code": "material",
+   "option_code": "glass",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "I-瓦尔纳 Ⅱ",
+   "attribute_code": "material",
+   "option_code": "fabric",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "I-瓦尔纳 Ⅱ",
+   "attribute_code": "color",
+   "option_code": "grey",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "I-瓦尔纳 Ⅱ",
+   "attribute_code": "color",
+   "option_code": "white_oak",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "I-瓦尔纳 Ⅱ",
+   "attribute_code": "color",
+   "option_code": "walnut",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "领瑞",
+   "attribute_code": "series",
+   "option_code": "领瑞",
+   "source": "business_confirmed",
+   "verified": true,
+   "confidence": 1.0,
+   "note": "系列归属：product_tag 现有 series 标签（事实回填）"
+  },
+  {
+   "series": "领瑞",
+   "attribute_code": "style",
+   "option_code": "new_chinese",
+   "source": "business_confirmed",
+   "verified": false,
+   "confidence": 0.95,
+   "note": "官方产品地图：领瑞归入新中式风格区（3个新中式系列之一）"
+  },
+  {
+   "series": "领瑞",
+   "category_name": "总裁桌",
+   "attribute_code": "shape",
+   "option_code": "rect",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉样图判定"
+  },
+  {
+   "series": "领瑞",
+   "category_name": "主管桌",
+   "attribute_code": "shape",
+   "option_code": "rect",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉样图判定"
+  },
+  {
+   "series": "领瑞",
+   "category_name": "会议桌",
+   "attribute_code": "shape",
+   "option_code": "rect",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉样图判定"
+  },
+  {
+   "series": "领瑞",
+   "attribute_code": "material",
+   "option_code": "board",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "领瑞",
+   "attribute_code": "material",
+   "option_code": "steel",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "领瑞",
+   "attribute_code": "material",
+   "option_code": "solid_wood",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "领瑞",
+   "attribute_code": "material",
+   "option_code": "leather",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "领瑞",
+   "attribute_code": "material",
+   "option_code": "glass",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "领瑞",
+   "attribute_code": "color",
+   "option_code": "walnut",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "领瑞",
+   "attribute_code": "color",
+   "option_code": "grey",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "领瑞",
+   "attribute_code": "color",
+   "option_code": "black",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "维度-X",
+   "attribute_code": "series",
+   "option_code": "维度-X",
+   "source": "business_confirmed",
+   "verified": true,
+   "confidence": 1.0,
+   "note": "系列归属：product_tag 现有 series 标签（事实回填）"
+  },
+  {
+   "series": "维度-X",
+   "attribute_code": "style",
+   "option_code": "modern",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.9,
+   "note": "视觉modern(0.9)；屏风工作站系统，钢制框架+扪布/板式面板"
+  },
+  {
+   "series": "维度-X",
+   "category_name": "职员桌",
+   "attribute_code": "shape",
+   "option_code": "rect",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉样图判定"
+  },
+  {
+   "series": "维度-X",
+   "category_name": "屏风面板",
+   "attribute_code": "shape",
+   "option_code": "rect",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉样图判定"
+  },
+  {
+   "series": "维度-X",
+   "attribute_code": "material",
+   "option_code": "board",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "维度-X",
+   "attribute_code": "material",
+   "option_code": "fabric",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "维度-X",
+   "attribute_code": "material",
+   "option_code": "steel",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "维度-X",
+   "attribute_code": "material",
+   "option_code": "aluminium",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "维度-X",
+   "attribute_code": "material",
+   "option_code": "glass",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "维度-X",
+   "attribute_code": "color",
+   "option_code": "grey",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "维度-X",
+   "attribute_code": "color",
+   "option_code": "white",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "维度-X",
+   "attribute_code": "color",
+   "option_code": "white_oak",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "知",
+   "attribute_code": "series",
+   "option_code": "知",
+   "source": "business_confirmed",
+   "verified": true,
+   "confidence": 1.0,
+   "note": "系列归属：product_tag 现有 series 标签（事实回填）"
+  },
+  {
+   "series": "知",
+   "attribute_code": "style",
+   "option_code": "modern",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉modern(0.85)+图册modern:9；教育空间课桌椅柜"
+  },
+  {
+   "series": "知",
+   "category_name": "文件柜",
+   "attribute_code": "shape",
+   "option_code": "rect",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉样图判定"
+  },
+  {
+   "series": "知",
+   "attribute_code": "material",
+   "option_code": "board",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "知",
+   "attribute_code": "material",
+   "option_code": "steel",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "知",
+   "attribute_code": "material",
+   "option_code": "solid_wood",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "知",
+   "attribute_code": "material",
+   "option_code": "glass",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "知",
+   "attribute_code": "color",
+   "option_code": "white",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "知",
+   "attribute_code": "color",
+   "option_code": "grey",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "知",
+   "attribute_code": "color",
+   "option_code": "black",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "知",
+   "attribute_code": "color",
+   "option_code": "white_oak",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "千岛",
+   "attribute_code": "series",
+   "option_code": "千岛",
+   "source": "business_confirmed",
+   "verified": true,
+   "confidence": 1.0,
+   "note": "系列归属：product_tag 现有 series 标签（事实回填）"
+  },
+  {
+   "series": "千岛",
+   "attribute_code": "style",
+   "option_code": "modern",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.92,
+   "note": "视觉modern(0.92)+图册modern:9；休闲区布艺沙发椅+洽谈桌"
+  },
+  {
+   "series": "千岛",
+   "category_name": "休闲沙发",
+   "attribute_code": "shape",
+   "option_code": "arc",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉样图判定样图为弧形壳布艺旋转椅（arc）"
+  },
+  {
+   "series": "千岛",
+   "category_name": "洽谈桌",
+   "attribute_code": "shape",
+   "option_code": "rect",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉样图判定"
+  },
+  {
+   "series": "千岛",
+   "attribute_code": "material",
+   "option_code": "fabric",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "千岛",
+   "attribute_code": "material",
+   "option_code": "leather",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "千岛",
+   "attribute_code": "material",
+   "option_code": "solid_wood",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "千岛",
+   "attribute_code": "material",
+   "option_code": "steel",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "千岛",
+   "attribute_code": "material",
+   "option_code": "board",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "千岛",
+   "attribute_code": "color",
+   "option_code": "black",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "千岛",
+   "attribute_code": "color",
+   "option_code": "white",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "千岛",
+   "attribute_code": "color",
+   "option_code": "grey",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "千岛",
+   "attribute_code": "color",
+   "option_code": "beige",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "星-S2",
+   "attribute_code": "series",
+   "option_code": "星-S2",
+   "source": "business_confirmed",
+   "verified": true,
+   "confidence": 1.0,
+   "note": "系列归属：product_tag 现有 series 标签（事实回填）"
+  },
+  {
+   "series": "星-S2",
+   "attribute_code": "style",
+   "option_code": "modern",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.9,
+   "note": "视觉modern(0.9)+图册modern:15；高管区真皮沙发（艺术钢琴款）"
+  },
+  {
+   "series": "星-S2",
+   "category_name": "高管区沙发",
+   "attribute_code": "shape",
+   "option_code": "rect",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉样图判定"
+  },
+  {
+   "series": "星-S2",
+   "category_name": "主管区沙发",
+   "attribute_code": "shape",
+   "option_code": "rect",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉样图判定"
+  },
+  {
+   "series": "星-S2",
+   "attribute_code": "material",
+   "option_code": "leather",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "星-S2",
+   "attribute_code": "material",
+   "option_code": "fabric",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "星-S2",
+   "attribute_code": "material",
+   "option_code": "steel",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "星-S2",
+   "attribute_code": "material",
+   "option_code": "aluminium",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "星-S2",
+   "attribute_code": "material",
+   "option_code": "board",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "星-S2",
+   "attribute_code": "color",
+   "option_code": "black",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "星-S2",
+   "attribute_code": "color",
+   "option_code": "grey",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "星-S2",
+   "attribute_code": "color",
+   "option_code": "walnut",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "灵致 Ⅱ",
+   "attribute_code": "series",
+   "option_code": "灵致 Ⅱ",
+   "source": "business_confirmed",
+   "verified": true,
+   "confidence": 1.0,
+   "note": "系列归属：product_tag 现有 series 标签（事实回填）"
+  },
+  {
+   "series": "灵致 Ⅱ",
+   "attribute_code": "style",
+   "option_code": "modern",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.93,
+   "note": "视觉modern(0.93)+图册modern:18；浅米色木纹+白色钢脚板式系统"
+  },
+  {
+   "series": "灵致 Ⅱ",
+   "category_name": "职员桌",
+   "attribute_code": "shape",
+   "option_code": "rect",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉样图判定"
+  },
+  {
+   "series": "灵致 Ⅱ",
+   "category_name": "主管桌",
+   "attribute_code": "shape",
+   "option_code": "rect",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉样图判定"
+  },
+  {
+   "series": "灵致 Ⅱ",
+   "category_name": "会议桌",
+   "attribute_code": "shape",
+   "option_code": "rect",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉样图判定"
+  },
+  {
+   "series": "灵致 Ⅱ",
+   "attribute_code": "material",
+   "option_code": "board",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "灵致 Ⅱ",
+   "attribute_code": "material",
+   "option_code": "steel",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "灵致 Ⅱ",
+   "attribute_code": "material",
+   "option_code": "fabric",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "灵致 Ⅱ",
+   "attribute_code": "color",
+   "option_code": "white",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "灵致 Ⅱ",
+   "attribute_code": "color",
+   "option_code": "beige",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "悦",
+   "attribute_code": "series",
+   "option_code": "悦",
+   "source": "business_confirmed",
+   "verified": true,
+   "confidence": 1.0,
+   "note": "系列归属：product_tag 现有 series 标签（事实回填）"
+  },
+  {
+   "series": "悦",
+   "attribute_code": "style",
+   "option_code": "modern",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.9,
+   "note": "视觉modern(0.9)+图册modern:13；公寓宿舍床柜系统（原木奶油风）"
+  },
+  {
+   "series": "悦",
+   "category_name": "公寓床",
+   "attribute_code": "shape",
+   "option_code": "rect",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉样图判定"
+  },
+  {
+   "series": "悦",
+   "category_name": "衣柜",
+   "attribute_code": "shape",
+   "option_code": "rect",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉样图判定"
+  },
+  {
+   "series": "悦",
+   "category_name": "床",
+   "attribute_code": "shape",
+   "option_code": "rect",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉样图判定"
+  },
+  {
+   "series": "悦",
+   "attribute_code": "material",
+   "option_code": "board",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "悦",
+   "attribute_code": "material",
+   "option_code": "steel",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "悦",
+   "attribute_code": "material",
+   "option_code": "solid_wood",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "悦",
+   "attribute_code": "color",
+   "option_code": "white",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "悦",
+   "attribute_code": "color",
+   "option_code": "grey",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "悦",
+   "attribute_code": "color",
+   "option_code": "white_oak",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "悦",
+   "attribute_code": "color",
+   "option_code": "green",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "坐站1号 Ⅱ",
+   "attribute_code": "series",
+   "option_code": "坐站1号 Ⅱ",
+   "source": "business_confirmed",
+   "verified": true,
+   "confidence": 1.0,
+   "note": "系列归属：product_tag 现有 series 标签（事实回填）"
+  },
+  {
+   "series": "坐站1号 Ⅱ",
+   "attribute_code": "style",
+   "option_code": "modern",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.9,
+   "note": "视觉modern(0.9)；电动升降坐站交替职员桌"
+  },
+  {
+   "series": "坐站1号 Ⅱ",
+   "category_name": "职员桌",
+   "attribute_code": "shape",
+   "option_code": "rect",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉样图判定"
+  },
+  {
+   "series": "坐站1号 Ⅱ",
+   "category_name": "挡板",
+   "attribute_code": "shape",
+   "option_code": "rect",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉样图判定"
+  },
+  {
+   "series": "坐站1号 Ⅱ",
+   "attribute_code": "material",
+   "option_code": "board",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "坐站1号 Ⅱ",
+   "attribute_code": "material",
+   "option_code": "steel",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "坐站1号 Ⅱ",
+   "attribute_code": "material",
+   "option_code": "fabric",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "坐站1号 Ⅱ",
+   "attribute_code": "color",
+   "option_code": "beige",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "坐站1号 Ⅱ",
+   "attribute_code": "color",
+   "option_code": "white",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "坐站1号 Ⅱ",
+   "attribute_code": "color",
+   "option_code": "grey",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "哈途",
+   "attribute_code": "series",
+   "option_code": "哈途",
+   "source": "business_confirmed",
+   "verified": true,
+   "confidence": 1.0,
+   "note": "系列归属：product_tag 现有 series 标签（事实回填）"
+  },
+  {
+   "series": "哈途",
+   "attribute_code": "style",
+   "option_code": "modern",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.95,
+   "note": "视觉modern(0.95)+图册fabric:9；全网布办公椅（职员椅/主管椅）"
+  },
+  {
+   "series": "哈途",
+   "attribute_code": "material",
+   "option_code": "fabric",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "哈途",
+   "attribute_code": "material",
+   "option_code": "aluminium",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "哈途",
+   "attribute_code": "color",
+   "option_code": "white",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "哈途",
+   "attribute_code": "color",
+   "option_code": "grey",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "哈途",
+   "attribute_code": "color",
+   "option_code": "black",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "戴蒙",
+   "attribute_code": "series",
+   "option_code": "戴蒙",
+   "source": "business_confirmed",
+   "verified": true,
+   "confidence": 1.0,
+   "note": "系列归属：product_tag 现有 series 标签（事实回填）"
+  },
+  {
+   "series": "戴蒙",
+   "attribute_code": "style",
+   "option_code": "modern",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.9,
+   "note": "视觉modern(0.9)+图册modern:9；培训椅+写字板（家族含圆弧/矩形培训桌）"
+  },
+  {
+   "series": "戴蒙",
+   "attribute_code": "material",
+   "option_code": "fabric",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "戴蒙",
+   "attribute_code": "material",
+   "option_code": "steel",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "戴蒙",
+   "attribute_code": "material",
+   "option_code": "board",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "戴蒙",
+   "attribute_code": "color",
+   "option_code": "white",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "戴蒙",
+   "attribute_code": "color",
+   "option_code": "grey",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "戴蒙",
+   "attribute_code": "color",
+   "option_code": "black",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "摩凳",
+   "attribute_code": "series",
+   "option_code": "摩凳",
+   "source": "business_confirmed",
+   "verified": true,
+   "confidence": 1.0,
+   "note": "系列归属：product_tag 现有 series 标签（事实回填）"
+  },
+  {
+   "series": "摩凳",
+   "attribute_code": "style",
+   "option_code": "modern",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.9,
+   "note": "视觉modern(0.9)+图册modern:5；模压壳体培训椅/凳（国潮鱼鳞纹元素款）"
+  },
+  {
+   "series": "摩凳",
+   "attribute_code": "material",
+   "option_code": "steel",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "摩凳",
+   "attribute_code": "material",
+   "option_code": "fabric",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "摩凳",
+   "attribute_code": "material",
+   "option_code": "board",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "摩凳",
+   "attribute_code": "color",
+   "option_code": "grey",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "摩凳",
+   "attribute_code": "color",
+   "option_code": "white",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  },
+  {
+   "series": "摩凳",
+   "attribute_code": "color",
+   "option_code": "black",
+   "source": "ai_inferred",
+   "verified": false,
+   "confidence": 0.85,
+   "note": "视觉+图册词频联合判定"
+  }
+ ]
+}

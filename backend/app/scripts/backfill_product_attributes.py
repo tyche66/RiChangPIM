@@ -48,15 +48,21 @@ from app.models.catalog_attribute import (  # noqa: E402
 )
 from app.models.product import Product  # noqa: E402
 
-DEFAULT_MAPPING = (
-    Path(__file__).resolve().parent / "data" / "product_attribute_mapping.json"
-)
+DEFAULT_MAPPING = Path(__file__).resolve().parent / "data" / "product_attribute_mapping.json"
 
-REQUIRED_KEYS = ("product_no", "attribute_code", "option_code")
+REQUIRED_KEYS = ("attribute_code", "option_code")
+# 条目定位方式二选一：product_no（单个 SKU）或 series（系列 tag_name，可加 category_name 限定类目）
+ENTRY_KEY_MODES = (("product_no",), ("series",))
 
 
 def load_mapping(path: Path) -> list[dict]:
-    """读取并校验 mapping 文件。"""
+    """读取并校验 mapping 文件。
+
+    条目支持两种定位方式：
+    * ``product_no``：单个 SKU（既有格式）；
+    * ``series``（+ 可选 ``category_name``）：系列单位，执行时按
+      ``product_tag`` 展开到该系列（可选限定类目）的全部在售产品。
+    """
     if not path.exists():
         raise SystemExit(f"mapping 文件不存在: {path}")
     payload = json.loads(path.read_text(encoding="utf-8"))
@@ -68,9 +74,17 @@ def load_mapping(path: Path) -> list[dict]:
         missing = [key for key in REQUIRED_KEYS if not entry.get(key)]
         if missing:
             raise SystemExit(f"mapping 第 {index} 条缺少字段: {missing}")
+        has_product_no = bool(str(entry.get("product_no") or "").strip())
+        has_series = bool(str(entry.get("series") or "").strip())
+        if not has_product_no and not has_series:
+            raise SystemExit(f"mapping 第 {index} 条既无 product_no 也无 series")
         out.append(
             {
-                "product_no": str(entry["product_no"]).strip(),
+                "product_no": str(entry["product_no"]).strip() if has_product_no else None,
+                "series": str(entry["series"]).strip() if has_series else None,
+                "category_name": (
+                    str(entry["category_name"]).strip() if entry.get("category_name") else None
+                ),
                 "attribute_code": str(entry["attribute_code"]).strip(),
                 "option_code": str(entry["option_code"]).strip(),
                 "source": str(entry.get("source") or "business_confirmed"),
@@ -80,6 +94,83 @@ def load_mapping(path: Path) -> list[dict]:
             }
         )
     return out
+
+
+async def _expand_series_entries(db, entries: list[dict]) -> tuple[list[dict], list[str]]:
+    """把 series 条目展开为 product_no 条目；返回 (展开后条目, 未解析系列列表)。"""
+    series_specs = [
+        (e["series"], e["category_name"])
+        for e in entries
+        if e["product_no"] is None and e["series"]
+    ]
+    if not series_specs:
+        return entries, []
+
+    # 系列 tag_name -> tag id（tag_type=series）
+    from app.models.product import Category, ProductTag, Tag  # noqa: PLC0415
+
+    series_names = sorted({name for name, _ in series_specs})
+    tag_rows = (
+        (
+            await db.execute(
+                select(Tag).where(
+                    Tag.tag_name.in_(series_names),
+                    Tag.tag_type == "series",
+                    Tag.is_deleted.is_(False),
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    tag_by_name = {row.tag_name: row for row in tag_rows}
+    unresolved = [name for name in series_names if name not in tag_by_name]
+    if unresolved:
+        return entries, unresolved
+
+    # 每个 (系列, 类目) 的产品编号列表
+    product_nos_by_spec: dict[tuple[str, str | None], list[str]] = {}
+    for name, category_name in series_specs:
+        tag = tag_by_name[name]
+        stmt = (
+            select(Product.product_no)
+            .join(ProductTag, ProductTag.product_id == Product.id)
+            .join(Category, Category.id == Product.category_id)
+            .where(
+                ProductTag.tag_id == tag.id,
+                ProductTag.is_deleted.is_(False),
+                Product.is_deleted.is_(False),
+                Product.status == "active",
+            )
+        )
+        if category_name:
+            stmt = stmt.where(Category.category_name == category_name)
+        rows = (await db.execute(stmt)).scalars().all()
+        product_nos_by_spec[(name, category_name)] = sorted(rows)
+
+    expanded: list[dict] = []
+    for entry in entries:
+        if entry["product_no"] is not None:
+            expanded.append(entry)
+            continue
+        name = entry["series"]
+        if name not in tag_by_name:
+            continue
+        category_name = entry["category_name"]
+        nos = product_nos_by_spec.get((name, category_name), [])
+        if not nos:
+            scope = f"{name}系列" + (f"/{category_name}" if category_name else "")
+            print(f"[check] WARN 系列展开为空（无在售产品）: {scope}")
+            continue
+        for product_no in nos:
+            child = dict(entry)
+            child["product_no"] = product_no
+            child["series"] = None
+            note = child.get("note") or ""
+            scope = f"{name}系列" + (f"/{category_name}" if category_name else "")
+            child["note"] = f"[系列展开:{scope}] {note}".strip()
+            expanded.append(child)
+    return expanded, []
 
 
 async def _resolve_products(db, product_nos: list[str]) -> dict[str, Product]:
@@ -150,10 +241,7 @@ async def _existing_values(db, product_ids) -> set[tuple]:
         .scalars()
         .all()
     )
-    return {
-        (row.product_id, row.attribute_id, row.option_id, row.value_text)
-        for row in rows
-    }
+    return {(row.product_id, row.attribute_id, row.option_id, row.value_text) for row in rows}
 
 
 async def run(mapping_path: Path, *, apply: bool) -> int:
@@ -162,14 +250,21 @@ async def run(mapping_path: Path, *, apply: bool) -> int:
         print("[check] mapping 为空，无需回填")
         return 0
 
-    product_nos = sorted({entry["product_no"] for entry in entries})
-    pairs = [(entry["attribute_code"], entry["option_code"]) for entry in entries]
-
-    created = 0
-    skipped = 0
-    unresolved: list[str] = []
-
     async with AsyncSessionLocal() as db:
+        entries, unresolved_series = await _expand_series_entries(db, entries)
+        for name in unresolved_series:
+            print(f"[check] UNRESOLVED 系列不存在或未标注: {name}")
+        if not entries:
+            print("[check] 展开后无有效条目")
+            return 0
+
+        product_nos = sorted({entry["product_no"] for entry in entries if entry["product_no"]})
+        pairs = [(entry["attribute_code"], entry["option_code"]) for entry in entries]
+
+        created = 0
+        skipped = 0
+        unresolved: list[str] = []
+
         products = await _resolve_products(db, product_nos)
         resolved = await _resolve_options(db, pairs)
         existing = await _existing_values(db, list(p.id for p in products.values()))
@@ -220,8 +315,7 @@ async def run(mapping_path: Path, *, apply: bool) -> int:
             existing.add(signature)
             created += 1
             print(
-                f"[apply] {entry['product_no']} -> "
-                f"{entry['attribute_code']}={entry['option_code']}"
+                f"[apply] {entry['product_no']} -> {entry['attribute_code']}={entry['option_code']}"
             )
         if apply:
             await db.commit()
