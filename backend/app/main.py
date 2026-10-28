@@ -170,13 +170,37 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
     _app.state.started_at = time.time()
     # Warm the AI config cache (DB override layer) before serving traffic so the
     # first request already resolves provider settings instead of env-only.
-    from app.services.ai_config import refresh_cache
+    from app.services.ai_config import CACHE_TTL_SECONDS, refresh_cache
 
     try:
         await refresh_cache()
     except Exception:
         pass
-    yield
+
+    # 周期刷新：只在「启动 + 保存配置」时刷新是不够的——快照一旦过期，
+    # 读路径就会回落 env，把管理员在 AI 配置中心显式改的模型/Key 静默丢回
+    # 环境变量值（2026-10-28 实测：改模型后约 15 秒又变回 env 的旧模型）。
+    # 这里用短于 TTL 的间隔持续续期，保证缓存始终是 DB 覆盖层的真值。
+    async def _refresh_ai_config_loop() -> None:
+        interval = max(1.0, CACHE_TTL_SECONDS / 3.0)
+        while True:
+            await asyncio.sleep(interval)
+            try:
+                await refresh_cache()
+            except Exception:
+                # DB 抖动时保留旧快照（refresh_cache 自身已保证），绝不清空。
+                pass
+
+    refresher = asyncio.create_task(_refresh_ai_config_loop())
+
+    try:
+        yield
+    finally:
+        refresher.cancel()
+        try:
+            await refresher
+        except asyncio.CancelledError:
+            pass
     # Release adapter-held HTTP clients (e.g. OpenAIAdapter's httpx.AsyncClient).
     from app.adapters.factory import _cached_adapter, _cached_content_adapter
 

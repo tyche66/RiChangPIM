@@ -158,14 +158,18 @@ async def refresh_cache(db_factory: Any = None) -> dict[str, AiConfig]:
 
 
 def peek(scope: str) -> AiConfig | None:
-    """读缓存快照；过期或未预热时返回 None（调用方回落 env）。"""
+    """读缓存快照。
+
+    过期也返回旧快照：**绝不因为「超过 15 秒没人写配置」就悄悄回落 env**。
+    2026-10-28 实测：管理员把模型改成 agnes-3.0-flash，15 秒后这里返回 None，
+    ``get_config`` 改走 env 的 agnes-2.5-flash，供应商后台看到的调用就一直是 2.5
+    ——用户的显式配置被静默丢弃。新鲜度由 ``refresh_cache`` 的周期任务保证，
+    读路径只负责「有快照就用快照」。
+    """
     entry = _cache.get(scope)
     if entry is None:
         return None
-    loaded_at, config = entry
-    if time.monotonic() - loaded_at > CACHE_TTL_SECONDS:
-        return None
-    return config
+    return entry[1]
 
 
 def get_config(scope: str) -> AiConfig:

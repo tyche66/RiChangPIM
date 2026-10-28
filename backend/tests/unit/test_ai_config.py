@@ -122,9 +122,17 @@ def test_sync_get_config_falls_back_to_env_without_cache(monkeypatch):
 
 
 def test_cache_ttl_expires(monkeypatch):
+    """TTL 只表示"该续期了"，过期快照仍然生效，绝不回落 env。
+
+    2026-10-28 修复：旧行为是过期返回 None，调用方回落 env，把管理员在
+    AI 配置中心显式改的模型静默丢回环境变量值（改完约 15 秒又变回旧模型）。
+    """
     monkeypatch.setattr(
         ai_config_module,
         "_cache",
         {SCOPE_CONTENT: (0.0, AiConfig(scope=SCOPE_CONTENT, chat_model="cached"))},
     )
-    assert ai_config_module.peek(SCOPE_CONTENT) is None
+    snapshot = ai_config_module.peek(SCOPE_CONTENT)
+    assert snapshot is not None
+    assert snapshot.chat_model == "cached"
+    assert get_config(SCOPE_CONTENT).chat_model == "cached"

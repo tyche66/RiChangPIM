@@ -48,6 +48,13 @@
 - **AI 配置中心页面空白**：前端 `src/api/aiConfig.ts` 多读了一层 envelope（`resp.data.data`），恒取到空数组；已改为仓库约定的 `resp.data`。
 - **发布后白屏（须刷新才好）**：nginx 原本完全不发 `Cache-Control`，浏览器 heuristic 缓存旧 `index.html`，代码更新后旧入口 chunk 名 404。现入口 HTML 一律 `no-cache` 重新校验，带内容哈希的 `/admin/assets/` 与 `/assets/` 为 `public, max-age=31536000, immutable`。
 
+### AI 配置中心：模型改动 15 秒后失效（2026-10-28 修复）
+- **现象**：在 AI 配置中心把选品检索模型改成 `agnes-3.0-flash`，供应商后台收到的调用仍是 env 里的 `agnes-2.5-flash`。
+- **根因**：`ai_config` 的进程内缓存只在「启动」与「保存配置」时刷新，没有周期刷新；`peek()` 超过 `CACHE_TTL_SECONDS`(15s) 就返回 None，`get_config()` 随即回落环境变量——管理员的显式配置被静默丢回 env。内容工坊 scope 同理。
+- **修复**：`peek()` 过期也返回旧快照（TTL 只是「该续期了」，不是「作废」）；`main.lifespan` 增加短于 TTL 的周期刷新任务，缓存始终是 DB 覆盖层真值；DB 抖动仍保留旧快照，不清空、不回落 env。
+- 验收：改配置后等 20 秒（超过旧 TTL）再查询，知识网关 `usage.model` 为 DB 覆盖值。
+- 测试：`tests/unit/test_ai_config_ttl.py`（过期快照仍生效、空缓存才回落 env、DB 抖动保留旧快照）；`test_ai_config.py::test_cache_ttl_expires` 改为锁新行为。
+
 ### 自然语言检索与查询历史（2026-10-28 修复「现代风格」返回空）
 - **根因（三层）**：① 规则层只认词典别名，说法没列进别名表就没有硬条件；
   ② 模型规划器拿到的字典上下文**只有 option code，没有中文名和别名**，
