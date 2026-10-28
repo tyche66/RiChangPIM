@@ -9,6 +9,7 @@ from app.knowledge.attributes import (
     EMPTY_DICTIONARY,
     AttributeDictionary,
     build_product_query,
+    normalize_text,
 )
 from app.knowledge.entities import QueryEntities
 from app.knowledge.facets import ProductFacets
@@ -112,7 +113,9 @@ class RuleBasedPlanner:
         entities.product_ids = [str(x) for x in request.scope.product_ids] + UUID_RE.findall(
             msg
         )
-        entities.product_nos = _extract_product_nos(msg)
+        entities.product_nos = _extract_product_nos(
+            msg, _alias_words(self._dictionary)
+        )
         entities.status_terms = [code for term, code in QUALITY_TERMS.items() if term in msg]
 
         query = build_product_query(
@@ -226,16 +229,42 @@ class RuleBasedPlanner:
         )
 
 
-def _extract_product_nos(message: str) -> list[str]:
+def _extract_product_nos(message: str, alias_words: set[str] | None = None) -> list[str]:
     candidates = PRODUCT_NO_RE.findall(message)
     blocked = {"RMB", "SQL", "http", "https"}
     out: list[str] = []
     for item in candidates:
         if item in blocked or item.isdigit() or len(item) < 3:
             continue
+        if not looks_like_model_number(item):
+            continue
+        # 与受治理词典别名撞车的词（modern/LIDO/千岛…）是属性词，不是型号：
+        # 当成 product_no 会用 IN 过滤把属性命中结果全部清空（2026-10-28
+        # 实测：查询「modern」被解析成 product_no=modern，style=modern 的
+        # 175 款产品全被过滤成 0）。
+        if alias_words and normalize_text(item) in alias_words:
+            continue
         if item not in out:
             out.append(item)
     return out[:20]
+
+
+def looks_like_model_number(token: str) -> bool:
+    """形态判断：真实产品型号必含数字或 ``-._/`` 分隔符。
+
+    本库 4024 个在售型号全部含数字（无数字的 0 条，已核对）。纯字母词
+    （modern、LIDO、OLED…）按普通词/属性词处理，不当型号；否则
+    「modern」这类纯英文查询会被 ``product_no IN ('modern')`` 过滤成空。
+    将来若出现无数字型号，需要连同这条判据一起重新评估。
+    """
+    if len(token) < 3:
+        return False
+    return any(ch.isdigit() for ch in token) or any(sep in token for sep in "-._/")
+
+
+def _alias_words(dictionary: AttributeDictionary) -> set[str]:
+    """词典全部别名的归一化集合，用于把属性词从型号候选里摘出来。"""
+    return {entry.normalized for entry in dictionary.aliases if entry.normalized}
 
 
 def get_planner() -> Planner:

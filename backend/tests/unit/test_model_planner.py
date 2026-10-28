@@ -104,7 +104,12 @@ def test_model_planning_prompt_describes_typed_attribute_facets():
     assert "hard_facets" in prompt
     assert "不同属性之间必须同时满足（AND）" in prompt
     assert "只能使用下列已定义的属性与取值，不得编造 attribute_code 或 option" in prompt
-    assert "无法归一的词放入 unknown_terms" in prompt
+    assert "确实没有任何属性可归的词才放 unknown_terms" in prompt
+    assert "不得拼成一个整体关键词" in prompt
+    # 自然语言说法必须按语义归到已定义取值：2026-10-28「现代风格」返回空的根因
+    assert "偏现代风格" in prompt
+    assert "style=modern" in prompt
+    assert "多字少字" in prompt
     # 不再宣称 shape 来自 tag_type
     assert "tag_type" not in prompt
 

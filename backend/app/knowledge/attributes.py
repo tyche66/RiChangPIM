@@ -272,9 +272,14 @@ SIZE_TERMS = (
     "长度", "长", "宽度", "宽", "高度", "高", "尺寸", "规格", "毫米", "厘米", "米",
     "mm", "MM", "cm", "CM", "m",
 )
+# 属性维度后缀词：「风格/样式/系列」本身不指向任何产品，只是「XX风格」的结构
+# 后缀。留着会变成 AND 关键词把属性命中结果过滤空（2026-10-28 实测
+# 「现代简约风格」只剩「风格」作关键词 → 0 结果）。注意只拦整词，不停用
+# 「班台」「职员桌」这类真正有检索意义的名词。
+ATTRIBUTE_SUFFIX_TERMS = ("风格", "样式", "款式", "风格化", "系列", "类型", "类")
 TERM_STOPWORDS = set(POLITE_TERMS) | set(QUESTION_TERMS) | set(COUNT_TERMS) | set(
     PRICE_TERMS
-) | set(SIZE_TERMS)
+) | set(SIZE_TERMS) | set(ATTRIBUTE_SUFFIX_TERMS)
 
 _RESIDUAL_FILLER_TERMS = tuple(
     sorted(
@@ -678,8 +683,11 @@ def build_product_query(
                 source="rule",
             )
         )
+        # aliases 是 option_code -> 命中别名原文的映射。包成 [alias] 而不是
+        # list(alias)：后者会把「现代风格」拆成单字，下游按单字剔除残词时
+        # 既删不干净也可能误删（2026-10-28 实测 alias_labels 存的是单字）。
         query.alias_labels.setdefault(attribute_code, {}).update(
-            {code: list(aliases) for code, aliases in options.items()}
+            {code: [aliases] for code, aliases in options.items()}
         )
     for attribute_code, options in excluded.items():
         query.exclude_values.append(

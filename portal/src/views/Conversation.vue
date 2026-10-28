@@ -45,7 +45,13 @@ import SourceDialog from '@/components/SourceDialog.vue'
 import { useAuthStore } from '@/stores/auth'
 import { buildAnswer, citationIndexBySource } from '@/utils/citations'
 import { isEmbedded } from '@/utils/embed'
-import { confidenceLabel, formatDuration, phaseLabel, shortId } from '@/utils/format'
+import {
+  confidenceLabel,
+  formatDateTime,
+  formatDuration,
+  phaseLabel,
+  shortId,
+} from '@/utils/format'
 import { vReveal } from '@/utils/reveal'
 
 const RESULT_STATUS_LABELS: Record<string, string> = {
@@ -56,6 +62,21 @@ const RESULT_STATUS_LABELS: Record<string, string> = {
 }
 /** 首屏推荐卡数量。叠卡同屏最多 5 张，推荐位就按 5 张铺。 */
 const RECOMMEND_SIZE = 5
+
+/**
+ * 浏览器本地查询历史的存储键与容量上限。
+ *
+ * 历史只回答一个问题：这一轮到底问的是什么。所以条目里只有查询文本和时间，
+ * 绝不写 token、账号、session_id、trace_id、产品数据，也不发任何新请求。
+ */
+const QUERY_HISTORY_KEY = 'richangpim.portal.queryHistory.v1'
+const QUERY_HISTORY_LIMIT = 30
+
+/** 一条本地查询历史：只有查询文本和 ISO 时间，不含任何身份或结果数据。 */
+interface QueryHistoryItem {
+  message: string
+  at: string
+}
 
 const auth = useAuthStore()
 const route = useRoute()
@@ -91,6 +112,11 @@ const controller = ref<AbortController | null>(null)
 const resultsEl = ref<HTMLElement | null>(null)
 const composer = ref<InstanceType<typeof ChatInput> | null>(null)
 
+/** 本地查询历史：新到旧，最多 QUERY_HISTORY_LIMIT 条。 */
+const queryHistory = ref<QueryHistoryItem[]>([])
+const historyOpen = ref(false)
+const lastQueryAt = ref('')
+
 const rendered = computed(() => buildAnswer(answer.value, sources.value, busy.value))
 const segments = computed(() => rendered.value.segments)
 const citationIndex = computed(() => citationIndexBySource(rendered.value.citations))
@@ -106,6 +132,13 @@ const hasResults = computed(() =>
   ),
 )
 const started = computed(() => busy.value || hasResults.value || Boolean(lastQuery.value))
+/** 本次查询的时间戳：查询后立刻能看到「这一轮问的是什么、什么时候问的」。 */
+const lastQueryTime = computed(() => (lastQueryAt.value ? formatDateTime(lastQueryAt.value) : ''))
+/** 折叠行的文案：「历史查询 12 条 ▾」。 */
+const historySummary = computed(() => {
+  const count = queryHistory.value.length
+  return count ? `历史查询 ${count} 条` : '历史查询'
+})
 /** 门户 viewer 只有 ai:* 权限，取产品列表会 403，所以先判断再请求。 */
 const canViewProducts = computed(
   () => auth.roleCode === 'admin' || auth.permissions.includes('product:view'),
@@ -195,6 +228,110 @@ function clearResults() {
 function reset() {
   clearResults()
   lastQuery.value = ''
+  lastQueryAt.value = ''
+}
+
+/* ===== 浏览器本地查询历史 =====
+ * 用户原话：「点击查询之后，我看不到本轮查询的是什么。需要有一个地方显示查询历史，
+ * 最好是浏览器本地存储，不在服务器端存储。」所以这里只动 localStorage：
+ * 不新增接口、不落服务器、不写 token / session_id / trace_id / 产品数据。
+ * localStorage 在隐私模式、存储被禁用或配额已满时会抛错，统一静默降级——
+ * 读失败当没有历史，写失败只丢这一条历史，查询流程本身不受影响。
+ */
+function safeLocalStorage(): Storage | null {
+  try {
+    return window.localStorage
+  } catch {
+    return null
+  }
+}
+
+function parseHistoryItem(value: unknown): QueryHistoryItem | null {
+  if (typeof value !== 'object' || value === null) return null
+  const record = value as Record<string, unknown>
+  const message = typeof record.message === 'string' ? record.message.trim() : ''
+  if (!message) return null
+  const at = typeof record.at === 'string' ? record.at : ''
+  if (at && Number.isNaN(new Date(at).getTime())) return null
+  return { message, at }
+}
+
+function readQueryHistory(): QueryHistoryItem[] {
+  const store = safeLocalStorage()
+  if (!store) return []
+  try {
+    const raw = store.getItem(QUERY_HISTORY_KEY)
+    if (!raw) return []
+    const parsed: unknown = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    return parsed
+      .map((item) => parseHistoryItem(item))
+      .filter((item): item is QueryHistoryItem => item !== null)
+      .slice(0, QUERY_HISTORY_LIMIT)
+  } catch {
+    return []
+  }
+}
+
+function writeQueryHistory(list: QueryHistoryItem[]) {
+  const store = safeLocalStorage()
+  if (!store) return
+  try {
+    store.setItem(QUERY_HISTORY_KEY, JSON.stringify(list))
+  } catch {
+    // 配额已满或被禁用：这一条历史不入库，界面上已有的列表照常可用。
+  }
+}
+
+/**
+ * 成功后留档。同句重复查询时把旧条目上提到最前并更新时间戳，
+ * 因此既不会堆重复项，也不会因为「相邻重复」凭空多出记录。
+ */
+function recordQueryHistory(message: string) {
+  const text = message.trim()
+  if (!text) return
+  const kept = queryHistory.value.filter((item) => item.message !== text)
+  queryHistory.value = [{ message: text, at: new Date().toISOString() }, ...kept].slice(
+    0,
+    QUERY_HISTORY_LIMIT,
+  )
+  writeQueryHistory(queryHistory.value)
+}
+
+function clearQueryHistory() {
+  queryHistory.value = []
+  historyOpen.value = false
+  writeQueryHistory([])
+}
+
+/** 点历史条目：先把该句填回输入框，再立即重新执行这一次查询。 */
+function rerunQuery(item: QueryHistoryItem) {
+  if (busy.value) return
+  historyOpen.value = false
+  composer.value?.prefill(item.message)
+  void submit(item.message)
+}
+
+/** 相对时间：让列表里一眼分出「刚刚」和「三天前」，再早退回具体日期。 */
+function relativeTime(at: string): string {
+  if (!at) return ''
+  const parsed = Date.parse(at)
+  if (Number.isNaN(parsed)) return ''
+  const diff = Date.now() - parsed
+  if (diff < 0) return '刚刚'
+  const minutes = Math.floor(diff / 60000)
+  if (minutes < 1) return '刚刚'
+  if (minutes < 60) return `${minutes} 分钟前`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours} 小时前`
+  const days = Math.floor(hours / 24)
+  if (days <= 7) return `${days} 天前`
+  return formatDateTime(at)
+}
+
+/** 历史条目上的完整时间提示（悬停 / 读屏都能拿到确切时间）。 */
+function historyTimeTitle(item: QueryHistoryItem): string {
+  return item.at ? formatDateTime(item.at) : '时间未记录'
 }
 
 function isAbortError(value: unknown): boolean {
@@ -266,6 +403,7 @@ async function submit(message: string) {
   }
   clearResults()
   lastQuery.value = message
+  lastQueryAt.value = new Date().toISOString()
   phaseText.value = '正在识别意图'
   busy.value = true
   const startedAt = Date.now()
@@ -295,6 +433,8 @@ async function submit(message: string) {
         throw streamFailure || exc
       }
     }
+    // 查询走通才留档：失败和中止的尝试不进历史，列表里只留下真正问过的问题。
+    recordQueryHistory(message)
   } catch (exc) {
     if (isAbortError(exc)) notice.value = '已停止生成，下面是已经收到的内容。'
     else error.value = exc instanceof Error ? exc.message : '请求失败'
@@ -384,6 +524,8 @@ function signOut() {
 }
 
 onMounted(() => {
+  // 本地历史与服务器会话无关：进页面即读，login/刷新后照样看得到。
+  queryHistory.value = readQueryHistory()
   const initial = route.query.q
   if (typeof initial === 'string' && initial) void submit(initial)
   void loadRecommended()
@@ -414,6 +556,56 @@ onMounted(() => {
 
       <div class="composer-wrap">
         <ChatInput ref="composer" :busy="busy" @submit="submit" @stop="stop" />
+
+        <!--
+          查询历史（仅浏览器本地）。默认折叠成一行，展开后点任意一条即把该句
+          填回输入框并重新执行；「清空历史」只清本地，不碰任何服务器数据。
+        -->
+        <div v-if="queryHistory.length" class="query-history">
+          <div class="query-history__bar">
+            <button
+              type="button"
+              class="query-history__toggle"
+              :aria-expanded="historyOpen"
+              aria-controls="query-history-list"
+              @click="historyOpen = !historyOpen"
+            >
+              <span>{{ historySummary }}</span>
+              <svg
+                class="query-history__caret"
+                :class="{ 'query-history__caret--open': historyOpen }"
+                viewBox="0 0 24 24"
+                fill="none"
+                aria-hidden="true"
+              >
+                <path
+                  d="M6 9l6 6l6-6"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </button>
+            <button type="button" class="button button--ghost button--small" @click="clearQueryHistory">
+              清空历史
+            </button>
+          </div>
+          <ul v-show="historyOpen" id="query-history-list" class="query-history__list" aria-label="本地查询历史">
+            <li v-for="item in queryHistory" :key="item.message">
+              <button
+                type="button"
+                class="query-history__item"
+                :title="historyTimeTitle(item)"
+                :aria-label="`重新查询：${item.message}，${historyTimeTitle(item)}`"
+                @click="rerunQuery(item)"
+              >
+                <span class="query-history__text">{{ item.message }}</span>
+                <span class="query-history__time">{{ relativeTime(item.at) }}</span>
+              </button>
+            </li>
+          </ul>
+        </div>
       </div>
 
       <HeroDeck
@@ -445,6 +637,7 @@ onMounted(() => {
       <p v-if="lastQuery" class="query-echo">
         <span>本次查询</span>
         <strong>{{ lastQuery }}</strong>
+        <time v-if="lastQueryTime" class="query-echo__time" :datetime="lastQueryAt">{{ lastQueryTime }}</time>
       </p>
 
       <article v-reveal class="panel panel--answer">
@@ -523,3 +716,115 @@ onMounted(() => {
 
   </main>
 </template>
+
+<style scoped>
+/* ===== 查询历史（浏览器本地）=====
+ * 挂在输入框正下方，与胶囊输入同一条视觉动线：默认折叠成一行文字，展开是
+ * 一张弱填充的列表。样式沿用 main.css 的令牌（ink / border / radius），
+ * 深色主题自动跟随，不另写颜色。
+ */
+
+.query-history {
+  margin-top: -6px;
+}
+
+/* 折叠行：左边「历史查询 N 条 ▾」，右边「清空历史」，两端对齐、不换行 */
+.query-history__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 30px;
+}
+
+.query-history__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--ink-muted);
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.6;
+  cursor: pointer;
+  transition: color .18s ease;
+}
+.query-history__toggle:hover { color: var(--ink); }
+.query-history__toggle:focus-visible {
+  outline: 2px solid var(--pine);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+.query-history__caret {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  transition: transform .18s ease;
+}
+.query-history__caret--open { transform: rotate(180deg); }
+
+.query-history__list {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 4px;
+  max-height: 264px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+/* 列表行：整行可点，hover 高亮；左边查询文本、右边相对时间 */
+.query-history__item {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color .18s ease;
+}
+.query-history__item + .query-history__item { margin-top: 2px; }
+.query-history__item:hover { background: var(--surface-strong); }
+.query-history__item:focus-visible {
+  outline: 2px solid var(--pine);
+  outline-offset: -2px;
+}
+.query-history__text {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.query-history__time {
+  flex: none;
+  color: var(--ink-subtle);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* 「本次查询」回显：加一个右对齐的时间戳，滚动后翻回来也知道是这一轮的 */
+.query-echo__time {
+  margin-left: auto;
+  color: var(--ink-subtle);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .query-history__list { max-height: 208px; }
+  .query-history__item { flex-wrap: wrap; }
+  .query-history__time { flex-basis: 100%; }
+}
+</style>

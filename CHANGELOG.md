@@ -48,6 +48,31 @@
 - **AI 配置中心页面空白**：前端 `src/api/aiConfig.ts` 多读了一层 envelope（`resp.data.data`），恒取到空数组；已改为仓库约定的 `resp.data`。
 - **发布后白屏（须刷新才好）**：nginx 原本完全不发 `Cache-Control`，浏览器 heuristic 缓存旧 `index.html`，代码更新后旧入口 chunk 名 404。现入口 HTML 一律 `no-cache` 重新校验，带内容哈希的 `/admin/assets/` 与 `/assets/` 为 `public, max-age=31536000, immutable`。
 
+### 自然语言检索与查询历史（2026-10-28 修复「现代风格」返回空）
+- **根因（三层）**：① 规则层只认词典别名，说法没列进别名表就没有硬条件；
+  ② 模型规划器拿到的字典上下文**只有 option code，没有中文名和别名**，
+  模型无法把「现代风格」映射到 `modern`；③ 纯英文词被型号正则误判成
+  `product_no`（「modern」→`product_no IN ('modern')`，把属性命中结果全部过滤空）。
+- **词典补齐**：每个 style/shape/material/color 选项都补「…风格/…风」后缀与
+  英文别名；`board` 补「板式」，`rect` 补「方桌/矩形桌」。
+- **模型规划器**：字典上下文改为 `code(中文名): option(别名|别名)` 形态，
+  并明确要求把多字少字、口语化、带程度词的说法按语义归到已定义取值。
+- **型号提取**：`_extract_product_nos` 增加形态判据（必含数字或 `-._/`）与
+  词典别名排除；本库 4024 个在售型号全部含数字，判据安全。`alias_labels`
+  修正为存整条别名（原先 `list(字符串)` 把「现代风格」拆成了单字）。
+- **新增 `app/knowledge/semantic.py`**：关键词/属性精确层一无所获时的两级兜底。
+  先 `resolve_facets`——让模型把自然语言归一到受治理取值（词典内 fail-closed，
+  编造的属性/取值一律丢弃）再跑一次精确 SQL；仍无果再 `screen_products`——
+  对宽松/文本召回候选做一次语义筛选，挑最贴切的若干款。两级都不成立保持为空
+  （「巴洛克式会议桌」仍然为空）。响应新增 `semantic_interpretation` 字段。
+- **停用词**：「风格/样式/款式/系列」这类结构后缀不再作为 AND 关键词，
+  否则「现代简约风格」剔除「现代简约」后剩下的「风格」会清空结果。
+- **门户查询历史**：新增浏览器 localStorage 历史（`richangpim.portal.queryHistory.v1`，
+  上限 30 条，只存查询文本与时间，隐私模式下降级不报错），点击条目可重跑；
+  「本次查询」回显补充时间戳。不新增任何服务端存储。
+- 测试：新增 `tests/unit/test_knowledge_semantic.py`（47 例：解析容错、fail-closed、
+  负向保持空、型号提取、归一/筛选/兜底链路）；全量 `tests/unit` 554 passed / 5 skipped。
+
 ### 系列属性索引扩充（2026-10-28 数据工具，随后端镜像重发布生效）
 - `seed_attribute_dictionary` 新增 `SERIES_OPTIONS`：20 个系列选项 + 65 个别名，`option_code` 取系列 `tag_name`，使「灵多系列」这类问句能在查询理解层解析成 `series=灵多`。
 - `backfill_product_attributes` 新增「系列（+可选类目）」条目形态：按 `product_tag`(`tag_type=series`) 展开到该系列全部在售产品，展开不到成员时告警，幂等语义不变。

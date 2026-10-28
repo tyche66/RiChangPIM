@@ -9,10 +9,11 @@ from uuid import UUID, uuid4
 
 from app.adapters.base import AIServiceAdapter
 from app.core.config import settings
-from app.knowledge.attributes import await_load_dictionary
+from app.knowledge.attributes import EMPTY_DICTIONARY, await_load_dictionary, normalize_text
 from app.knowledge.citations import CitationValidator
 from app.knowledge.errors import KnowledgeErrorCode, KnowledgeGatewayError
 from app.knowledge.events import sse_event
+from app.knowledge.facets import ProductFacets
 from app.knowledge.metrics import record_query
 from app.knowledge.model_gateway import AdapterModelGateway
 from app.knowledge.model_planner import ModelToolPlanner
@@ -22,6 +23,7 @@ from app.knowledge.policy import require_ai_access
 from app.knowledge.quota import QuotaCheckRequest, QuotaUsageRecord, get_quota_checker
 from app.knowledge.retrieval.hybrid import HybridRetriever
 from app.knowledge.schemas import KnowledgeQueryRequest, KnowledgeQueryResponse, KnowledgeUsage
+from app.knowledge.semantic import resolve_facets, screen_products
 from app.knowledge.sessions import DigestConversationStore, digest_text
 from app.knowledge.tools.base import ToolContext
 from app.knowledge.tools.registry import ToolRegistry, default_tool_registry
@@ -110,6 +112,18 @@ class KnowledgeGateway:
             issues = tool_results.get("issues", [])
             suppliers = tool_results.get("suppliers", [])
 
+            # 关键词/属性精确层一无所获时，先让模型把自然语言归一成受治理属性取值
+            # 再查一次，仍无果才对召回候选做语义筛选——让门户卡片区始终拿到
+            # "最贴切"的候选，而不是空。
+            products, semantic_note = await self._recover_products(
+                request,
+                plan,
+                products,
+                tool_results,
+                tool_context,
+                session_id=session_id,
+            )
+
             if plan.retrieval.get("enabled"):
                 retriever = HybridRetriever(self.adapter, self.db)
                 product_id = products[0].get("id") if products else None
@@ -132,7 +146,14 @@ class KnowledgeGateway:
                 plan, request, current_user, user_id, products, sources, usage
             )
             answer = _deterministic_answer(
-                plan, facts, products, sources, issues, suppliers, pending_actions
+                plan,
+                facts,
+                products,
+                sources,
+                issues,
+                suppliers,
+                pending_actions,
+                semantic_note=semantic_note,
             )
             self.citation_validator.validate_sources(sources)
             model_gateway = AdapterModelGateway(self.adapter)
@@ -184,6 +205,7 @@ class KnowledgeGateway:
                 pending_actions=pending_actions,
                 confidence=_confidence(facts, products, sources),
                 insufficient_sources=not (facts or products or sources),
+                semantic_interpretation=semantic_note or None,
                 usage=usage,
             )
             store = DigestConversationStore(self.db, user_id)
@@ -305,6 +327,8 @@ class KnowledgeGateway:
             "issues": [],
             "suppliers": [],
             "tool_names": [],
+            # 宽松 / 文本召回的候选：不作为主结果返回，只供语义筛选兜底。
+            "candidates": [],
         }
         for tool_name in plan.required_tools:
             params = plan.tool_params.get(tool_name) or _params_for_tool(tool_name, plan, request)
@@ -312,9 +336,134 @@ class KnowledgeGateway:
             acc["tool_names"].append(tool_name)
             for key in ("facts", "products", "sources", "issues", "suppliers"):
                 acc[key].extend(result.get(key) or [])
+            acc["candidates"].extend(result.get("relaxed_candidates") or [])
+            acc["candidates"].extend(result.get("text_candidates") or [])
         acc["products"] = _dedupe_by(acc["products"], "id")
+        acc["candidates"] = _dedupe_by(acc["candidates"], "id")
         acc["sources"] = _dedupe_by(acc["sources"], "source_id")
         return acc
+
+    async def _recover_products(
+        self,
+        request: KnowledgeQueryRequest,
+        plan: QueryPlan,
+        products: list[dict[str, Any]],
+        tool_results: dict[str, Any],
+        context: ToolContext,
+        *,
+        session_id: str,
+    ) -> tuple[list[dict[str, Any]], str]:
+        """精确层一无所获时的两级兜底，按代价从低到高：
+
+        1. **语义归一**：让模型把自然语言映射成受治理属性取值（词典内 fail-closed），
+           再跑一次精确 SQL。命中即拿到该条件下的完整结果集。
+        2. **语义筛选**：对宽松/文本召回的候选池做一次模型筛选，挑最贴切的若干款。
+
+        两级都不成立就保持为空——「巴洛克式会议桌」这类查询必须仍然为空。
+        """
+        if products or "product.search" not in plan.required_tools:
+            return products, ""
+        dictionary = getattr(self.planner, "dictionary", None) or EMPTY_DICTIONARY
+        # 语义归一的说明（问过模型就透传，哪怕归一不出也要告诉用户为什么空）
+        note = ""
+
+        # ---- 1) 语义归一 -> 精确 SQL -------------------------------------
+        resolution = await resolve_facets(
+            request.message,
+            dictionary,
+            adapter=self.adapter,
+            session_id=session_id,
+        )
+        if resolution.consulted:
+            note = resolution.interpretation
+        if resolution.used:
+            params = dict(
+                plan.tool_params.get("product.search")
+                or _params_for_tool("product.search", plan, request)
+            )
+            # 整句原话曾因"没读懂"被当成关键词；现在有了属性条件，它只会变成
+            # AND 过滤把结果清空，所以按归一化整句剔除。
+            raw = normalize_text(request.message)
+            keywords = [kw for kw in params.get("keywords") or [] if normalize_text(kw) != raw]
+            params["keywords"] = keywords
+            params["keyword"] = None
+            existing = [
+                facet
+                for facet in params.get("hard_facets") or []
+                if facet.get("attribute_code") not in {f.attribute_code for f in resolution.facets}
+            ]
+            params["hard_facets"] = [
+                *_dump_facets(resolution.facets),
+            ] + existing
+            params["facets"] = {
+                **{str(k): v for k, v in (params.get("facets") or {}).items()},
+                **{f.attribute_code: list(f.values) for f in resolution.facets},
+            }
+            result = await self.registry.execute("product.search", params, context)
+            exact = result.get("products") or []
+            if exact:
+                # 同步 entities，保证确定答案/引用/排序逻辑看到同一批硬条件
+                plan.entities.query.hard_facets = list(resolution.facets)
+                plan.entities.facets = ProductFacets.from_query(plan.entities.query)
+                plan.tool_params["product.search"] = params
+                return _dedupe_by(exact, "id"), resolution.interpretation
+            tool_results.setdefault("candidates", [])
+            tool_results["candidates"].extend(result.get("relaxed_candidates") or [])
+            tool_results["candidates"].extend(result.get("text_candidates") or [])
+
+        # ---- 2) 语义筛选 -------------------------------------------------
+        products, screen_note = await self._screen_candidates(
+            request,
+            plan,
+            products,
+            _dedupe_by(tool_results.get("candidates") or [], "id"),
+            session_id=session_id,
+        )
+        # 语义归一问过模型：它的说明优先保留（即便归一不出，也要告诉用户为什么空）；
+        # 只有筛选给出了更具体的贴合说明时才覆盖。
+        return products, screen_note or note
+
+    async def _screen_candidates(
+        self,
+        request: KnowledgeQueryRequest,
+        plan: QueryPlan,
+        products: list[dict[str, Any]],
+        candidates: list[dict[str, Any]],
+        *,
+        session_id: str,
+    ) -> tuple[list[dict[str, Any]], str]:
+        """精确层一无所获时，对召回候选做一次自然语言语义筛选。
+
+        返回 (筛选后的产品卡片, 一句中文说明)。没有候选、适配器不可用或模型
+        认为没有贴合的产品时，原样返回空——「巴洛克式会议桌」这类查询必须为空。
+        """
+        if products:
+            return products, ""
+        if "product.search" not in plan.required_tools or not candidates:
+            return products, ""
+        screening = await screen_products(
+            request.message,
+            candidates,
+            adapter=self.adapter,
+            session_id=session_id,
+        )
+        if not screening.used:
+            return products, screening.interpretation
+        by_no = {
+            str(card.get("product_no") or ""): card
+            for card in candidates
+            if card.get("product_no")
+        }
+        screened: list[dict[str, Any]] = []
+        for item in screening.products:
+            card = by_no.get(item.product_no)
+            if card is None:
+                continue
+            card = dict(card)
+            card["match_tier"] = "semantic"
+            card["match_reason"] = item.reason or card.get("match_reason") or ""
+            screened.append(card)
+        return screened, screening.interpretation
 
     async def _plan(self, request, *, current_user: dict, pool, session_id: str) -> QueryPlan:
         planner = ModelToolPlanner(self.planner, self.registry)
@@ -451,6 +600,8 @@ def _deterministic_answer(
     issues: list[dict],
     suppliers: list[dict],
     pending_actions: list[dict],
+    *,
+    semantic_note: str = "",
 ) -> str:
     if plan.intent.value == "proposal_draft":
         if pending_actions:
@@ -467,6 +618,7 @@ def _deterministic_answer(
     if plan.entities.facets.shape and not products:
         return "未找到符合指定桌形的产品。"
     if products:
+        note = f"（AI 语义筛选：{semantic_note}）" if semantic_note else ""
         if plan.entities.specification_sort:
             selected = products[0]
             length = selected.get("specification_length_mm")
@@ -492,7 +644,10 @@ def _deterministic_answer(
                 f"当前{price_label}面价为 {product_name}，"
                 f"面价 {selected.get('face_price_display')}。"
             )
-        return f"找到 {len(products)} 个相关产品，价格与库存均来自当前 PIM 结构化事实。"
+        return (
+            f"找到 {len(products)} 个相关产品{note}，"
+            "价格与库存均来自当前 PIM 结构化事实。"
+        )
     if sources:
         return "已找到可引用资料来源，请核对来源后使用。"
     return "资料不足，无法形成可靠答案。"
@@ -516,6 +671,11 @@ def _confidence(facts: list, products: list, sources: list) -> str:
     if sources:
         return "medium"
     return "insufficient"
+
+
+def _dump_facets(facets) -> list[dict[str, Any]]:
+    """HardFacet -> 可JSON序列化的参数形态（与 _params_for_tool 一致）。"""
+    return [facet.model_dump(mode="json") for facet in facets]
 
 
 def _dedupe_by(items: list[dict], key: str) -> list[dict]:

@@ -157,4 +157,7 @@ class KnowledgeQueryResponse(BaseModel):
     pending_actions: list[Any] = Field(default_factory=list)
     confidence: Literal["high", "medium", "low", "insufficient"] = "medium"
     insufficient_sources: bool = False
+    # 精确层没命中、由 AI 语义筛选兜底时的一句中文说明（例如"现代风格 → 风格=现代"）。
+    # 纯前端可据此提示用户"这些是 AI 理解后的最贴切结果，不是精确条件命中"。
+    semantic_interpretation: str | None = None
     usage: KnowledgeUsage = Field(default_factory=KnowledgeUsage)
