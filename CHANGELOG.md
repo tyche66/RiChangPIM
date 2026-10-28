@@ -48,6 +48,13 @@
 - **AI 配置中心页面空白**：前端 `src/api/aiConfig.ts` 多读了一层 envelope（`resp.data.data`），恒取到空数组；已改为仓库约定的 `resp.data`。
 - **发布后白屏（须刷新才好）**：nginx 原本完全不发 `Cache-Control`，浏览器 heuristic 缓存旧 `index.html`，代码更新后旧入口 chunk 名 404。现入口 HTML 一律 `no-cache` 重新校验，带内容哈希的 `/admin/assets/` 与 `/assets/` 为 `public, max-age=31536000, immutable`。
 
+### 系列属性索引扩充（2026-10-28 数据工具，随后端镜像重发布生效）
+- `seed_attribute_dictionary` 新增 `SERIES_OPTIONS`：20 个系列选项 + 65 个别名，`option_code` 取系列 `tag_name`，使「灵多系列」这类问句能在查询理解层解析成 `series=灵多`。
+- `backfill_product_attributes` 新增「系列（+可选类目）」条目形态：按 `product_tag`(`tag_type=series`) 展开到该系列全部在售产品，展开不到成员时告警，幂等语义不变。
+- 新增 `backend/app/scripts/data/series_attribute_mapping.json`：217 条系列级规则（series/style/shape/material/color），覆盖 20 个系列。系列自身条目是 `product_tag` 事实回填；风格/桌形/材质/颜色由产品图视觉 + 官方画册/培训教材判定，其中新中式（领瑞、大都会）与现代（I-瓦尔纳Ⅱ）以官方培训教材「产品地图」分区为准，修正了视觉的 modern 误判。
+- 全部 197 条 AI 候选已于 2026-10-27 经业务逐行确认，`verified` 置 true；确认范围、确认人与日期写入 mapping 的 `_confirmed_by`/`_confirmed_at`/`_confirmed_scope`，逐条 note 亦追加确认信息。`source` 保持原值（`ai_inferred` 保留 AI 溯源），回退仍可按 `source`+写入日期精确软删。
+- 本地 `--check`：created=17879 / skipped=0 / unresolved=0。生效方式为容器内 `--check`→`--apply`；验收走知识网关问句与 `product_attribute_value` 统计。回退按 `source`+日期软删 `product_attribute_value`，不硬删、不清表。
+
 ## v1.9.4 — 2026-10-23
 
 本版本合并三组能力：产品属性检索、内容 Skills/独立选题、方案空间与客户展示；同时把本地迁移链对齐到生产 `0024_attachment_biz_domain_compat` 基线，避免服务器升级时 revision 不识别。发布前并入一组界面修复：内容工坊改用「创作 Skills」口径、新增方案弹窗重排、分享页商品详情改为点击弹窗。
