@@ -26,34 +26,21 @@
 
 **不要去改的历史记录**（改了就是篡改发布史）：`BUILD_LOG.md` 的构建记录、`PROJECT_MANAGEMENT.md` 的发布台账、`TODO.md` 的「已发布」条目、`docs/08-开发路线图.md` 的里程碑行。`RELEASE_GATE.md` 已改成版本无关，不需要跟着版本走。
 
-## v1.9.5 — 2026-10-26
+## v1.9.6 — 2026-10-28
 
-本版本交付 AI 配置中心（`AI 功能 → AI 配置中心`，仅管理员）：选品检索与内容工坊两个域的 API 地址、API Key、对话模型 ID、可选模型列表、嵌入模型与超时改为可在后台维护，数据库覆盖优先、留空回落环境变量，保存后约 15 秒生效无需重启。同时重写内容工坊/独立选题的提示词（写作规则前置、合规规则改为后台执行），并把产品事实从 3 个字段扩展到 12 个（含受治理属性，价格/库存/供应商等隐私字段一律不进提示词）。
+本版交付**首批 20 系列产品属性索引**（词典 `series` 选项 + 217 条系列级 mapping，
+回填 17879 条产品属性值，全部条目已业务确认）；修复「现代风格」这类自然语言查询
+返回空的三层根因（词典别名不全、模型字典上下文只有 option code、纯英文词被误判成
+产品型号）；在关键词/属性精确层一无所获时新增两级语义兜底（先把自然语言**归一元
+到受治理属性取值**再查一次，仍无果才对召回候选做**语义筛选**）；门户新增浏览器
+本地查询历史；并修复 AI 配置中心的改动约 15 秒后静默回落环境变量的问题。
 
-### AI 配置中心
-- 新增 `ai_provider_config` 表（迁移 `0031_ai_provider_config`）与 `ai:config` 权限码（仅 admin）。
-- 两个 scope：`knowledge`（选品检索/知识库/润色/推荐）与 `content`（内容工坊/独立选题）；逐字段覆盖，空值回落环境变量，关闭开关即整域回落。
-- 读取一律返回密钥掩码；`POST /ai/config/{scope}/test` 做最小连通性探测（10s 超时、不重试、不回传上游响应体）。
-- 适配器缓存按配置指纹重建，改 Key/模型后无需重启后端；启动时预热缓存。
-- `GET/PUT` 命中 `PermissionChecker("ai:config")` 并显式校验 `role_code=admin`，非管理员 403。
-
-### 内容生成质量
-- 内容工坊两个 DNA Skill 与独立选题模板重写：标题/正文写作规则前置，"事实规则只在后台执行，绝不能变成正文的口吻"，禁止把免责/核验话术写进 title/body/hashtags。
-- 生成侧 system 消息改为写手人格（`SYSTEM_PERSONA`），合规继续由后置守卫与 `verification_gaps` 兜底。
-- 产品事实扩展到 12 字段（品类/品牌/材质/材质说明/颜色/描述/受治理属性），仅保留可信来源属性值，`ai_inferred` 未确认的丢弃；`face_price`/`stock_status`/`data_source` 等一律不进提示词。
-- `--refresh` 种子模式：用代码模板原地刷新已存在的运营 Skill（原模式对已存在行只跳过）。
-
-### 发布后修复（并入 v1.9.5）
-- **迁移 0031 列名错误**：向 `permission` 插 `ai:config` 时用了不存在的 `code`/`name` 列，backend 启动即崩；已改为真实的 `perm_code`/`perm_name`，与 `0020_crm_perms` 写法对齐。
-- **AI 配置中心页面空白**：前端 `src/api/aiConfig.ts` 多读了一层 envelope（`resp.data.data`），恒取到空数组；已改为仓库约定的 `resp.data`。
-- **发布后白屏（须刷新才好）**：nginx 原本完全不发 `Cache-Control`，浏览器 heuristic 缓存旧 `index.html`，代码更新后旧入口 chunk 名 404。现入口 HTML 一律 `no-cache` 重新校验，带内容哈希的 `/admin/assets/` 与 `/assets/` 为 `public, max-age=31536000, immutable`。
-
-### AI 配置中心：模型改动 15 秒后失效（2026-10-28 修复）
-- **现象**：在 AI 配置中心把选品检索模型改成 `agnes-3.0-flash`，供应商后台收到的调用仍是 env 里的 `agnes-2.5-flash`。
-- **根因**：`ai_config` 的进程内缓存只在「启动」与「保存配置」时刷新，没有周期刷新；`peek()` 超过 `CACHE_TTL_SECONDS`(15s) 就返回 None，`get_config()` 随即回落环境变量——管理员的显式配置被静默丢回 env。内容工坊 scope 同理。
-- **修复**：`peek()` 过期也返回旧快照（TTL 只是「该续期了」，不是「作废」）；`main.lifespan` 增加短于 TTL 的周期刷新任务，缓存始终是 DB 覆盖层真值；DB 抖动仍保留旧快照，不清空、不回落 env。
-- 验收：改配置后等 20 秒（超过旧 TTL）再查询，知识网关 `usage.model` 为 DB 覆盖值。
-- 测试：`tests/unit/test_ai_config_ttl.py`（过期快照仍生效、空缓存才回落 env、DB 抖动保留旧快照）；`test_ai_config.py::test_cache_ttl_expires` 改为锁新行为。
+### 系列属性索引扩充（2026-10-28 数据工具，随后端镜像重发布生效）
+- `seed_attribute_dictionary` 新增 `SERIES_OPTIONS`：20 个系列选项 + 65 个别名，`option_code` 取系列 `tag_name`，使「灵多系列」这类问句能在查询理解层解析成 `series=灵多`。
+- `backfill_product_attributes` 新增「系列（+可选类目）」条目形态：按 `product_tag`(`tag_type=series`) 展开到该系列全部在售产品，展开不到成员时告警，幂等语义不变。
+- 新增 `backend/app/scripts/data/series_attribute_mapping.json`：217 条系列级规则（series/style/shape/material/color），覆盖 20 个系列。系列自身条目是 `product_tag` 事实回填；风格/桌形/材质/颜色由产品图视觉 + 官方画册/培训教材判定，其中新中式（领瑞、大都会）与现代（I-瓦尔纳Ⅱ）以官方培训教材「产品地图」分区为准，修正了视觉的 modern 误判。
+- 全部 197 条 AI 候选已于 2026-10-27 经业务逐行确认，`verified` 置 true；确认范围、确认人与日期写入 mapping 的 `_confirmed_by`/`_confirmed_at`/`_confirmed_scope`，逐条 note 亦追加确认信息。`source` 保持原值（`ai_inferred` 保留 AI 溯源），回退仍可按 `source`+写入日期精确软删。
+- 本地 `--check`：created=17879 / skipped=0 / unresolved=0。生效方式为容器内 `--check`→`--apply`；验收走知识网关问句与 `product_attribute_value` 统计。回退按 `source`+日期软删 `product_attribute_value`，不硬删、不清表。
 
 ### 自然语言检索与查询历史（2026-10-28 修复「现代风格」返回空）
 - **根因（三层）**：① 规则层只认词典别名，说法没列进别名表就没有硬条件；
@@ -80,12 +67,34 @@
 - 测试：新增 `tests/unit/test_knowledge_semantic.py`（47 例：解析容错、fail-closed、
   负向保持空、型号提取、归一/筛选/兜底链路）；全量 `tests/unit` 554 passed / 5 skipped。
 
-### 系列属性索引扩充（2026-10-28 数据工具，随后端镜像重发布生效）
-- `seed_attribute_dictionary` 新增 `SERIES_OPTIONS`：20 个系列选项 + 65 个别名，`option_code` 取系列 `tag_name`，使「灵多系列」这类问句能在查询理解层解析成 `series=灵多`。
-- `backfill_product_attributes` 新增「系列（+可选类目）」条目形态：按 `product_tag`(`tag_type=series`) 展开到该系列全部在售产品，展开不到成员时告警，幂等语义不变。
-- 新增 `backend/app/scripts/data/series_attribute_mapping.json`：217 条系列级规则（series/style/shape/material/color），覆盖 20 个系列。系列自身条目是 `product_tag` 事实回填；风格/桌形/材质/颜色由产品图视觉 + 官方画册/培训教材判定，其中新中式（领瑞、大都会）与现代（I-瓦尔纳Ⅱ）以官方培训教材「产品地图」分区为准，修正了视觉的 modern 误判。
-- 全部 197 条 AI 候选已于 2026-10-27 经业务逐行确认，`verified` 置 true；确认范围、确认人与日期写入 mapping 的 `_confirmed_by`/`_confirmed_at`/`_confirmed_scope`，逐条 note 亦追加确认信息。`source` 保持原值（`ai_inferred` 保留 AI 溯源），回退仍可按 `source`+写入日期精确软删。
-- 本地 `--check`：created=17879 / skipped=0 / unresolved=0。生效方式为容器内 `--check`→`--apply`；验收走知识网关问句与 `product_attribute_value` 统计。回退按 `source`+日期软删 `product_attribute_value`，不硬删、不清表。
+### AI 配置中心：模型改动 15 秒后失效（2026-10-28 修复）
+- **现象**：在 AI 配置中心把选品检索模型改成 `agnes-3.0-flash`，供应商后台收到的调用仍是 env 里的 `agnes-2.5-flash`。
+- **根因**：`ai_config` 的进程内缓存只在「启动」与「保存配置」时刷新，没有周期刷新；`peek()` 超过 `CACHE_TTL_SECONDS`(15s) 就返回 None，`get_config()` 随即回落环境变量——管理员的显式配置被静默丢回 env。内容工坊 scope 同理。
+- **修复**：`peek()` 过期也返回旧快照（TTL 只是「该续期了」，不是「作废」）；`main.lifespan` 增加短于 TTL 的周期刷新任务，缓存始终是 DB 覆盖层真值；DB 抖动仍保留旧快照，不清空、不回落 env。
+- 验收：改配置后等 20 秒（超过旧 TTL）再查询，知识网关 `usage.model` 为 DB 覆盖值。
+- 测试：`tests/unit/test_ai_config_ttl.py`（过期快照仍生效、空缓存才回落 env、DB 抖动保留旧快照）；`test_ai_config.py::test_cache_ttl_expires` 改为锁新行为。
+
+## v1.9.5 — 2026-10-26
+
+本版本交付 AI 配置中心（`AI 功能 → AI 配置中心`，仅管理员）：选品检索与内容工坊两个域的 API 地址、API Key、对话模型 ID、可选模型列表、嵌入模型与超时改为可在后台维护，数据库覆盖优先、留空回落环境变量，保存后约 15 秒生效无需重启。同时重写内容工坊/独立选题的提示词（写作规则前置、合规规则改为后台执行），并把产品事实从 3 个字段扩展到 12 个（含受治理属性，价格/库存/供应商等隐私字段一律不进提示词）。
+
+### AI 配置中心
+- 新增 `ai_provider_config` 表（迁移 `0031_ai_provider_config`）与 `ai:config` 权限码（仅 admin）。
+- 两个 scope：`knowledge`（选品检索/知识库/润色/推荐）与 `content`（内容工坊/独立选题）；逐字段覆盖，空值回落环境变量，关闭开关即整域回落。
+- 读取一律返回密钥掩码；`POST /ai/config/{scope}/test` 做最小连通性探测（10s 超时、不重试、不回传上游响应体）。
+- 适配器缓存按配置指纹重建，改 Key/模型后无需重启后端；启动时预热缓存。
+- `GET/PUT` 命中 `PermissionChecker("ai:config")` 并显式校验 `role_code=admin`，非管理员 403。
+
+### 内容生成质量
+- 内容工坊两个 DNA Skill 与独立选题模板重写：标题/正文写作规则前置，"事实规则只在后台执行，绝不能变成正文的口吻"，禁止把免责/核验话术写进 title/body/hashtags。
+- 生成侧 system 消息改为写手人格（`SYSTEM_PERSONA`），合规继续由后置守卫与 `verification_gaps` 兜底。
+- 产品事实扩展到 12 字段（品类/品牌/材质/材质说明/颜色/描述/受治理属性），仅保留可信来源属性值，`ai_inferred` 未确认的丢弃；`face_price`/`stock_status`/`data_source` 等一律不进提示词。
+- `--refresh` 种子模式：用代码模板原地刷新已存在的运营 Skill（原模式对已存在行只跳过）。
+
+### 发布后修复（并入 v1.9.5）
+- **迁移 0031 列名错误**：向 `permission` 插 `ai:config` 时用了不存在的 `code`/`name` 列，backend 启动即崩；已改为真实的 `perm_code`/`perm_name`，与 `0020_crm_perms` 写法对齐。
+- **AI 配置中心页面空白**：前端 `src/api/aiConfig.ts` 多读了一层 envelope（`resp.data.data`），恒取到空数组；已改为仓库约定的 `resp.data`。
+- **发布后白屏（须刷新才好）**：nginx 原本完全不发 `Cache-Control`，浏览器 heuristic 缓存旧 `index.html`，代码更新后旧入口 chunk 名 404。现入口 HTML 一律 `no-cache` 重新校验，带内容哈希的 `/admin/assets/` 与 `/assets/` 为 `public, max-age=31536000, immutable`。
 
 ## v1.9.4 — 2026-10-23
 

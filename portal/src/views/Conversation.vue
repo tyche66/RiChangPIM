@@ -12,8 +12,8 @@
  * 2. 后端枚举、字段名和占位值一律经 utils/format 翻译，不直接渲染。
  * 3. 正文里的 [chunk:uuid] 由 utils/citations 折成脚注角标，引用关系不丢。
  * 4. 卡片堆始终是叠卡（最多 5 张），结果超过 5 张时在卡堆内用滚轮循环
- *    翻页，页面主体不跟滚；未查询时放推荐产品，取不到推荐（门户 viewer
- *    没有 product:view）就退化成空白占位卡，**不编造数据**。
+ *    翻页，页面主体不跟滚；未查询时放推荐产品，API 返回 403（无权限）
+ *    或其他错误时退化成占位卡，**不编造数据**。
  * 5. 查询后不自动滚动，改用卡片下方的「向下查看回答」提示，滚动由用户决定。
  * 6. 答案正文是 AI 生成的 Markdown，由 utils/markdown 渲染成可视元素；
  *    该模块对输入先做 HTML 转义再只输出白名单标签，XSS 没有注入面。
@@ -139,7 +139,11 @@ const historySummary = computed(() => {
   const count = queryHistory.value.length
   return count ? `历史查询 ${count} 条` : '历史查询'
 })
-/** 门户 viewer 只有 ai:* 权限，取产品列表会 403，所以先判断再请求。 */
+/**
+ * 是否有产品浏览权限。用于产品详情页跳转（有权限跳详情页，无权限跳登录页）。
+ * 不再作为 loadRecommended 的前置检查——推荐产品应该总是尝试加载，
+ * 如果 API 返回 403 再降级为占位卡。
+ */
 const canViewProducts = computed(
   () => auth.roleCode === 'admin' || auth.permissions.includes('product:view'),
 )
@@ -504,16 +508,17 @@ function prefill(text: string) {
 }
 
 /**
- * 首屏推荐产品。403 或后端不可用时保持空数组，让卡位退化成空白占位卡，
- * 绝不用假数据填充。
+ * 首屏推荐产品。总是尝试调用 API，如果返回 403（无权限）则降级为占位卡。
+ * 不再用 canViewProducts 做前置检查——即使 JWT 里没有 product:view，
+ * 也应该尝试加载，因为后端可能已经给 viewer 分配了该权限。
  */
 async function loadRecommended() {
-  if (!canViewProducts.value) return
   const token = await auth.ensureToken()
   if (!token) return
   try {
     recommended.value = await listProducts(token, RECOMMEND_SIZE)
   } catch {
+    // API 返回 403 或其他错误时，保持空数组，deckMode 会是 placeholder
     recommended.value = []
   }
 }
