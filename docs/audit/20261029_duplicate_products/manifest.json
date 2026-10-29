@@ -1,0 +1,66 @@
+{
+  "generated_at_utc": "2026-10-29T08:33:46.703952+00:00",
+  "patched_at_utc": "2026-10-29T08:46:57.071586+00:00",
+  "files": [
+    {
+      "file": "pairs.csv",
+      "bytes": 217401,
+      "sha256": "ea87b3d0d819b637727438a88caed5b9b440d67ecb24af04701855d99b1b9700"
+    },
+    {
+      "file": "pairs_minimal.csv",
+      "bytes": 29838,
+      "sha256": "0a46c05a4a374cb3042db8e7e1c1b6c45fe41c8146e4ac7193f1b38c45f617cf"
+    },
+    {
+      "file": "attachments.csv",
+      "bytes": 964011,
+      "sha256": "6e6e1959d4476ada96796de9d24c23463bf84be461da60f41d5e84e1196bc7a4"
+    },
+    {
+      "file": "source_images.csv",
+      "bytes": 639141,
+      "sha256": "2c5fe09fd3bd1372a6982c1c9d4db99568df18057c68bad18790a6bda32017ed"
+    },
+    {
+      "file": "target_images.csv",
+      "bytes": 319795,
+      "sha256": "601cf8e1e0bcbf1d19a8844b635e531427b504aedecf85bcd79125392f5180c1"
+    },
+    {
+      "file": "missing_pairs.csv",
+      "bytes": 5127,
+      "sha256": "a983e5635a92d99457ef179a522d9387548b9378141a3a2de10300f223b0421f"
+    },
+    {
+      "file": "issues.csv",
+      "bytes": 19693,
+      "sha256": "19ec70e1514efd58c7023530516b212a39e24158e760ed9fec6eda8a4f9a6cdf"
+    },
+    {
+      "file": "scene_groups.csv",
+      "bytes": 9511,
+      "sha256": "63a0801e7a57ac6ac198d4b8c6dc363054a053dd105d70b33f96cf6363b96c85"
+    },
+    {
+      "file": "manual_review.csv",
+      "bytes": 7113,
+      "sha256": "59a5094232f53efd8a3d066c93419bf4e2806ffa9144648c24b1672a29f4ddd2"
+    },
+    {
+      "file": "checks.csv",
+      "bytes": 1968,
+      "sha256": "5ec8496542c2b457f60ed481a5a36044db5893de1dfa3270d7dd99367517c2ea"
+    },
+    {
+      "file": "report.json",
+      "bytes": 1299204,
+      "sha256": "0883281e0ac973b409c6119db1870c5643a93de0930d4603cf7ed3784e95e6c8"
+    },
+    {
+      "file": "pairs.json",
+      "bytes": 1183143,
+      "sha256": "0f68d99ac40d7082e0da46d09c5a09f640ebdf1d6a8a575ef8f4150a31933036"
+    }
+  ]
+}

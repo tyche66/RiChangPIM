@@ -150,6 +150,14 @@
           <el-descriptions-item label="跳过">
             {{ importResult.skippedCount }}
           </el-descriptions-item>
+          <el-descriptions-item
+            v-if="importResult.aliasUpdatedCount || importResult.aliasCreatedCount"
+            label="别名冲突处理"
+          >
+            <span v-if="importResult.aliasUpdatedCount">按别名覆盖 {{ importResult.aliasUpdatedCount }} 个</span>
+            <span v-if="importResult.aliasUpdatedCount && importResult.aliasCreatedCount"> · </span>
+            <span v-if="importResult.aliasCreatedCount">作为新产品创建 {{ importResult.aliasCreatedCount }} 个</span>
+          </el-descriptions-item>
           <el-descriptions-item label="失败">
             <el-tag :type="importResult.failCount > 0 ? 'danger' : 'info'">
               {{ importResult.failCount }}
@@ -324,7 +332,7 @@ import { ElMessage } from 'element-plus'
 import { UploadFilled, Download } from '@element-plus/icons-vue'
 import type { UploadUserFile, UploadInstance } from 'element-plus'
 import { productApi } from '@/api'
-import type { ImportMode, ImportPreflightPayload } from '@/api'
+import type { ImportAliasAction, ImportMode, ImportPreflightPayload } from '@/api'
 import ImportConflictDialog from '@/components/ImportConflictDialog.vue'
 import { useAuthStore } from '@/stores/auth'
 import { hasPermission } from '@/types/permissions'
@@ -374,6 +382,8 @@ const importResult = ref<{
   updatedCount: number
   appendedCount: number
   skippedCount: number
+  aliasUpdatedCount: number
+  aliasCreatedCount: number
   imagesReplaced: number
   imagesAppended: number
   createdTags: number
@@ -508,10 +518,12 @@ const handleCommit = async ({
   mode,
   backup,
   new_tag_type,
+  alias_action,
 }: {
   mode: ImportMode
   backup: boolean
   new_tag_type: string
+  alias_action: ImportAliasAction | null
 }) => {
   const token = preflight.value?.token
   if (!token) {
@@ -523,13 +535,24 @@ const handleCommit = async ({
   confirming.value = true
   uploadPercent.value = 100
   try {
-    const res = await productApi.importCommit({ token, mode, backup, new_tag_type })
+    const res = await productApi.importCommit({
+      token,
+      mode,
+      backup,
+      new_tag_type,
+      ...(alias_action ? { alias_action } : {}),
+    })
     showConflictDialog.value = false
     preflight.value = null
     applyCommitResult(res.data || {})
   } catch (e: any) {
     ElMessage.error(importErrorMessage(e, 'commit'))
     const status = e?.response?.status
+    const code = e?.response?.data?.detail?.code
+    // 40903：别名冲突还没选处理方式。token 未被消费，保留弹窗让用户改选后重提。
+    if (code === 40903) {
+      return
+    }
     if (status === 404 || status === 409) {
       showConflictDialog.value = false
       preflight.value = null
@@ -553,6 +576,8 @@ const applyCommitResult = (data: Record<string, any>) => {
     updatedCount: data.updated_count || 0,
     appendedCount: data.appended_count || 0,
     skippedCount: data.skipped_count || 0,
+    aliasUpdatedCount: data.alias_updated_count || 0,
+    aliasCreatedCount: data.alias_created_count || 0,
     imagesReplaced: data.images_replaced || 0,
     imagesAppended: data.images_appended || 0,
     createdTags: data.created_tags || 0,
@@ -574,6 +599,8 @@ const applyCommitResult = (data: Record<string, any>) => {
     result.createdCount ? `新增 ${result.createdCount}` : '',
     result.updatedCount ? `更新 ${result.updatedCount}` : '',
     result.appendedCount ? `追加 ${result.appendedCount}` : '',
+    result.aliasUpdatedCount ? `别名覆盖 ${result.aliasUpdatedCount}` : '',
+    result.aliasCreatedCount ? `别名新增 ${result.aliasCreatedCount}` : '',
     result.skippedCount ? `跳过 ${result.skippedCount}` : '',
     result.failCount ? `失败 ${result.failCount}` : '',
   ].filter(Boolean)

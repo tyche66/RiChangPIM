@@ -5,6 +5,7 @@ import logging
 import os
 import re
 import time
+import unicodedata
 from collections.abc import Callable
 from decimal import Decimal
 from typing import Any
@@ -51,6 +52,7 @@ from app.services.import_staging import (
     discard_staged,
     load_staged,
     stage_upload,
+    update_staged_meta,
 )
 from app.services.product_import import (
     PLACEHOLDER_PRICE,
@@ -1614,6 +1616,175 @@ def _normalize_new_tag_type(raw: str | None) -> str | None:
     return value if re.fullmatch(r"[a-z][a-z0-9_-]{0,15}", value) else "series"
 
 
+# ---------------------------------------------------------------------------
+# 产品编号别名：103800022 ↔ P-103800022
+#
+# 生产里同一个产品被先后录成了带前缀与不带前缀两条，只看精确 product_no 会让
+# 「覆盖」变成新建第二条。这里只识别「前导 P- 与无前导 P-」这一种关系：比较时
+# 忽略大小写与首尾空格，但绝不改写库里实际存储的编号。
+# ---------------------------------------------------------------------------
+_PRODUCT_NO_ALIAS_PREFIX = "p-"
+ALIAS_ACTIONS = frozenset({"overwrite_alias", "create_new"})
+ALIAS_RISK_SAFE = "safe"
+ALIAS_RISK_HIGH = "high"
+
+
+def _normalize_product_no(value: str | None) -> str:
+    """仅用于比较的产品编号键：去首尾空格 + 忽略大小写。"""
+    return (value or "").strip().casefold()
+
+
+def _product_no_alias_key(value: str | None) -> str:
+    """别名比较键：在 ``_normalize_product_no`` 之上再去掉前导 ``P-``。"""
+    key = _normalize_product_no(value)
+    if key.startswith(_PRODUCT_NO_ALIAS_PREFIX):
+        key = key[len(_PRODUCT_NO_ALIAS_PREFIX) :].strip()
+    return key
+
+
+def _normalize_product_name(value: str | None) -> str:
+    """产品名称规范化：全角转半角、忽略大小写与所有空白。"""
+    return "".join(unicodedata.normalize("NFKC", value or "").casefold().split())
+
+
+async def _alias_products_by_key(
+    db: AsyncSession, alias_keys: set[str]
+) -> dict[str, list[Product]]:
+    """按别名键取候选产品（含已软删除，用于把「已删除」判成高风险）。
+
+    用 ``lower(trim(product_no))`` 在库里做一次粗筛，再在 Python 里按别名键精确
+    归类；这样既能容忍存储侧的空白/大小写差异，又不需要为编号建函数索引。
+    """
+    if not alias_keys:
+        return {}
+    variants = set(alias_keys) | {_PRODUCT_NO_ALIAS_PREFIX + key for key in alias_keys}
+    result = await db.execute(
+        select(Product)
+        .where(func.lower(func.trim(Product.product_no)).in_(variants))
+        .order_by(Product.create_time, Product.id)
+    )
+    grouped: dict[str, list[Product]] = {}
+    for product in result.scalars().all():
+        key = _product_no_alias_key(product.product_no)
+        if key in alias_keys:
+            grouped.setdefault(key, []).append(product)
+    return grouped
+
+
+def _classify_alias(
+    fields: RowFields, candidates: list[Product]
+) -> dict[str, Any] | None:
+    """判断一行与现有产品的别名关系。没有候选返回 None。
+
+    只有「候选唯一、未删除、名称规范化后相同」才算安全；其余一律高风险，
+    绝不允许自动覆盖。
+    """
+    if not candidates:
+        return None
+    deleted = [product for product in candidates if product.is_deleted]
+    active = [product for product in candidates if not product.is_deleted]
+    numbers = "、".join(product.product_no for product in candidates)
+    if deleted:
+        return {
+            "risk": ALIAS_RISK_HIGH,
+            "reason": f"别名编号对应的产品已删除（{numbers}），不能自动覆盖",
+            "product": deleted[0] if len(candidates) == 1 else None,
+            "candidate_numbers": numbers,
+        }
+    if len(active) != 1:
+        return {
+            "risk": ALIAS_RISK_HIGH,
+            "reason": f"别名候选不唯一（{len(active)} 个：{numbers}），不能自动覆盖",
+            "product": None,
+            "candidate_numbers": numbers,
+        }
+    product = active[0]
+    incoming_name = _normalize_product_name(fields.product_name)
+    existing_name = _normalize_product_name(product.product_name)
+    if not incoming_name or incoming_name != existing_name:
+        return {
+            "risk": ALIAS_RISK_HIGH,
+            "reason": (
+                f"名称不一致（表内「{fields.product_name or ''}」/ "
+                f"系统内「{product.product_name or ''}」），不能自动覆盖"
+            ),
+            "product": product,
+            "candidate_numbers": product.product_no,
+        }
+    return {
+        "risk": ALIAS_RISK_SAFE,
+        "reason": "名称规范化后一致，可按别名覆盖并保留原产品 ID",
+        "product": product,
+        "candidate_numbers": product.product_no,
+    }
+
+
+def _ensure_alias_choice(
+    meta: dict[str, Any],
+    *,
+    mode: str,
+    alias_action: str | None,
+    row_decisions: dict[int, str],
+) -> None:
+    """在消费暂存 token 之前拒绝「没选别名处理方式」的提交。
+
+    预检已把冲突行写进 meta，所以这里不用重新解析上传包；返回 409 时 token
+    仍然可用，用户改选后可以直接重提，不必再传一次几百兆的包。
+    """
+    if mode == "skip":
+        # skip 的语义就是「已存在的一律不动」，别名行同样跳过，无需额外选择。
+        return
+    try:
+        alias_rows = [int(row) for row in (meta.get("alias_rows") or [])]
+    except (TypeError, ValueError):
+        return
+    if not alias_rows:
+        return
+    safe_rows = {int(row) for row in (meta.get("alias_safe_rows") or [])}
+    unresolved: list[int] = []
+    for row in alias_rows:
+        action = row_decisions.get(row) or alias_action
+        if mode == "create":
+            if action != "create_new":
+                unresolved.append(row)
+            continue
+        if action == "overwrite_alias":
+            # 全局「按别名覆盖」只覆盖安全行；高风险行必须逐行确认。
+            if row in safe_rows or row in row_decisions:
+                continue
+            unresolved.append(row)
+        elif action is None:
+            unresolved.append(row)
+    if not unresolved:
+        return
+    high_risk = [row for row in unresolved if row not in safe_rows]
+    if alias_action == "overwrite_alias" and high_risk:
+        msg = (
+            f"有 {len(high_risk)} 行别名冲突风险较高（名称不同 / 候选不唯一 / "
+            "产品已删除），不能按别名自动覆盖。请逐行确认，或改选「作为新产品创建」。"
+        )
+    elif mode == "create":
+        msg = (
+            f"有 {len(unresolved)} 行产品编号存在别名冲突（只差前导 P-）。"
+            "create 模式只能选择「作为新产品创建」，不会改动已有产品。"
+        )
+    else:
+        msg = (
+            f"有 {len(unresolved)} 行产品编号存在别名冲突（只差前导 P-）。"
+            "请明确选择：按别名覆盖（写入原产品 ID）或作为新产品创建。"
+        )
+    raise HTTPException(
+        status_code=409,
+        detail={
+            "code": 40903,
+            "msg": msg,
+            "alias_rows": unresolved[: settings.PRODUCT_IMPORT_CONFLICT_LIMIT],
+            "alias_conflict_count": len(alias_rows),
+            "alias_high_risk_rows": high_risk[: settings.PRODUCT_IMPORT_CONFLICT_LIMIT],
+        },
+    )
+
+
 async def _product_backup_record(db: AsyncSession, product: Product) -> dict[str, Any]:
     """覆盖前的产品原值 + 图片绑定（附件 id 不变，恢复时按原顺序重建）。"""
     image_ids = (
@@ -1642,6 +1813,8 @@ async def _run_import(
     report_skipped_as_failure: bool = False,
     backup: bool = True,
     new_tag_type: str = "series",
+    alias_action: str | None = None,
+    alias_decisions: dict[int, str] | None = None,
 ) -> dict:
     """批量导入的执行体（旧 ``/import`` 与新的 ``/import/commit`` 共用）。
 
@@ -1653,11 +1826,35 @@ async def _run_import(
                        图片 / 场景图 / 标签按表格整套替换
     * ``append``    —— 只补空字段（库里为空才写），图片 / 场景图 / 标签追加
 
+    ``alias_action`` / ``alias_decisions`` 决定「编号只差前导 P-」时怎么处理：
+    未指定的别名冲突直接 409，绝不按名称自动合并；选择 ``overwrite_alias`` 时
+    写的是原产品 ID（产品编号保持库里存储的原值），选择 ``create_new`` 才新增。
+
     覆盖 / 追加都**不改 product.id**，所以方案、报价、分享页指向的仍是同一个
     产品行；产品事实快照也不会因为改名/改价而回填到历史方案里。
     """
     if mode not in IMPORT_MODES:
         raise HTTPException(status_code=422, detail={"code": 42201, "msg": f"未知导入模式: {mode}"})
+    if alias_action is not None and alias_action not in ALIAS_ACTIONS:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": 42202, "msg": "alias_action 只能是 overwrite_alias / create_new"},
+        )
+    row_decisions = dict(alias_decisions or {})
+    invalid_decisions = set(row_decisions.values()) - ALIAS_ACTIONS
+    if invalid_decisions:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": 42202,
+                "msg": "alias_decisions.action 只能是 overwrite_alias / create_new",
+            },
+        )
+    if mode == "create" and alias_action == "overwrite_alias":
+        raise HTTPException(
+            status_code=422,
+            detail={"code": 42202, "msg": "create 模式不能按别名覆盖，请改用 overwrite / append"},
+        )
 
     # UploadFile 的底层就是个临时文件（Starlette 超过 1MB 就落盘），所以体积用 seek
     # 量、字节交给 load_bundle 按需读：一个 259MB 的包不该先在内存里躺成一份 bytes，
@@ -1758,18 +1955,51 @@ async def _run_import(
             )
             existing = {product.product_no: product for product in found.scalars().all()}
 
+        # 别名候选（103800022 ↔ P-103800022）：同样一次查完，含已删除行。
+        alias_map = await _alias_products_by_key(
+            db, {_product_no_alias_key(value) for value in wanted}
+        )
+
         # 先把「这行能不能进库」判完，再去动图片：解析不了的行没必要为它下载/上传图片。
         failures: list[dict[str, Any]] = []
-        todo: list[tuple[ProductRow, RowFields, dict[str, UUID], Product | None, str]] = []
+        todo: list[
+            tuple[ProductRow, RowFields, dict[str, UUID], Product | None, str, str, str]
+        ] = []
         seen: set[str] = set()
+        seen_alias_keys: set[str] = set()
         skipped_count = 0
+        unresolved_alias: list[dict[str, Any]] = []
+        alias_created_count = 0
+        alias_updated_count = 0
+        alias_new_notes: list[str] = []
         for row, fields in zip(sheet.rows, parsed, strict=True):
             reasons = list(fields.errors)
             refs: dict[str, UUID] = {}
             current = existing.get(fields.product_no) if fields.product_no else None
+            alias_info: dict[str, Any] | None = None
+            alias_key = _product_no_alias_key(fields.product_no)
+            if current is None and fields.product_no and not reasons:
+                alias_info = _classify_alias(fields, alias_map.get(alias_key, []))
+            action = ""
+            if alias_info is not None:
+                action = row_decisions.get(row.excel_row, "")
+                if not action and alias_action == "create_new":
+                    action = "create_new"
+                elif (
+                    not action
+                    and alias_action == "overwrite_alias"
+                    and alias_info["risk"] == ALIAS_RISK_SAFE
+                ):
+                    action = "overwrite_alias"
             target = "update" if current is not None else "create"
+            effective_mode = mode
+            if action == "overwrite_alias" and alias_info is not None:
+                target = "update"
+                effective_mode = "overwrite"
             if not reasons:
-                if fields.product_no in seen:
+                if fields.product_no in seen or (
+                    fields.product_no and alias_key in seen_alias_keys
+                ):
                     reasons.append("表里有重复的产品编号，只导入第一次出现的那行")
                 elif current is not None:
                     if mode == "skip":
@@ -1781,6 +2011,38 @@ async def _run_import(
                             continue
                     elif mode == "create":
                         reasons.append("产品编号已存在")
+                elif alias_info is not None:
+                    if mode == "skip":
+                        # skip 的语义就是「已存在的一律不动」：别名同样视为已存在。
+                        skipped_count += 1
+                        seen.add(fields.product_no)
+                        seen_alias_keys.add(alias_key)
+                        continue
+                    if not action:
+                        unresolved_alias.append(
+                            {
+                                "row": row.excel_row,
+                                "product_no": fields.product_no,
+                                "alias_product_no": alias_info["candidate_numbers"],
+                                "risk": alias_info["risk"],
+                                "reason": alias_info["reason"],
+                            }
+                        )
+                        reasons.append("产品编号存在别名冲突，尚未选择处理方式")
+                    elif action == "overwrite_alias" and (
+                        alias_info["product"] is None or alias_info["product"].is_deleted
+                    ):
+                        # 候选不唯一 / 唯一候选已删除时没有可安全写入的原产品。
+                        reasons.append(
+                            f"别名冲突无法确定可覆盖的原产品：{alias_info['reason']}"
+                        )
+                    elif action == "overwrite_alias" and alias_info["risk"] == ALIAS_RISK_HIGH:
+                        # 高风险（名称不同 / 候选不唯一 / 已删除）绝不自动覆盖；
+                        # 只有逐行明确选了 overwrite_alias 才放行。
+                        if row_decisions.get(row.excel_row) != "overwrite_alias":
+                            reasons.append(
+                                f"别名冲突风险高，未覆盖：{alias_info['reason']}"
+                            )
                 # 品牌/供应商/分类：新建时必须给全（库里是 NOT NULL）；更新时留空表示
                 # 「保留原值」，给了名字但系统里没有才算这一行失败。
                 for label, name, mapping, key in (
@@ -1806,16 +2068,41 @@ async def _run_import(
                     }
                 )
                 continue
+            if action == "overwrite_alias" and alias_info is not None:
+                current = alias_info["product"]
+            elif action == "create_new" and alias_info is not None:
+                alias_new_notes.append(
+                    f"第 {row.excel_row} 行 {fields.product_no}：按你的选择作为新产品创建，"
+                    f"系统里仍保留同编号别名产品 {alias_info['candidate_numbers']}"
+                )
             seen.add(fields.product_no)
+            if fields.product_no:
+                seen_alias_keys.add(alias_key)
             notes.extend(f"第 {fields.excel_row} 行：{note}" for note in fields.notes)
-            todo.append((row, fields, refs, current, target))
+            todo.append((row, fields, refs, current, target, effective_mode, action))
+
+        if unresolved_alias:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": 40903,
+                    "msg": (
+                        f"这次导入有 {len(unresolved_alias)} 行产品编号存在别名冲突"
+                        "（只差前导 P-）。请明确选择：按别名覆盖（写入原产品 ID）"
+                        "或作为新产品创建。"
+                    ),
+                    "alias_conflicts": unresolved_alias[: settings.PRODUCT_IMPORT_CONFLICT_LIMIT],
+                    "alias_conflict_count": len(unresolved_alias),
+                },
+            )
+        notes.extend(alias_new_notes)
 
         # 标签：命中已有标签就复用；没命中的按「单元格显式类型 > 导入参数默认类型」自动创建。
         # 老实现只记一条「已忽略」，于是新系列（如摩耳）永远进不来。
         default_tag_type = _normalize_new_tag_type(new_tag_type)
         created_tag_names: list[str] = []
         pending_tags: dict[tuple[str, str], str] = {}
-        for _row, fields, _refs, _current, _target in todo:
+        for _row, fields, _refs, _current, _target, _mode, _action in todo:
             for name, hint in fields.tag_specs:
                 if _resolve_tag_id(tag_index, name, hint) is not None:
                     continue
@@ -1913,7 +2200,7 @@ async def _run_import(
     images_replaced = 0
     images_appended = 0
     backup_records: list[dict[str, Any]] = []
-    for row, fields, refs, current, target in todo:
+    for row, fields, refs, current, target, effective_mode, alias_step in todo:
         buckets = per_row.get(row.excel_row, empty)
         cover = buckets["cover"]
         gallery = ([cover] if cover is not None else []) + buckets["images"]
@@ -1972,8 +2259,8 @@ async def _run_import(
                     # 绑定恢复回去（产品 id 不变，方案/报价引用不受影响）。
                     if backup:
                         backup_records.append(await _product_backup_record(db, product))
-                    _apply_product_fields(product, fields, refs, mode)
-                    if mode == "overwrite":
+                    _apply_product_fields(product, fields, refs, effective_mode)
+                    if effective_mode == "overwrite":
                         await _replace_product_tags(db, product, fields, tag_index)
                         row_images = await _replace_product_images(
                             db, product, gallery, attachments
@@ -2003,12 +2290,16 @@ async def _run_import(
         success += 1
         if target == "create" or current is None:
             created_count += 1
-        elif mode == "overwrite":
+        elif effective_mode == "overwrite":
             updated_count += 1
             images_replaced += row_images
         else:
             appended_count += 1
             images_appended += row_images
+        if alias_step == "overwrite_alias":
+            alias_updated_count += 1
+        elif alias_step == "create_new":
+            alias_created_count += 1
         image_count += row_images
         scene_count += row_scenes
 
@@ -2036,6 +2327,8 @@ async def _run_import(
             "updated_count": updated_count,
             "appended_count": appended_count,
             "skipped_count": skipped_count,
+            "alias_updated_count": alias_updated_count,
+            "alias_created_count": alias_created_count,
             "images_replaced": images_replaced,
             "images_appended": images_appended,
             "created_tags": len(created_tag_names),
@@ -2055,6 +2348,13 @@ async def _run_import(
     }
 
 
+class ImportAliasDecision(BaseModel):
+    """对单行别名冲突的明确决定（行号即表格里的 excel_row）。"""
+
+    row: int
+    action: str
+
+
 class ImportCommitRequest(BaseModel):
     """预检通过后的提交参数。"""
 
@@ -2064,6 +2364,9 @@ class ImportCommitRequest(BaseModel):
     # 表格里没写类型的「新标签」归到哪一类：series（默认）或 none。
     # 单元格里写了「系列:摩耳」这类显式类型的，以单元格为准。
     new_tag_type: str = "series"
+    # 别名冲突（103800022 ↔ P-103800022）的处理方式：不选就拒绝提交。
+    alias_action: str | None = None
+    alias_decisions: list[ImportAliasDecision] = []
 
 
 @router.post("/import", dependencies=[Depends(PermissionChecker("product:import"))])
@@ -2181,42 +2484,60 @@ async def preflight_import(
 
     existing: dict[str, tuple[UUID, str, int]] = {}
     wanted = {f.product_no for f in parsed if f.product_no}
+    # 别名候选一次查完（含已软删除：删掉的产品同样不能被自动覆盖）。
+    alias_map = await _alias_products_by_key(
+        db, {_product_no_alias_key(value) for value in wanted}
+    )
+    exact_rows = []
     if wanted:
-        rows = (
+        exact_rows = (
             await db.execute(
                 select(Product.id, Product.product_no, Product.product_name).where(
                     Product.product_no.in_(wanted), Product.is_deleted.is_(False)
                 )
             )
         ).all()
-        image_counts: dict[UUID, int] = {}
-        product_ids = [row.id for row in rows]
-        if product_ids:
-            count_rows = (
-                await db.execute(
-                    select(ProductImage.product_id, func.count())
-                    .where(
-                        ProductImage.product_id.in_(product_ids),
-                        ProductImage.is_deleted.is_(False),
-                    )
-                    .group_by(ProductImage.product_id)
+    image_counts: dict[UUID, int] = {}
+    product_ids = [row.id for row in exact_rows]
+    product_ids.extend(p.id for products in alias_map.values() for p in products)
+    if product_ids:
+        count_rows = (
+            await db.execute(
+                select(ProductImage.product_id, func.count())
+                .where(
+                    ProductImage.product_id.in_(product_ids),
+                    ProductImage.is_deleted.is_(False),
                 )
-            ).all()
-            image_counts = {product_id: count for product_id, count in count_rows}
-        for row in rows:
-            existing[row.product_no] = (row.id, row.product_name, image_counts.get(row.id, 0))
+                .group_by(ProductImage.product_id)
+            )
+        ).all()
+        image_counts = {product_id: count for product_id, count in count_rows}
+    for row in exact_rows:
+        existing[row.product_no] = (row.id, row.product_name, image_counts.get(row.id, 0))
 
     conflicts: list[dict[str, Any]] = []
+    alias_conflicts: list[dict[str, Any]] = []
     invalid: list[dict[str, Any]] = []
     seen: set[str] = set()
+    seen_alias_keys: set[str] = set()
     new_count = 0
     existing_count = 0
     invalid_count = 0
+    alias_safe_count = 0
+    alias_high_risk_count = 0
     for row, fields in zip(sheet.rows, parsed, strict=True):
         reasons = list(fields.errors)
         is_existing = fields.product_no in existing
+        alias_key = _product_no_alias_key(fields.product_no)
+        alias_info = None
+        if not is_existing and fields.product_no and not reasons:
+            alias_info = _classify_alias(fields, alias_map.get(alias_key, []))
+        # 别名命中的产品已经在库里：允许靠原值补全主数据，和精确命中同样对待。
+        is_known = is_existing or alias_info is not None
         if not reasons:
-            if fields.product_no in seen:
+            if fields.product_no in seen or (
+                fields.product_no and alias_key in seen_alias_keys
+            ):
                 reasons.append("表里有重复的产品编号，只导入第一次出现的那行")
             else:
                 for label, name, mapping in (
@@ -2226,7 +2547,7 @@ async def preflight_import(
                 ):
                     if not name:
                         # 已有产品可以靠原值补全，新建产品必须自己给全
-                        if not is_existing:
+                        if not is_known:
                             reasons.append(f"{label}为空（产品必须挂在{label}下）")
                         continue
                     if name not in mapping:
@@ -2242,6 +2563,8 @@ async def preflight_import(
             )
             continue
         seen.add(fields.product_no)
+        if fields.product_no:
+            seen_alias_keys.add(alias_key)
         if is_existing:
             existing_count += 1
             _, existing_name, image_count = existing[fields.product_no]
@@ -2254,10 +2577,55 @@ async def preflight_import(
                     "existing_image_count": image_count,
                 }
             )
+        elif alias_info is not None:
+            alias_product = alias_info["product"]
+            if alias_info["risk"] == ALIAS_RISK_SAFE:
+                alias_safe_count += 1
+            else:
+                alias_high_risk_count += 1
+            alias_conflicts.append(
+                {
+                    "row": row.excel_row,
+                    "product_no": fields.product_no,
+                    "product_name": fields.product_name,
+                    "alias_product_id": (
+                        str(alias_product.id) if alias_product is not None else None
+                    ),
+                    "alias_product_no": alias_info["candidate_numbers"],
+                    "existing_name": (
+                        alias_product.product_name if alias_product is not None else None
+                    ),
+                    "existing_image_count": (
+                        image_counts.get(alias_product.id, 0)
+                        if alias_product is not None
+                        else 0
+                    ),
+                    "risk": alias_info["risk"],
+                    "reason": alias_info["reason"],
+                }
+            )
         else:
             new_count += 1
 
     limit = settings.PRODUCT_IMPORT_CONFLICT_LIMIT
+
+    # 把别名冲突行写进暂存元数据：commit 在消费 token 之前就能拒绝「未选择
+    # 别名处理方式」的提交，用户还能用同一个 token 重新选择，不必重传大包。
+    try:
+        update_staged_meta(
+            token,
+            user_id=user_id,
+            alias_conflict_count=len(alias_conflicts),
+            alias_rows=[item["row"] for item in alias_conflicts],
+            alias_safe_rows=[
+                item["row"] for item in alias_conflicts if item["risk"] == ALIAS_RISK_SAFE
+            ],
+            alias_high_risk_rows=[
+                item["row"] for item in alias_conflicts if item["risk"] == ALIAS_RISK_HIGH
+            ],
+        )
+    except StagingError:
+        logger.warning("导入预检：别名冲突元数据写入失败", exc_info=True)
 
     # 预检里把「会被新建的标签」也列出来：用户在弹窗就能看到「摩耳」将被创建，
     # 并选择新标签归入「系列」（默认）还是「未分组」。这里不写库。
@@ -2291,12 +2659,18 @@ async def preflight_import(
             "total_rows": len(sheet.rows),
             "new_count": new_count,
             "existing_count": existing_count,
+            "exact_existing_count": existing_count,
+            "alias_conflict_count": len(alias_conflicts),
+            "alias_safe_count": alias_safe_count,
+            "alias_high_risk_count": alias_high_risk_count,
             "invalid_count": invalid_count,
             "new_tags": new_tags[:limit],
             "new_tag_count": len(new_tags),
             "new_tag_type_default": "series",
             "conflicts": conflicts[:limit],
             "conflicts_truncated": len(conflicts) > limit,
+            "alias_conflicts": alias_conflicts[:limit],
+            "alias_conflicts_truncated": len(alias_conflicts) > limit,
             "invalid": invalid[:limit],
             "invalid_truncated": len(invalid) > limit,
             "notes": _capped(notes),
@@ -2325,6 +2699,40 @@ async def commit_import(
             detail={"code": 42201, "msg": "mode 只能是 overwrite / append / skip"},
         )
 
+    alias_action = (payload.alias_action or "").strip().lower() or None
+    if alias_action is not None and alias_action not in ALIAS_ACTIONS:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": 42202, "msg": "alias_action 只能是 overwrite_alias / create_new"},
+        )
+    if mode == "create" and alias_action == "overwrite_alias":
+        raise HTTPException(
+            status_code=422,
+            detail={"code": 42202, "msg": "create 模式不能按别名覆盖，请改用 overwrite / append"},
+        )
+    row_decisions: dict[int, str] = {}
+    for decision in payload.alias_decisions:
+        if decision.action not in ALIAS_ACTIONS:
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "code": 42202,
+                    "msg": "alias_decisions.action 只能是 overwrite_alias / create_new",
+                },
+            )
+        row_decisions[decision.row] = decision.action
+
+    # 先只读暂存元数据：别名没选就 409，且不消费 token，用户改选后可原样重提。
+    try:
+        _upload_path, meta = load_staged(payload.token, user_id=user_id)
+    except StagingError as exc:
+        raise HTTPException(
+            status_code=exc.status_code, detail={"code": exc.code, "msg": exc.message}
+        ) from exc
+    _ensure_alias_choice(
+        meta, mode=mode, alias_action=alias_action, row_decisions=row_decisions
+    )
+
     try:
         upload_path, _meta = consume_staged(payload.token, user_id=user_id)
     except StagingError as exc:
@@ -2339,6 +2747,8 @@ async def commit_import(
             mode=mode,
             backup=payload.backup,
             new_tag_type=payload.new_tag_type,
+            alias_action=alias_action,
+            alias_decisions=row_decisions,
         )
 
 

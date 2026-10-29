@@ -1,4 +1,4 @@
-from sqlalchemy import Column, DateTime, ForeignKey, String
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import relationship
 
@@ -52,5 +52,7 @@ class User(CommonBase):
     status = Column(String(20), default="active")
     role_id = Column(PGUUID(as_uuid=True), ForeignKey("role.id"), nullable=False)
     last_login_time = Column(DateTime(timezone=True))
+    # 管理员重设密码时自增；JWT 的 tv 声明与之不符即视为旧会话失效。
+    token_version = Column(Integer, nullable=False, default=0, server_default="0")
 
     role = relationship("Role", back_populates="users")

@@ -71,6 +71,8 @@ async def login(request: Request, login_data: LoginRequest, db: AsyncSession = D
 
     request.state.user_id = str(user.id)
     user_id = str(user.id)
+    # commit/rollback 可能让 ORM 属性过期，先取出签发 token 需要的值。
+    token_version = user.token_version or 0
 
     # 登录时间要真的落库，用户管理里的「最后登录」才不是空壳。
     # 写失败不能把已经通过校验的登录卡住，所以单独 try 一次并降级为日志。
@@ -83,11 +85,11 @@ async def login(request: Request, login_data: LoginRequest, db: AsyncSession = D
         logger.warning("last_login_time 写入失败 user_id=%s", user_id, exc_info=True)
 
     access_token = create_access_token(
-        data={"sub": user_id, "role_code": role_code, "perms": perms},
+        data={"sub": user_id, "role_code": role_code, "perms": perms, "tv": token_version},
         expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
     )
     refresh_token = create_access_token(
-        data={"sub": user_id, "type": "refresh"},
+        data={"sub": user_id, "type": "refresh", "tv": token_version},
         expires_delta=timedelta(days=7),
     )
     return {
@@ -110,18 +112,25 @@ async def refresh_token_endpoint(refresh_token: str, db: AsyncSession = Depends(
             detail={"code": 40102, "msg": "Refresh token 无效"},
         )
     user_id = UUID(payload["sub"])
-    _, role_code, perms = await _load_role_and_user(user_id, db)
+    user, role_code, perms = await _load_role_and_user(user_id, db)
     if role_code is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={"code": 40103, "msg": "用户不存在"},
         )
+    token_version = user.token_version or 0
+    # 旧 token 没有 tv 时按 0 处理：密码被重设过（version > 0）就拒绝刷新。
+    if payload.get("tv", 0) != token_version:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={"code": 40104, "msg": "登录状态已失效，请重新登录"},
+        )
     new_access = create_access_token(
-        data={"sub": payload["sub"], "role_code": role_code, "perms": perms},
+        data={"sub": payload["sub"], "role_code": role_code, "perms": perms, "tv": token_version},
         expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
     )
     new_refresh = create_access_token(
-        data={"sub": payload["sub"], "type": "refresh"},
+        data={"sub": payload["sub"], "type": "refresh", "tv": token_version},
         expires_delta=timedelta(days=7),
     )
     return {
@@ -169,5 +178,6 @@ async def change_password(
     if not user or not verify_password(old_password, user.password_hash):
         raise HTTPException(status_code=400, detail={"code": 40001, "msg": "原密码错误"})
     user.password_hash = get_password_hash(new_password)
+    user.token_version = (user.token_version or 0) + 1
     await db.commit()
     return {"code": 200, "msg": "success"}

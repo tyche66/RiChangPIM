@@ -121,7 +121,7 @@
           </el-table-column>
           <el-table-column
             label="操作"
-            width="200"
+            width="300"
           >
             <template #default="{ row }">
               <el-button
@@ -130,6 +130,14 @@
                 @click="handleEdit(row)"
               >
                 编辑
+              </el-button>
+              <el-button
+                v-if="authStore.roleCode === 'admin'"
+                size="small"
+                type="warning"
+                @click="handleResetPassword(row)"
+              >
+                重设密码
               </el-button>
               <el-button
                 v-if="hasPermission(authStore.permissions, 'user:delete')"
@@ -330,6 +338,64 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <!-- Reset Password Dialog -->
+    <el-dialog
+      v-model="showReset"
+      title="重设密码"
+      width="460px"
+      append-to-body
+      lock-scroll
+      @close="resetResetForm"
+    >
+      <el-form
+        ref="resetFormRef"
+        :model="resetForm"
+        :rules="resetRules"
+        label-width="90px"
+      >
+        <el-form-item label="用户">
+          <el-input
+            :value="resetForm.username"
+            disabled
+          />
+        </el-form-item>
+        <el-form-item
+          label="新密码"
+          prop="new_password"
+        >
+          <el-input
+            v-model="resetForm.new_password"
+            type="password"
+            placeholder="8-72 位新密码"
+            show-password
+          />
+        </el-form-item>
+        <el-form-item
+          label="确认密码"
+          prop="confirm_password"
+        >
+          <el-input
+            v-model="resetForm.confirm_password"
+            type="password"
+            placeholder="请再次输入新密码"
+            show-password
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showReset = false">
+          取消
+        </el-button>
+        <el-button
+          type="primary"
+          :loading="resetting"
+          @click="submitReset"
+        >
+          确定
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -339,18 +405,22 @@ import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'elem
 import { userApi, roleApi } from '@/api'
 import { useAuthStore } from '@/stores/auth'
 import { hasPermission } from '@/types/permissions'
+import { buildResetPasswordRules } from '@/utils/passwordRules'
 
 const authStore = useAuthStore()
 
 const loading = ref(false)
 const submitting = ref(false)
+const resetting = ref(false)
 const users = ref<any[]>([])
 const roles = ref<any[]>([])
 const total = ref(0)
 const showCreate = ref(false)
 const showEdit = ref(false)
+const showReset = ref(false)
 const createFormRef = ref<FormInstance>()
 const editFormRef = ref<FormInstance>()
+const resetFormRef = ref<FormInstance>()
 
 const queryParams = reactive({
   role_id: '' as string | undefined,
@@ -376,6 +446,13 @@ const editForm = reactive({
   status: '',
 })
 
+const resetForm = reactive({
+  id: '',
+  username: '',
+  new_password: '',
+  confirm_password: '',
+})
+
 const createRules: FormRules = {
   username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
   password: [{ required: true, message: '请输入密码', trigger: 'blur' }],
@@ -385,6 +462,21 @@ const createRules: FormRules = {
 const editRules: FormRules = {
   role_id: [{ required: true, message: '请选择角色', trigger: 'change' }],
   status: [{ required: true, message: '请选择状态', trigger: 'change' }],
+}
+
+const resetRules: FormRules = buildResetPasswordRules(() => resetForm.new_password)
+
+// 接口失败只弹一次：调用方统一 suppressErrorMessage，由这里取后端中文提示。
+function apiErrorMessage(e: any, fallback: string): string {
+  const detail = e?.response?.data?.detail
+  if (typeof detail === 'string' && detail) return detail
+  if (detail && typeof detail === 'object') {
+    if (!Array.isArray(detail) && typeof detail.msg === 'string' && detail.msg) return detail.msg
+    const first = Array.isArray(detail) ? detail[0] : null
+    if (first && typeof first.msg === 'string' && first.msg) return first.msg
+  }
+  if (!e?.response) return '网络连接失败，请稍后重试'
+  return fallback
 }
 
 function getRoleName(roleId: string): string {
@@ -453,14 +545,25 @@ function handleEdit(row: any) {
 async function handleDelete(row: any) {
   try {
     await ElMessageBox.confirm(`确定删除用户 "${row.username}"？`, '确认删除')
-    await userApi.delete(row.id)
+  } catch {
+    return
+  }
+  try {
+    await userApi.delete(row.id, { suppressErrorMessage: true })
     ElMessage.success('删除成功')
     fetchUsers()
   } catch (e: any) {
-    if (e !== 'cancel') {
-      ElMessage.error('删除失败')
-    }
+    ElMessage.error(apiErrorMessage(e, '删除失败'))
   }
+}
+
+function handleResetPassword(row: any) {
+  resetForm.id = row.id
+  resetForm.username = row.username
+  resetForm.new_password = ''
+  resetForm.confirm_password = ''
+  resetFormRef.value?.clearValidate()
+  showReset.value = true
 }
 
 function resetCreateForm() {
@@ -482,24 +585,35 @@ function resetEditForm() {
   editFormRef.value?.resetFields()
 }
 
+function resetResetForm() {
+  resetForm.id = ''
+  resetForm.username = ''
+  resetForm.new_password = ''
+  resetForm.confirm_password = ''
+  resetFormRef.value?.resetFields()
+}
+
 async function submitCreate() {
   if (!createFormRef.value) return
   await createFormRef.value.validate(async (valid) => {
     if (!valid) return
     submitting.value = true
     try {
-      await userApi.create({
-        username: createForm.username,
-        password: createForm.password,
-        email: createForm.email || undefined,
-        phone: createForm.phone || undefined,
-        role_id: createForm.role_id,
-      })
+      await userApi.create(
+        {
+          username: createForm.username,
+          password: createForm.password,
+          email: createForm.email || undefined,
+          phone: createForm.phone || undefined,
+          role_id: createForm.role_id,
+        },
+        { suppressErrorMessage: true }
+      )
       ElMessage.success('创建成功')
       showCreate.value = false
       fetchUsers()
-    } catch {
-      ElMessage.error('创建失败')
+    } catch (e: any) {
+      ElMessage.error(apiErrorMessage(e, '创建失败'))
     } finally {
       submitting.value = false
     }
@@ -512,19 +626,44 @@ async function submitEdit() {
     if (!valid) return
     submitting.value = true
     try {
-      await userApi.update(editForm.id, {
-        email: editForm.email || undefined,
-        phone: editForm.phone || undefined,
-        role_id: editForm.role_id,
-        status: editForm.status,
-      })
+      await userApi.update(
+        editForm.id,
+        {
+          email: editForm.email || undefined,
+          phone: editForm.phone || undefined,
+          role_id: editForm.role_id,
+          status: editForm.status,
+        },
+        { suppressErrorMessage: true }
+      )
       ElMessage.success('保存成功')
       showEdit.value = false
       fetchUsers()
-    } catch {
-      ElMessage.error('保存失败')
+    } catch (e: any) {
+      ElMessage.error(apiErrorMessage(e, '保存失败'))
     } finally {
       submitting.value = false
+    }
+  })
+}
+
+async function submitReset() {
+  if (!resetFormRef.value) return
+  await resetFormRef.value.validate(async (valid) => {
+    if (!valid) return
+    resetting.value = true
+    try {
+      await userApi.resetPassword(
+        resetForm.id,
+        { new_password: resetForm.new_password },
+        { suppressErrorMessage: true }
+      )
+      ElMessage.success('密码已重设，该用户需重新登录')
+      showReset.value = false
+    } catch (e: any) {
+      ElMessage.error(apiErrorMessage(e, '重设密码失败'))
+    } finally {
+      resetting.value = false
     }
   })
 }

@@ -1,0 +1,31 @@
+﻿check,result,count,details
+active_products_total,info,4494,product.is_deleted=false
+active_p_prefix_products,info,4241,product_no LIKE 'P-%'
+active_non_prefix_products,info,253,product_no NOT LIKE 'P-%'
+exact_name_unique_pairs,pass,240,每对全局唯一，名称完全相等
+unmatched_non_prefix_products,warning,13,无名称完全匹配的 P- 产品
+candidate_multi_match_pairs,pass,0,无一对多候选
+pair_name_mismatch,pass,0,240/240 名称完全相等
+pair_brand_mismatch,pass,0,240/240 品牌一致
+pair_supplier_mismatch,pass,0,240/240 供应商一致
+pair_category_mismatch,pass,0,240/240 分类一致
+pair_status_mismatch,warning,240,"target=draft, source=active"
+pair_material_diff,info,227,material 文本不完全相等
+pair_specification_diff,info,227,specification 文本不完全相等
+minio_objects_checked,pass,620,唯一 oss_key，含 8 个仅被软删除链接引用的对象
+minio_objects_missing,pass,0,stat_object 全部成功
+db_file_size_vs_minio_size_mismatch,pass,0,620/620 一致
+active_source_image_links,info,1118,416 产品图 + 702 场景图
+active_target_image_links,info,559,325 产品图 + 234 场景图
+active_source_unique_image_objects,info,347,308 产品图 + 39 场景图
+active_target_unique_image_objects,info,265,252 产品图 + 13 场景图
+source_target_attachment_overlap,pass,0,没有共用附件
+source_target_scene_name_overlap,pass,0,没有同名场景图
+visual_cover_compared,info,240,240 对封面感知哈希 + 抽样目视
+visual_cover_same_or_near,pass,236,dHash 0-10
+visual_cover_mirrored_same_product,info,4,pair 58/59/66/67，镜像
+visual_cover_different_product,pass,0,未发现不同产品
+soft_deleted_source_product_image_links,warning,10,"8 个唯一对象，2,808,945 bytes"
+scene_groups_membership_exact,pass,13,13/13 组 Jaccard=1.0
+scene_groups_aspect_ratio_mismatch_gt_1_5x,warning,13,13/13 组宽高比偏差 >1.5 倍
+scene_groups_aspect_ratio_within_0_5_2x,warning,0,0/13 组在 0.5-2 倍内

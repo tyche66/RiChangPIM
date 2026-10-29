@@ -64,5 +64,13 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     bind = op.get_bind()
+    # 0004 的种子把 ai:config 一并装配进了 role_permission；直接删 permission
+    # 会撞外键。按 0004 downgrade 的顺序先清关联再删权限码。
+    bind.execute(
+        sa.text(
+            "DELETE FROM role_permission rp USING permission p "
+            "WHERE rp.permission_id = p.id AND p.perm_code = 'ai:config'"
+        )
+    )
     bind.execute(sa.text("DELETE FROM permission WHERE perm_code = 'ai:config'"))
     op.drop_table("ai_provider_config")

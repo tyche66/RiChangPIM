@@ -10,6 +10,7 @@
   重复数据时并非安全（数据导致的 downgrade 失败）。
 """
 
+import pathlib
 from uuid import uuid4
 
 import pytest
@@ -21,7 +22,16 @@ from _db_probe import (
     resolve_test_database_url,
     to_sync_url,
 )
+from alembic.config import Config
+from alembic.script import ScriptDirectory
 from sqlalchemy import create_engine, text
+
+
+def _head_revision() -> str:
+    """动态读取 alembic head，避免每加一个迁移就要改测试常量。"""
+    backend_root = pathlib.Path(__file__).resolve().parent.parent
+    config = Config(str(backend_root / "alembic.ini"))
+    return ScriptDirectory.from_config(config).get_current_head()
 
 EXPECTED_TABLES = {
     "role",
@@ -164,7 +174,7 @@ def test_fresh_db_upgrade_head_has_consistent_schema():
         assert _has_partial_unique_index(eng, "share_token", "idx_share_token_token")
         with eng.connect() as conn:
             ver = conn.execute(text("SELECT version_num FROM alembic_version")).scalar()
-        assert ver == "0030_content_dna_fields"
+        assert ver == _head_revision()
         with eng.connect() as conn:
             manage = conn.execute(
                 text(
@@ -256,7 +266,7 @@ def test_teardown_leaves_consistent_empty_schema_and_upgrade_restores():
         assert EXPECTED_TABLES <= _table_names(eng)
         with eng.connect() as conn:
             ver = conn.execute(text("SELECT version_num FROM alembic_version")).scalar()
-        assert ver == "0030_content_dna_fields"
+        assert ver == _head_revision()
     finally:
         _reset_schema(url)
 

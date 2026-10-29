@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class Token(BaseModel):
@@ -32,6 +32,11 @@ class UserUpdate(BaseModel):
     phone: str | None = None
     role_id: UUID | None = None
     status: str | None = None
+
+
+class ResetPasswordRequest(BaseModel):
+    # bcrypt 只取前 72 字节，超出部分会被静默忽略，这里直接拒绝。
+    new_password: str = Field(min_length=8, max_length=72)
 
 
 class UserResponse(UserBase):

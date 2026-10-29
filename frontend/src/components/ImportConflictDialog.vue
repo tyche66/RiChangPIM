@@ -11,13 +11,16 @@
   >
     <template v-if="preflight">
       <el-alert
-        v-if="preflight.existing_count > 0"
+        v-if="preflight.existing_count > 0 || preflight.alias_conflict_count > 0"
         type="warning"
         :closable="false"
         class="preflight-alert"
       >
         <template #title>
-          将影响 {{ preflight.existing_count }} 个已存在的产品编号
+          将影响 {{ preflight.existing_count }} 个精确匹配的产品
+          <template v-if="preflight.alias_conflict_count > 0">
+            ，另有 {{ preflight.alias_conflict_count }} 行只差前导 P-（别名冲突）
+          </template>
           <template v-if="conflictWithImages > 0">
             （其中 {{ conflictWithImages }} 个带图片，覆盖模式下图片会整套替换）
           </template>
@@ -40,18 +43,22 @@
           <strong class="stat__value stat__value--new">{{ preflight.new_count }}</strong>
         </div>
         <div class="stat">
-          <span class="stat__label">已存在</span>
-          <strong class="stat__value stat__value--exists">{{ preflight.existing_count }}</strong>
+          <span class="stat__label">精确覆盖</span>
+          <strong class="stat__value stat__value--exists">{{ preflight.exact_existing_count }}</strong>
         </div>
         <div class="stat">
-          <span class="stat__label">无法导入</span>
-          <strong class="stat__value stat__value--invalid">{{ preflight.invalid_count }}</strong>
+          <span class="stat__label">别名覆盖</span>
+          <strong class="stat__value stat__value--alias">{{ preflight.alias_safe_count }}</strong>
         </div>
         <div class="stat">
-          <span class="stat__label">表格行数</span>
-          <strong class="stat__value">{{ preflight.total_rows }}</strong>
+          <span class="stat__label">高风险</span>
+          <strong class="stat__value stat__value--danger">{{ preflight.alias_high_risk_count }}</strong>
         </div>
       </div>
+      <p class="stat-footnote">
+        无法导入 {{ preflight.invalid_count }} 条 · 表格共 {{ preflight.total_rows }} 行
+        <span class="muted">（高风险别名不会自动覆盖）</span>
+      </p>
 
       <div class="mode-block">
         <p class="mode-block__title">
@@ -97,6 +104,120 @@
         >
           覆盖前把受影响产品的原值导出成快照（可用 backup_id 回滚）
         </el-checkbox>
+      </div>
+
+      <div
+        v-if="preflight.alias_conflict_count > 0"
+        class="alias-block"
+      >
+        <p class="alias-block__title">
+          产品编号别名冲突
+          <span class="muted">
+            只差前导 P-，例如 103800022 ↔ P-103800022
+          </span>
+        </p>
+        <p
+          v-if="mode === 'skip'"
+          class="alias-skip-hint"
+        >
+          跳过模式下这些行一律不写入（和精确命中的已存在产品一样处理）。
+          如需覆盖原产品，请把上方模式改成「覆盖」或「追加信息」。
+        </p>
+        <template v-else>
+          <el-radio-group
+            v-model="aliasAction"
+            class="alias-group"
+          >
+            <el-radio
+              value="overwrite_alias"
+              class="mode-option"
+            >
+              <span class="mode-option__name">按别名覆盖（写入原产品 ID）</span>
+              <span class="mode-option__hint">
+                只处理名称一致且候选唯一的安全行，原有产品 ID 与存储编号不变；
+                高风险行会标记为失败，不会被自动改动
+              </span>
+            </el-radio>
+            <el-radio
+              value="create_new"
+              class="mode-option"
+            >
+              <span class="mode-option__name">作为新产品创建</span>
+              <span class="mode-option__hint">
+                不动已有产品，本行会新增一条产品（系统里仍保留同编号的别名产品）
+              </span>
+            </el-radio>
+          </el-radio-group>
+          <p
+            v-if="aliasAction === 'overwrite_alias' && preflight.alias_high_risk_count > 0"
+            class="alias-warning"
+          >
+            有 {{ preflight.alias_high_risk_count }} 行属于高风险（名称不同 / 候选不唯一 /
+            产品已删除），本次会跳过并在结果里列明。
+          </p>
+        </template>
+
+        <el-table
+          :data="preflight.alias_conflicts.slice(0, 20)"
+          border
+          size="small"
+          max-height="220"
+        >
+          <el-table-column
+            prop="row"
+            label="行号"
+            width="66"
+            align="center"
+            class-name="cell-num"
+          />
+          <el-table-column
+            prop="product_no"
+            label="表内编号"
+            width="130"
+            class-name="cell-code"
+          />
+          <el-table-column
+            prop="alias_product_no"
+            label="系统内编号"
+            width="130"
+            class-name="cell-code"
+          />
+          <el-table-column
+            prop="product_name"
+            label="表内名称"
+            min-width="130"
+            show-overflow-tooltip
+            class-name="cell-meta"
+          />
+          <el-table-column
+            prop="existing_name"
+            label="系统内名称"
+            min-width="130"
+            show-overflow-tooltip
+            class-name="cell-meta"
+          />
+          <el-table-column
+            label="风险"
+            width="100"
+            align="center"
+          >
+            <template #default="{ row }">
+              <el-tag
+                size="small"
+                :type="row.risk === 'safe' ? 'success' : 'danger'"
+              >
+                {{ row.risk === 'safe' ? '可覆盖' : '高风险' }}
+              </el-tag>
+            </template>
+          </el-table-column>
+        </el-table>
+        <p
+          v-if="preflight.alias_conflicts_truncated"
+          class="muted"
+        >
+          共 {{ preflight.alias_conflict_count }} 行，这里只显示前
+          {{ preflight.alias_conflicts.length }} 行。
+        </p>
       </div>
 
       <div
@@ -242,7 +363,7 @@
         type="primary"
         class="capsule-btn capsule-btn-primary"
         :loading="confirming"
-        :disabled="!preflight"
+        :disabled="!canConfirm"
         @click="onConfirm"
       >
         {{ confirmLabel }}
@@ -253,7 +374,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import type { ImportMode, ImportPreflightPayload } from '@/api'
+import type { ImportAliasAction, ImportMode, ImportPreflightPayload } from '@/api'
 
 const props = defineProps<{
   modelValue: boolean
@@ -263,7 +384,14 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]
-  confirm: [payload: { mode: ImportMode; backup: boolean; new_tag_type: string }]
+  confirm: [
+    payload: {
+      mode: ImportMode
+      backup: boolean
+      new_tag_type: string
+      alias_action: ImportAliasAction | null
+    },
+  ]
   cancel: []
 }>()
 
@@ -274,14 +402,18 @@ const backup = ref(true)
 // 没在单元格里写类型的新标签归到哪一类。默认「系列」：供应商产品包里的新标签
 // 绝大多数是新系列（如摩耳），而通用标签（热销/新品）通常早就存在、会被复用。
 const newTagType = ref<'series' | 'none'>('series')
+// 别名冲突（103800022 ↔ P-103800022）必须由用户明确选择，不预选、不自动合并。
+const aliasAction = ref<ImportAliasAction | ''>('')
 
 watch(
   () => props.preflight,
   (value) => {
     if (value) {
-      mode.value = value.existing_count > 0 ? 'overwrite' : 'skip'
+      mode.value =
+        value.existing_count > 0 || value.alias_conflict_count > 0 ? 'overwrite' : 'skip'
       backup.value = true
       newTagType.value = value.new_tag_type_default === 'none' ? 'none' : 'series'
+      aliasAction.value = ''
     }
   },
 )
@@ -290,21 +422,41 @@ const conflictWithImages = computed(
   () => props.preflight?.conflicts.filter((row) => row.existing_image_count > 0).length || 0,
 )
 
+const needsAliasChoice = computed(
+  () => (props.preflight?.alias_conflict_count || 0) > 0 && mode.value !== 'skip',
+)
+
+const canConfirm = computed(
+  () => !!props.preflight && !(needsAliasChoice.value && !aliasAction.value),
+)
+
 const confirmLabel = computed(() => {
   const total = props.preflight
   if (!total) return '开始导入'
-  if (total.existing_count === 0) return `导入 ${total.new_count} 个新产品`
-  if (mode.value === 'overwrite') {
-    return `覆盖 ${total.existing_count} 个产品并导入 ${total.new_count} 个新增`
+  if (mode.value === 'skip') {
+    return `跳过已存在，只导入 ${total.new_count} 个新增`
   }
-  if (mode.value === 'append') {
-    return `追加到 ${total.existing_count} 个产品并导入 ${total.new_count} 个新增`
+  const parts: string[] = []
+  if (total.existing_count > 0) {
+    parts.push(`${mode.value === 'overwrite' ? '覆盖' : '追加'} ${total.existing_count} 个精确匹配`)
   }
-  return `跳过已存在，只导入 ${total.new_count} 个新增`
+  if (total.alias_conflict_count > 0 && aliasAction.value === 'overwrite_alias') {
+    parts.push(`别名覆盖 ${total.alias_safe_count} 个`)
+  } else if (total.alias_conflict_count > 0 && aliasAction.value === 'create_new') {
+    parts.push(`别名新增 ${total.alias_conflict_count} 个`)
+  }
+  if (total.new_count > 0) parts.push(`新增 ${total.new_count} 个`)
+  return parts.length ? `确认导入：${parts.join(' + ')}` : '开始导入'
 })
 
 function onConfirm() {
-  emit('confirm', { mode: mode.value, backup: backup.value, new_tag_type: newTagType.value })
+  if (!canConfirm.value) return
+  emit('confirm', {
+    mode: mode.value,
+    backup: backup.value,
+    new_tag_type: newTagType.value,
+    alias_action: needsAliasChoice.value ? (aliasAction.value as ImportAliasAction) : null,
+  })
 }
 </script>
 
@@ -350,8 +502,55 @@ function onConfirm() {
   color: var(--pim-warning-ink);
 }
 
-.stat__value--invalid {
+.stat__value--alias {
+  color: var(--pim-brand, #2f6fed);
+}
+
+.stat__value--danger {
   color: var(--pim-danger);
+}
+
+.stat-footnote {
+  margin: -6px 0 16px 0;
+  font-size: 12px;
+  color: var(--pim-text-soft);
+}
+
+.alias-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 12px;
+  border: 1px solid var(--pim-warning-border, var(--pim-line-strong));
+  border-radius: var(--pim-radius-sm);
+  background: var(--pim-surface-soft);
+}
+
+.alias-block__title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--pim-text-strong);
+}
+
+.alias-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: stretch;
+}
+
+.alias-warning,
+.alias-skip-hint {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--pim-danger-ink);
+}
+
+.alias-skip-hint {
+  color: var(--pim-text-soft);
 }
 
 .mode-block {

@@ -1,0 +1,24 @@
+﻿priority,product_scope,reason,source_product_id,source_product_no,target_product_id,target_product_no,product_name,details,recommended_action
+P2,pair,soft_deleted_source_hd_image,b37f3551-37b1-4641-866a-e3b13e745e83,P-138400007,d0d2d1af-2a4b-4891-ad85-887b6720f36d,138400007,COP65SW职员椅,有 1 条已软删除的高分辨率来源图，需决定是否恢复,迁移 active 产品图；软删高分辨率图与场景图需人工确认
+P2,pair,soft_deleted_source_hd_image,7783dab8-1331-4138-8ea3-52701302e2e7,P-138400008,54a31203-32e6-4ca5-9910-8b889787c691,138400008,COP64SW职员椅,有 1 条已软删除的高分辨率来源图，需决定是否恢复,迁移 active 产品图；软删高分辨率图与场景图需人工确认
+P2,pair,soft_deleted_source_hd_image,635533e8-e882-48f5-b431-7cabb50baa98,P-143400007,1c7a1f32-adc8-4486-81c0-2e9ce2de000f,143400007,CKY81SR主管椅,有 1 条已软删除的高分辨率来源图，需决定是否恢复,迁移 active 产品图；软删高分辨率图与场景图需人工确认
+P2,pair,soft_deleted_source_hd_image,f60e1b7d-601a-4df2-a8e3-9cd5b1d2db05,P-143400008,2340168d-69cb-463a-a7db-64dca0900089,143400008,CKY61SR职员椅,有 1 条已软删除的高分辨率来源图，需决定是否恢复,迁移 active 产品图；软删高分辨率图与场景图需人工确认
+P2,pair,soft_deleted_source_hd_image,205ee31e-1c58-4ecb-affb-635af8360330,P-143400009,4524dcb8-bd3a-491d-92d1-edd0297f13c9,143400009,CKY71GR会议椅,有 1 条已软删除的高分辨率来源图，需决定是否恢复,迁移 active 产品图；软删高分辨率图与场景图需人工确认
+P2,pair,soft_deleted_source_hd_image,4d3209a9-ba6f-4226-828a-cfbdaef9c5be,P-143400010,51efe20f-1907-49b1-8541-8243ac2b42be,143400010,CKY81SC主管椅,有 1 条已软删除的高分辨率来源图，需决定是否恢复,迁移 active 产品图；软删高分辨率图与场景图需人工确认
+P2,pair,soft_deleted_source_hd_image,b80c6a9c-5941-4314-8e67-76f81cb3ca33,P-143400011,d56d917f-79f7-4bb7-9894-c807a6f0172f,143400011,CKY61SC职员椅,有 1 条已软删除的高分辨率来源图，需决定是否恢复,迁移 active 产品图；软删高分辨率图与场景图需人工确认
+P2,pair,soft_deleted_source_hd_image,21e83aad-d2e9-4b62-b95f-cf10fc9895cc,P-143400012,893d79da-2fdb-4f2e-b35f-35b390a58689,143400012,CKY71GC会议椅,有 1 条已软删除的高分辨率来源图，需决定是否恢复,迁移 active 产品图；软删高分辨率图与场景图需人工确认
+P1,pair,source_live_reference;soft_deleted_source_hd_image,8face260-f7ea-45ea-abc7-622bf3444e23,P-143500001,c1d9e641-92eb-4941-9462-384940b6bcf8,143500001,CKS11GS培训椅,P- 来源被方案/分享页/内容批次引用；迁图后必须先改引用再退役；有 1 条已软删除的高分辨率来源图，需决定是否恢复,迁产品图；场景图需人工确认裁切；退役 P- 前先改方案/分享页/内容批次引用
+P1,pair,source_live_reference;soft_deleted_source_hd_image,3a69c281-3fff-4a81-947b-b4fdc1914c22,P-143500002,cb8a24c3-83a8-4bda-96fd-5cd46f48f304,143500002,CKS10GS培训椅,P- 来源被方案/分享页/内容批次引用；迁图后必须先改引用再退役；有 1 条已软删除的高分辨率来源图，需决定是否恢复,迁产品图；场景图需人工确认裁切；退役 P- 前先改方案/分享页/内容批次引用
+P3,unmatched_product,no_counterpart,,,058d4b81-c2ca-41de-9a19-81eb1dd0d9f8,EMD70.095095,铭达洽谈桌 EMD70.095095,无 P- 对应；已有 4000×3000 高清图；方案 0、报价 0、分享页 0、分享令牌 0。,确认是独立产品后保留现状；不要合并或删除。
+P3,unmatched_product,no_counterpart,,,2b45e7ce-c8ab-4a2a-ab69-2094b54430a7,EMD71.110110,铭达洽谈桌 EMD71.110110,无 P- 对应；已有 4000×3000 高清图；方案 0、报价 0、分享页 0、分享令牌 0。,确认是独立产品后保留现状；不要合并或删除。
+P3,unmatched_product,no_counterpart,,,6f74ee8c-6526-4a9c-8ba9-1cb20fed2d6b,EMD76.240110,铭达会议桌 EMD76.240110,无 P- 对应；已有 4000×3000 高清图；方案 0、报价 0、分享页 0、分享令牌 0。,确认是独立产品后保留现状；不要合并或删除。
+P3,unmatched_product,no_counterpart,,,9e05d73a-36e6-4d67-9840-b8c59c277f25,EMD77.360150,铭达会议桌 EMD77.360150,无 P- 对应；已有 4000×3000 高清图；方案 0、报价 0、分享页 0、分享令牌 0。,确认是独立产品后保留现状；不要合并或删除。
+P3,unmatched_product,no_counterpart,,,b305c295-bae2-4360-9f02-ad40e5488a3f,EMD78.480160,铭达会议桌 EMD78.480160,无 P- 对应；已有 4000×3000 高清图；方案 0、报价 0、分享页 0、分享令牌 0。,确认是独立产品后保留现状；不要合并或删除。
+P1,unmatched_product,no_counterpart;live_references,,,abd10add-c7a9-4a98-ab13-2f65b7a7e7ee,EMD85L/R.180170,铭达班台 EMD85L/R.180170,无 P- 对应；已有 4000×3000 高清图；方案 3、报价 1、分享页 7、分享令牌 7。,确认是独立产品后保留现状；不要合并或删除。
+P1,unmatched_product,no_counterpart;live_references,,,06ff7b7d-9c71-4499-954e-8e85f79c8332,EMD86L/R.200170,铭达班台 EMD86L/R.200170,无 P- 对应；已有 4000×3000 高清图；方案 2、报价 0、分享页 2、分享令牌 2。,确认是独立产品后保留现状；不要合并或删除。
+P3,unmatched_product,no_counterpart,,,5341e490-1a1e-4a3a-9087-8274ede23c91,EMD87L/R.240190,铭达班台 EMD87L/R.240190,无 P- 对应；已有 4000×3000 高清图；方案 0、报价 0、分享页 0、分享令牌 0。,确认是独立产品后保留现状；不要合并或删除。
+P1,unmatched_product,no_counterpart;live_references,,,225aa5a6-0205-46f0-8488-760a7dd13a18,EMD88L/R.280190,铭达班台 EMD88L/R.280190,无 P- 对应；已有 4000×3000 高清图；方案 1、报价 0、分享页 1、分享令牌 1。,确认是独立产品后保留现状；不要合并或删除。
+P1,unmatched_product,no_counterpart;live_references,,,37cfe00b-fcb5-4916-8004-e3e45cd4d2f0,EMD89R.320190,铭达总裁桌 EMD89R.320190,无 P- 对应；已有 4000×3000 高清图；方案 2、报价 0、分享页 7、分享令牌 7。,确认是独立产品后保留现状；不要合并或删除。
+P3,unmatched_product,no_counterpart,,,bc13ced5-c778-4094-a9c4-707d97218c79,EMD96L/R.220200,铭达背柜 EMD96L/R.220200,无 P- 对应；已有 4000×3000 高清图；方案 0、报价 0、分享页 0、分享令牌 0。,确认是独立产品后保留现状；不要合并或删除。
+P3,unmatched_product,no_counterpart,,,9324c191-3443-43fb-8427-e0efbb98786f,EMD97L/R.260200,铭达背柜 EMD97L/R.260200,无 P- 对应；已有 4000×3000 高清图；方案 0、报价 0、分享页 0、分享令牌 0。,确认是独立产品后保留现状；不要合并或删除。
+P3,unmatched_product,no_counterpart,,,560ecd59-8bdf-4d1f-b24e-3a5168b91191,EMD98L/R.320200,铭达背柜 EMD98L/R.320200,无 P- 对应；已有 4000×3000 高清图；方案 0、报价 0、分享页 0、分享令牌 0。,确认是独立产品后保留现状；不要合并或删除。

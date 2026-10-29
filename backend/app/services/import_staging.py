@@ -148,6 +148,14 @@ def load_staged(token: str, *, user_id: str) -> tuple[Path, dict]:
     return directory / _UPLOAD_NAME, meta
 
 
+def update_staged_meta(token: str, *, user_id: str, **fields: object) -> dict:
+    """更新暂存元数据（归属与有效期先校验）。预检用它登记别名冲突行。"""
+    upload_path, meta = load_staged(token, user_id=user_id)
+    meta.update(fields)
+    _write_json(upload_path.parent / _META_NAME, meta)
+    return meta
+
+
 def consume_staged(token: str, *, user_id: str) -> tuple[Path, dict]:
     """取出暂存文件并标记已消费（同一 token 只能提交一次）。"""
     directory = _dir(token)
@@ -210,4 +218,5 @@ __all__ = [
     "discard_staged",
     "load_staged",
     "stage_upload",
+    "update_staged_meta",
 ]

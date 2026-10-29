@@ -227,12 +227,28 @@ export interface ProductListParams {
 /** 重传产品包时可选的重复处理方式。 */
 export type ImportMode = 'overwrite' | 'append' | 'skip'
 
+/** 产品编号别名冲突（103800022 ↔ P-103800022）的处理方式。 */
+export type ImportAliasAction = 'overwrite_alias' | 'create_new'
+
 export interface ImportConflictRow {
   row: number
   product_no: string
   product_name: string
   existing_name: string
   existing_image_count: number
+}
+
+export interface ImportAliasConflictRow {
+  row: number
+  product_no: string
+  product_name: string
+  alias_product_id: string | null
+  alias_product_no: string
+  existing_name: string | null
+  existing_image_count: number
+  /** safe = 名称一致、候选唯一，可按别名覆盖；high = 绝不自动覆盖 */
+  risk: 'safe' | 'high'
+  reason: string
 }
 
 export interface ImportInvalidRow {
@@ -250,7 +266,15 @@ export interface ImportPreflightPayload {
   header_row: number
   total_rows: number
   new_count: number
+  /** 精确编号命中的已存在产品数（= existing_count，保留旧字段兼容） */
   existing_count: number
+  exact_existing_count: number
+  /** 只差前导 P-、未精确命中的行数 */
+  alias_conflict_count: number
+  /** 名称一致、候选唯一，可按别名覆盖的行数 */
+  alias_safe_count: number
+  /** 名称不同 / 候选不唯一 / 产品已删除：绝不自动覆盖 */
+  alias_high_risk_count: number
   invalid_count: number
   /** 会被新建的标签（表格里还没有的），用于在弹窗里先告知用户 */
   new_tags: Array<{ name: string; tag_type: string | null }>
@@ -258,6 +282,8 @@ export interface ImportPreflightPayload {
   new_tag_type_default: string
   conflicts: ImportConflictRow[]
   conflicts_truncated: boolean
+  alias_conflicts: ImportAliasConflictRow[]
+  alias_conflicts_truncated: boolean
   invalid: ImportInvalidRow[]
   invalid_truncated: boolean
   notes: string[]
@@ -274,6 +300,8 @@ export interface ImportCommitPayload {
   updated_count: number
   appended_count: number
   skipped_count: number
+  alias_updated_count: number
+  alias_created_count: number
   images_replaced: number
   images_appended: number
   created_tags: number
@@ -350,6 +378,8 @@ export const productApi = {
     mode: ImportMode
     backup?: boolean
     new_tag_type?: string
+    alias_action?: ImportAliasAction
+    alias_decisions?: Array<{ row: number; action: ImportAliasAction }>
   }) =>
     api.post('/products/import/commit', payload, {
       timeout: 905000,
@@ -516,9 +546,17 @@ export const shareApi = {
 export const userApi = {
   list: (params?: Record<string, unknown>) => api.get('/users', { params }),
   get: (id: string) => api.get(`/users/${id}`),
-  create: (data: unknown) => api.post('/users', data),
-  update: (id: string, data: unknown) => api.put(`/users/${id}`, data),
-  delete: (id: string) => api.delete(`/users/${id}`),
+  create: (data: unknown, config?: { suppressErrorMessage?: boolean }) =>
+    api.post('/users', data, config),
+  update: (id: string, data: unknown, config?: { suppressErrorMessage?: boolean }) =>
+    api.put(`/users/${id}`, data, config),
+  delete: (id: string, config?: { suppressErrorMessage?: boolean }) =>
+    api.delete(`/users/${id}`, config),
+  resetPassword: (
+    id: string,
+    data: { new_password: string },
+    config?: { suppressErrorMessage?: boolean }
+  ) => api.post(`/users/${id}/reset-password`, data, config),
 }
 
 export const roleApi = {
