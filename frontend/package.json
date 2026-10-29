@@ -1,7 +1,7 @@
 {
   "name": "ai-pim-frontend",
   "private": true,
-  "version": "1.9.6",
+  "version": "1.9.7",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -18,7 +18,7 @@
     "element-plus": "^2.5.0",
     "pinia": "^2.1.0",
     "qrcode": "^1.5.4",
-    "vue": "^3.4.0",
+    "vue": "^3.5.44",
     "vue-echarts": "^7.0.3",
     "vue-router": "^4.2.0"
   },

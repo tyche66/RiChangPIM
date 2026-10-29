@@ -67,6 +67,40 @@ export interface Proposal {
   total_face_value: number
   create_time: string
   items: ProposalItem[]
+  /** Track D：方案平面图（媒体库绑定，详情接口随方案返回） */
+  floor_plans?: ProposalFloorPlan[]
+}
+
+/**
+ * 方案平面图：图片本体在媒体库，本结构只是绑定关系 + 展示名。
+ * `image_url` 是后端签发的短时地址（15 分钟），不要缓存到 localStorage。
+ */
+export interface ProposalFloorPlan {
+  id: string
+  proposal_id: string
+  project_id: string | null
+  attachment_id: string
+  name: string
+  floor_label?: string | null
+  space_label?: string | null
+  sort: number
+  file_name?: string | null
+  file_type?: string | null
+  file_size?: number | null
+  image_url: string
+  create_time?: string | null
+}
+
+/**
+ * 新增方案对话框里的平面图暂存项：方案还没创建，因此没有绑定 id。
+ * 创建成功后由 `proposalFloorPlanApi.batchCreate` 一次性绑定。
+ */
+export interface FloorPlanDraft {
+  id?: string
+  attachment_id: string
+  name: string
+  image_url?: string | null
+  sort?: number
 }
 
 // ============ Quotation ============

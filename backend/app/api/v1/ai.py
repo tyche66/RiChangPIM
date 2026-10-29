@@ -40,7 +40,6 @@ from app.schemas.ai import (
 )
 from app.services.ai_config import get_config
 from app.services.polish import PolishService
-from app.services.ai_config import get_config
 from app.services.rag_index import RagIndexer, RagSearcher
 from app.services.recommend import RecommendService
 

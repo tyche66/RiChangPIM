@@ -54,10 +54,22 @@ class ManualRef(BaseModel):
     doc_type: str
 
 
+class ProposalFloorPlanRef(BaseModel):
+    """媒体库删除前的引用提示：这张图被哪个方案的平面图在用。"""
+
+    floor_plan_id: UUID
+    proposal_id: UUID
+    proposal_no: str
+    proposal_name: str
+    floor_plan_name: str
+    project_id: UUID | None = None
+
+
 class FileReferences(BaseModel):
     product_images: list[ProductImageRef] = []
     scene_images: list[SceneImageRef] = []
     manuals: list[ManualRef] = []
+    proposal_floor_plans: list[ProposalFloorPlanRef] = []
 
 
 class FileDetailResponse(BaseModel):
@@ -82,6 +94,7 @@ __all__ = [
     "FileDetailResponse",
     "FileReferences",
     "ProductImageRef",
+    "ProposalFloorPlanRef",
     "SceneImageRef",
     "ManualRef",
 ]

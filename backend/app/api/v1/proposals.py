@@ -3,6 +3,7 @@ from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import func, or_, select
+from sqlalchemy import update as sa_update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -12,9 +13,10 @@ from app.core.security import create_access_token
 from app.middleware.audit import audit_action
 from app.models.product import Product, ProductImage
 from app.models.project import Project
-from app.models.sales import ProjectSpace, Proposal, ProposalItem
+from app.models.sales import ProjectSpace, Proposal, ProposalFloorPlan, ProposalItem
 from app.schemas.proposal import ProposalCreate, ProposalUpdate
 from app.services.product_snapshot import build_product_snapshot
+from app.services.proposal_floor_plans import floor_plan_payload, load_floor_plans
 
 router = APIRouter()
 
@@ -334,9 +336,22 @@ def _proposal_to_dict(proposal: Proposal) -> dict:
     }
 
 
-def _wrap_proposal(proposal: Proposal, enriched_items: list[dict]) -> dict:
+async def _floor_plan_payloads(
+    db: AsyncSession, proposal_id: UUID, request: Request
+) -> list[dict]:
+    """方案详情里的平面图：短时展示地址按当前登录用户签发。"""
+    rows = await load_floor_plans(db, proposal_id)
+    subject = getattr(request.state, "user_id", None)
+    return [floor_plan_payload(row, subject=subject) for row in rows]
+
+
+def _wrap_proposal(
+    proposal: Proposal, enriched_items: list[dict], floor_plans: list[dict] | None = None
+) -> dict:
     resp = _proposal_to_dict(proposal)
     resp["items"] = enriched_items
+    # Track D：平面图随详情返回，前端不必为只读展示再打一次接口
+    resp["floor_plans"] = floor_plans or []
     return {"code": 200, "data": resp}
 
 
@@ -413,7 +428,8 @@ async def get_proposal(request: Request, proposal_id: UUID, db: AsyncSession = D
         prod = prod_map.get(it.product_id)
         enriched_items.append(_enrich_item(it, prod, cover_urls.get(it.product_id)))
 
-    return _wrap_proposal(proposal, enriched_items)
+    floor_plans = await _floor_plan_payloads(db, proposal.id, request)
+    return _wrap_proposal(proposal, enriched_items, floor_plans)
 
 
 @router.post(
@@ -474,7 +490,7 @@ async def create_proposal(
         prod = prod_map.get(it.product_id)
         enriched.append(_enrich_item(it, prod, cover_urls.get(it.product_id)))
 
-    return _wrap_proposal(prop, enriched)
+    return _wrap_proposal(prop, enriched, [])
 
 
 @router.put(
@@ -522,6 +538,17 @@ async def update_proposal(
             existing_item.space_label = space_data["space_label"]
     for field in update_fields:
         setattr(proposal, field, getattr(proposal_data, field))
+
+    if "project_id" in update_fields:
+        # Track D：平面图的项目归属跟随方案，避免方案换项目后平面图仍挂在旧项目
+        await db.execute(
+            sa_update(ProposalFloorPlan)
+            .where(
+                ProposalFloorPlan.proposal_id == proposal.id,
+                ProposalFloorPlan.is_deleted.is_(False),
+            )
+            .values(project_id=proposal.project_id)
+        )
 
     if "items" in proposal_data.model_fields_set:
         new_items = proposal_data.items
@@ -590,7 +617,8 @@ async def update_proposal(
             _enrich_item(it, items_prod_map.get(it.product_id), cover_urls.get(it.product_id))
         )
 
-    return _wrap_proposal(proposal, enriched)
+    floor_plans = await _floor_plan_payloads(db, proposal.id, request)
+    return _wrap_proposal(proposal, enriched, floor_plans)
 
 
 @router.post(
@@ -662,7 +690,9 @@ async def revert_confirmation(
             enriched.append(
                 _enrich_item(it, prod_map.get(it.product_id), cover_urls.get(it.product_id))
             )
-        return _wrap_proposal(proposal, enriched)
+        return _wrap_proposal(
+            proposal, enriched, await _floor_plan_payloads(db, proposal.id, request)
+        )
 
     if proposal.status != "confirmed":
         raise HTTPException(
@@ -712,7 +742,8 @@ async def revert_confirmation(
         enriched.append(
             _enrich_item(it, prod_map.get(it.product_id), cover_urls.get(it.product_id))
         )
-    return _wrap_proposal(proposal, enriched)
+    floor_plans = await _floor_plan_payloads(db, proposal.id, request)
+    return _wrap_proposal(proposal, enriched, floor_plans)
 
 
 @router.delete("/{proposal_id}", dependencies=[Depends(PermissionChecker("proposal:delete"))])

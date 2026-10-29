@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     # 这个值是 APP_VERSION 没被注入时的兜底：原来写死 "0.1.0"，于是任何忘记传
     # 构建参数的部署（以及全部开发环境）都会在 /api/v1/version、/health、
     # OpenAPI 文档里报 0.1.0，和真实产品版本差了 8 个 MINOR。兜底值必须是真话。
-    VERSION: str = "1.9.6"
+    VERSION: str = "1.9.7"
     APP_VERSION: str | None = None
     BUILD_ID: str = "dev-local"
     GIT_COMMIT: str = "unknown"
@@ -127,6 +127,15 @@ class Settings(BaseSettings):
     # 但 DNS rebinding 仍有残留风险，所以默认关闭，只在来源可信的部署上手动打开。
     PRODUCT_IMPORT_ALLOW_URL_FETCH: bool = False
     PRODUCT_IMPORT_URL_TIMEOUT: float = 10.0
+
+    # 预检暂存（重传产品包：先 preflight 再 commit）。
+    # 为什么落盘而不是内存：后台是 UVICORN_WORKERS=2，两个 worker 共享同一份文件
+    # 系统但各有自己的进程内存，暂存到共享目录才能让 commit 命中任意 worker；
+    # 也避免 259MB 的包让用户为了「确认一次」再传一遍。
+    PRODUCT_IMPORT_STAGING_DIR: str = "/tmp/pim_import_staging"
+    PRODUCT_IMPORT_STAGING_TTL_SECONDS: int = 7200
+    # 预检回显的冲突明细条数上限（超出只给计数 + truncated 标记）。
+    PRODUCT_IMPORT_CONFLICT_LIMIT: int = 200
 
     # 提醒引擎（HLD §14）
     REMINDER_HOUR: int = 9

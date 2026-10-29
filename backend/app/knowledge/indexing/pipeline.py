@@ -12,11 +12,11 @@ from app.core.config import settings
 from app.knowledge.documents.base import KnowledgeDocumentPayload, KnowledgeDocumentUpserter
 from app.knowledge.documents.manual_provider import ProductManualKnowledgeProvider
 from app.knowledge.documents.product_card import DatabaseProductFactProvider
-from app.services.ai_config import get_config
 from app.knowledge.indexing.chunker import chunk_text
 from app.knowledge.indexing.embedder import embed_chunks
 from app.knowledge.indexing.status import KnowledgeIndexErrorCode
 from app.models.knowledge import KnowledgeChunk, KnowledgeDocument
+from app.services.ai_config import get_config
 
 
 class KnowledgeIndexingPipeline:

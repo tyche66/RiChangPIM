@@ -26,6 +26,30 @@
 
 **不要去改的历史记录**（改了就是篡改发布史）：`BUILD_LOG.md` 的构建记录、`PROJECT_MANAGEMENT.md` 的发布台账、`TODO.md` 的「已发布」条目、`docs/08-开发路线图.md` 的里程碑行。`RELEASE_GATE.md` 已改成版本无关，不需要跟着版本走。
 
+## v1.9.7 — 2026-10-29
+
+两件事：**方案平面图**（分享页「方案信息」右侧展示、可全屏缩放）与**产品包重传**
+（先预检、再选覆盖 / 追加 / 跳过）。
+
+### 方案平面图（Track D）
+- 新增 `proposal_floor_plan` 表（迁移 `0032_proposal_floor_plans`）：图片本体仍在媒体库（MinIO + `attachment`），本表只存「方案 / 项目归属 + 展示名 + 排序」，删除绑定不删媒体文件。
+- 新增 `GET|POST /api/v1/proposals/{id}/floor-plans`、`POST .../batch`、`PUT|DELETE .../{floor_plan_id}`，权限沿用 `proposal:view` / `proposal:edit`，方案确认后仍可维护（平面图是展示物料，不是价格事实）。
+- 方案详情接口随响应返回 `floor_plans`（带 15 分钟短 token 地址）；公开分享接口在 `content.floor_plans` 透出，匿名访客仍不接触 MinIO 地址。
+- 媒体库：被平面图引用的附件计入引用数，删除时提示「方案平面图」并拒绝，引用详情新增 `proposal_floor_plans`。
+- 迁移 `0033_sales_media_permissions`：给 `sales` 补 `media:view` / `media:upload`（不含 delete / replace），否则业务员无法从媒体库选图或上传。
+- 后台：方案详情页新增「方案平面图」区块（上传 / 从媒体库选用 / 改名 / 上下移 / 删除 / 预览），新增方案对话框可先暂存多张，方案创建成功后一次性绑定；「上传平面图」按钮对 `proposal:edit` 之外的只读用户禁用。
+- 门户：分享页「方案信息」改成左右两栏，右侧为平面图缩略图（超过 4 张显示 `+N`），点击进原生 `<dialog>` 全屏查看器，支持滚轮 / 双指 / 按钮缩放（0.5x–5x）、放大后拖拽、左右键切换。
+
+### 产品包重传：预检 + 覆盖 / 追加 / 跳过
+- 新增 `POST /api/v1/products/import/preflight`：上传后只解析、只查重，**零写库**，返回 token（2 小时有效）+ 新增 / 已存在 / 无法导入计数 + 冲突清单（最多 200 条）。
+- 新增 `POST /api/v1/products/import/commit`：按 `overwrite` / `append` / `skip` 真正写库，返回 `created_count / updated_count / appended_count / skipped_count / images_replaced / images_appended / backup_id`；token 单次消费，重复提交返回 409。
+- 新增 `DELETE /api/v1/products/import/preflight/{token}`：取消预检并立刻删除暂存；暂存目录 `PRODUCT_IMPORT_STAGING_DIR`（默认 `/tmp/pim_import_staging`，TTL 2 小时，预检入口每小时限频清理一次）。
+- **合并规则（关键）**：`RowFields.provided` 记录「这一行真的填了哪些列」。覆盖只写填了值的单元格，空白保留库里原值（面价、状态、库存都不会被空白打回默认）；追加只在库值为空时写；图片覆盖整套替换（该行没图则保留原图），追加按附件去重后追加；场景图软删除行会恢复而不是重复 INSERT（`product_scene_image` 主键是二元组）；标签覆盖整组替换、追加取并集。
+- **标签自动创建（2026-10-29 追加）**：表格里出现系统还没有的标签（例如新系列「摩耳」）不再只记一条「已忽略」，提交时自动创建并绑定。类型取「单元格显式类型 > 导入参数默认类型」：单元格支持 `系列:摩耳`、`系列=摩耳`、`摩耳(系列)`、`series:Moer`，不写类型时按预检弹窗里选的「系列（默认）/ 未分组」创建；同名已有标签直接复用，不会重复建。预检会列出「将新建 N 个标签」及其名称，提交结果增加 `created_tags` / `new_tag_names`。
+- 面价占位价 99999 与 `completeness_status=pending` 联动：写占位价必带 pending，写真实价格则把悬挂的「待补充」恢复成 complete。
+- 覆盖前快照：`services/product_import_backup.py` 把受影响产品的原值与图片附件 id 写成 JSON（返回 `backup_id`），恢复入口 `python -m app.scripts.restore_import_backup <backup_id> [--dry-run]`；产品 id 不变，方案 / 报价 / 分享引用不受影响。
+- 后台导入页：去掉「跳过已存在」勾选框，改成「上传 → 预检弹窗（三选一 + 冲突示例 + 无法导入明细）→ 结果面板（新增 / 更新 / 追加 / 跳过 / 失败 + 图片替换与追加 + 快照 id）」。旧 `POST /products/import?skipIfExists=` 保留兼容。
+
 ## v1.9.6 — 2026-10-28
 
 本版交付**首批 20 系列产品属性索引**（词典 `series` 选项 + 217 条系列级 mapping，

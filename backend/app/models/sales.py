@@ -102,6 +102,65 @@ class ProposalItem(CommonBase):
     space = relationship("ProjectSpace")
 
 
+class ProposalFloorPlan(CommonBase):
+    """方案平面图（Track D）：媒体库附件与方案的绑定关系。
+
+    图片本身只存在媒体库（MinIO + attachment 行），本表只负责「属于哪个方案 /
+    哪个项目、以什么名字展示、排第几」。删除本行即解除绑定，附件仍留在媒体库。
+
+    楼层/空间名是冗余快照而不是外键：与 proposal_item 的 floor_label /
+    space_label 同口径，项目空间树改名不会让已分享的平面图标题漂移。
+    """
+
+    __tablename__ = "proposal_floor_plan"
+
+    proposal_id = Column(
+        PGUUID(as_uuid=True), ForeignKey("proposal.id", ondelete="CASCADE"), nullable=False
+    )
+    project_id = Column(
+        PGUUID(as_uuid=True), ForeignKey("projects.id", ondelete="SET NULL"), nullable=True
+    )
+    # 方案不强制关联项目，project_id 可空；绑定媒体库附件则不可为空且不可硬删
+    attachment_id = Column(
+        PGUUID(as_uuid=True), ForeignKey("attachment.id", ondelete="RESTRICT"), nullable=False
+    )
+    name = Column(String(128), nullable=False)
+    floor_label = Column(String(128), nullable=True)
+    space_label = Column(String(128), nullable=True)
+    sort = Column(Integer, nullable=False, default=0)
+
+    proposal = relationship("Proposal", backref="floor_plans")
+    attachment = relationship("Attachment")
+
+    __table_args__ = (
+        CheckConstraint("char_length(name) > 0", name="ck_pfp_name"),
+        Index(
+            "ix_pfp_proposal",
+            "proposal_id",
+            "sort",
+            postgresql_where=text("is_deleted = false"),
+        ),
+        Index(
+            "ix_pfp_project",
+            "project_id",
+            postgresql_where=text("is_deleted = false AND project_id IS NOT NULL"),
+        ),
+        Index(
+            "ix_pfp_attachment",
+            "attachment_id",
+            postgresql_where=text("is_deleted = false"),
+        ),
+        # 同一方案不得重复绑定同一个附件；软删除后可重新绑定
+        Index(
+            "uq_pfp_proposal_attachment",
+            "proposal_id",
+            "attachment_id",
+            unique=True,
+            postgresql_where=text("is_deleted = false"),
+        ),
+    )
+
+
 class Quotation(CommonBase):
     __tablename__ = "quotation"
 

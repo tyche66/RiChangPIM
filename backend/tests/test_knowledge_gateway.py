@@ -91,6 +91,7 @@ def test_non_stream_response_contract_defaults():
         "pending_actions",
         "confidence",
         "insufficient_sources",
+        "semantic_interpretation",
         "usage",
     }
     assert data["pending_actions"] == []

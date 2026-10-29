@@ -23,6 +23,7 @@ from app.api.v1.content import router as content_router
 from app.api.v1.content_skills import router as content_skills_router
 from app.api.v1.files import router as files_router
 from app.api.v1.products import router as products_router
+from app.api.v1.proposal_floor_plans import router as proposal_floor_plans_router
 from app.api.v1.proposals import router as proposals_router
 from app.api.v1.quotations import router as quotations_router
 from app.api.v1.share_token import router as share_token_router
@@ -54,6 +55,18 @@ EXPECTED_ROUTE_PERMISSIONS = {
     ("GET", "/api/v1/products/export"): "product:export",
     ("POST", "/api/v1/users/{user_id}/disable"): "user:disable",
     ("POST", "/api/v1/proposals/{proposal_id}/confirm"): "proposal:confirm",
+    # Track D：方案平面图（媒体库绑定）
+    ("GET", "/api/v1/proposals/{proposal_id}/floor-plans"): "proposal:view",
+    ("POST", "/api/v1/proposals/{proposal_id}/floor-plans"): "proposal:edit",
+    ("POST", "/api/v1/proposals/{proposal_id}/floor-plans/batch"): "proposal:edit",
+    (
+        "PUT",
+        "/api/v1/proposals/{proposal_id}/floor-plans/{floor_plan_id}",
+    ): "proposal:edit",
+    (
+        "DELETE",
+        "/api/v1/proposals/{proposal_id}/floor-plans/{floor_plan_id}",
+    ): "proposal:edit",
     ("GET", "/api/v1/audit/operation-logs"): "audit:view",
     ("GET", "/api/v1/content/models"): "content:view",
     ("POST", "/api/v1/content/batches"): "content:generate",
@@ -91,6 +104,10 @@ _ROUTER_PREFIX = [
     (products_router, "/api/v1/products"),
     (users_router, "/api/v1/users"),
     (proposals_router, "/api/v1/proposals"),
+    (
+        proposal_floor_plans_router,
+        "/api/v1/proposals/{proposal_id}/floor-plans",
+    ),
     (audit_router, "/api/v1/audit"),
     (share_token_router, "/api/v1"),
     (content_router, ""),

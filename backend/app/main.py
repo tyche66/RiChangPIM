@@ -22,6 +22,7 @@ from app.api.v1 import (
     observability,
     pending_actions,
     products,
+    proposal_floor_plans,
     proposals,
     roles,
     share_token,
@@ -240,6 +241,11 @@ app.include_router(brands_router, prefix="/api/v1/brands", tags=["brands"])
 app.include_router(suppliers_router, prefix="/api/v1/suppliers", tags=["suppliers"])
 app.include_router(tags_router, prefix="/api/v1/tags", tags=["tags"])
 app.include_router(proposals.router, prefix="/api/v1/proposals", tags=["proposals"])
+app.include_router(
+    proposal_floor_plans.router,
+    prefix="/api/v1/proposals/{proposal_id}/floor-plans",
+    tags=["proposals"],
+)
 app.include_router(shares.router, prefix="/api/v1/shares", tags=["shares"])
 app.include_router(share_token.router, prefix="/api/v1", tags=["shares"])
 app.include_router(ai.router, prefix="/api/v1/ai", tags=["ai"])

@@ -30,8 +30,10 @@ from app.models.product import (
     Category,
     Product,
     ProductImage,
+    ProductTag,
     SceneImage,
     Supplier,
+    Tag,
     product_scene_image,
 )
 
@@ -400,3 +402,318 @@ async def test_skip_if_exists_reports_the_row_as_skipped(
 
     # 三次下来库里始终只有一条产品。
     assert await _count(db, Product) == 1
+
+
+# ---------------------------------------------------------------------------
+# 重传产品包：preflight -> commit（覆盖 / 追加 / 跳过）
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def _isolated_staging(tmp_path, monkeypatch):
+    """预检暂存落到每个用例自己的临时目录，用例之间不共享 token。"""
+    from app.core.config import settings
+
+    monkeypatch.setattr(
+        settings, "PRODUCT_IMPORT_STAGING_DIR", str(tmp_path / "import_staging")
+    )
+
+
+async def _post_preflight(
+    client: AsyncClient, headers: dict, payload: bytes, *, name: str = "products.xlsx"
+) -> dict:
+    resp = await client.post(
+        "/api/v1/products/import/preflight",
+        files={"file": (name, payload, "application/octet-stream")},
+        headers=headers,
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["code"] == 200
+    return body["data"]
+
+
+async def _post_commit(
+    client: AsyncClient,
+    headers: dict,
+    token: str,
+    mode: str,
+    *,
+    backup: bool = True,
+    new_tag_type: str = "series",
+):
+    return await client.post(
+        "/api/v1/products/import/commit",
+        json={
+            "token": token,
+            "mode": mode,
+            "backup": backup,
+            "new_tag_type": new_tag_type,
+        },
+        headers=headers,
+    )
+
+
+@pytest.mark.anyio
+async def test_preflight_counts_then_skip_mode_changes_nothing(
+    client: AsyncClient, db: AsyncSession, minio: FakeMinio
+):
+    """预检只读不写；skip 模式只导入新增，已存在的产品一个字段都不动。"""
+    headers = await _login_admin(client)
+    master = await _seed_master(db)
+    existing_no = f"IMP-{uuid4().hex[:6].upper()}"
+    new_no = f"IMP-{uuid4().hex[:6].upper()}"
+
+    def _row(no: str, name: str, price: str) -> dict:
+        return {
+            "产品编号*": no,
+            "产品名称*": name,
+            "面价*": price,
+            "品牌": master["品牌"],
+            "供应商": master["供应商"],
+            "分类": master["分类"],
+            "状态": "上架",
+        }
+
+    first = await _post_import(
+        client, headers, _sheet_bytes([_row(existing_no, "老产品", "760")]), name="a.xlsx"
+    )
+    assert first["created_count"] == 1
+
+    before = (
+        await db.execute(select(Product).where(Product.product_no == existing_no))
+    ).scalar_one()
+    before_id, before_price, before_status = before.id, before.face_price, before.status
+
+    sheet = _sheet_bytes(
+        [
+            _row(existing_no, "改个名字", "999"),
+            _row(new_no, "新产品", "1200"),
+        ]
+    )
+    preflight = await _post_preflight(client, headers, sheet)
+    assert preflight["total_rows"] == 2
+    assert preflight["new_count"] == 1
+    assert preflight["existing_count"] == 1
+    assert preflight["invalid_count"] == 0
+    assert preflight["conflicts"][0]["product_no"] == existing_no
+    assert preflight["conflicts"][0]["existing_name"] == "老产品"
+
+    # 预检不许写库
+    still_old = (
+        await db.execute(select(Product.product_name).where(Product.id == before_id))
+    ).scalar_one()
+    assert still_old == "老产品"
+
+    resp = await _post_commit(client, headers, preflight["token"], "skip")
+    assert resp.status_code == 200, resp.text
+    data = resp.json()["data"]
+    assert data["skipped_count"] == 1
+    assert data["created_count"] == 1
+    assert data["updated_count"] == 0
+
+    db.expire_all()
+    after = (
+        await db.execute(select(Product).where(Product.product_no == existing_no))
+    ).scalar_one()
+    assert (after.id, after.face_price, after.status, after.product_name) == (
+        before_id,
+        before_price,
+        before_status,
+        "老产品",
+    )
+
+    # token 单次消费：再提交同一个 token 必须失败而不是把包再写一遍
+    replay = await _post_commit(client, headers, preflight["token"], "skip")
+    assert replay.status_code == 409
+    assert replay.json()["detail"]["code"] == 40901
+
+
+@pytest.mark.anyio
+async def test_overwrite_keeps_id_and_only_touches_provided_cells(
+    client: AsyncClient, db: AsyncSession, minio: FakeMinio
+):
+    """覆盖：id 不变、没填的单元格保留原值、面价按表更新。"""
+    headers = await _login_admin(client)
+    master = await _seed_master(db)
+    no = f"IMP-{uuid4().hex[:6].upper()}"
+
+    first_sheet = _sheet_bytes(
+        [
+            {
+                "产品编号*": no,
+                "产品名称*": "原名",
+                "面价*": "760",
+                "品牌": master["品牌"],
+                "供应商": master["供应商"],
+                "分类": master["分类"],
+                "材质": "原材质",
+                "状态": "上架",
+            }
+        ]
+    )
+    await _post_import(client, headers, first_sheet, name="first.xlsx")
+    before = (
+        await db.execute(select(Product).where(Product.product_no == no))
+    ).scalar_one()
+    product_id = before.id
+    assert before.material == "原材质"
+    assert before.status == "active"
+
+    # 第二份表只改面价与名称：「材质 / 状态」整列不出现
+    second_sheet = _sheet_bytes(
+        [
+            {
+                "产品编号*": no,
+                "产品名称*": "新名字",
+                "面价*": "880",
+                "品牌": master["品牌"],
+                "供应商": master["供应商"],
+                "分类": master["分类"],
+            }
+        ]
+    )
+    preflight = await _post_preflight(client, headers, second_sheet)
+    assert preflight["existing_count"] == 1
+
+    resp = await _post_commit(
+        client, headers, preflight["token"], "overwrite", backup=True
+    )
+    assert resp.status_code == 200, resp.text
+    data = resp.json()["data"]
+    assert data["updated_count"] == 1
+    assert data["backup_id"], "覆盖模式应留下可回滚的快照"
+
+    db.expire_all()
+    after = (
+        await db.execute(select(Product).where(Product.id == product_id))
+    ).scalar_one()
+    assert after.id == product_id
+    assert after.product_name == "新名字"
+    assert after.face_price == 880
+    # 空白 = 不改
+    assert after.material == "原材质"
+    assert after.status == "active"
+
+
+@pytest.mark.anyio
+async def test_append_only_fills_blank_fields(
+    client: AsyncClient, db: AsyncSession, minio: FakeMinio
+):
+    """追加：只补空字段；已有面价不动。"""
+    headers = await _login_admin(client)
+    master = await _seed_master(db)
+    no = f"IMP-{uuid4().hex[:6].upper()}"
+
+    base = {
+        "产品编号*": no,
+        "产品名称*": "追加测试",
+        "面价*": "760",
+        "品牌": master["品牌"],
+        "供应商": master["供应商"],
+        "分类": master["分类"],
+    }
+    await _post_import(client, headers, _sheet_bytes([base]), name="base.xlsx")
+    before = (
+        await db.execute(select(Product).where(Product.product_no == no))
+    ).scalar_one()
+    product_id = before.id
+    assert before.material is None
+
+    sheet = _sheet_bytes([{**base, "面价*": "999", "材质": "新材质"}])
+    preflight = await _post_preflight(client, headers, sheet)
+    resp = await _post_commit(client, headers, preflight["token"], "append")
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["data"]["appended_count"] == 1
+
+    db.expire_all()
+    after = (
+        await db.execute(select(Product).where(Product.id == product_id))
+    ).scalar_one()
+    assert after.material == "新材质"
+    # 面价已有值 → 追加模式不动
+    assert after.face_price == 760
+
+
+@pytest.mark.anyio
+async def test_preflight_reports_invalid_rows_without_touching_them(
+    client: AsyncClient, db: AsyncSession, minio: FakeMinio
+):
+    headers = await _login_admin(client)
+    master = await _seed_master(db)
+    sheet = _sheet_bytes(
+        [
+            {
+                "产品编号*": f"IMP-{uuid4().hex[:6].upper()}",
+                "产品名称*": "缺品牌",
+                "面价*": "100",
+                "品牌": "系统里没有的品牌",
+                "供应商": master["供应商"],
+                "分类": master["分类"],
+            }
+        ]
+    )
+    preflight = await _post_preflight(client, headers, sheet)
+    assert preflight["invalid_count"] == 1
+    assert preflight["new_count"] == 0
+    assert "系统里没有" in preflight["invalid"][0]["reason"]
+
+
+@pytest.mark.anyio
+async def test_import_creates_unknown_tags_and_binds_them(
+    client: AsyncClient, db: AsyncSession, minio: FakeMinio
+):
+    """新系列（如摩耳）以前会被「已忽略」，现在必须建标签并绑到产品上。"""
+    headers = await _login_admin(client)
+    master = await _seed_master(db)
+    series_name = f"摩耳{uuid4().hex[:4]}"
+    no = f"IMP-{uuid4().hex[:6].upper()}"
+
+    sheet = _sheet_bytes(
+        [
+            {
+                "产品编号*": no,
+                "产品名称*": "新系列椅子",
+                "面价*": "900",
+                "品牌": master["品牌"],
+                "供应商": master["供应商"],
+                "分类": master["分类"],
+                "标签": f"系列:{series_name},热销",
+            }
+        ]
+    )
+
+    preflight = await _post_preflight(client, headers, sheet)
+    assert preflight["new_tag_count"] == 2
+    typed = {tag["name"]: tag["tag_type"] for tag in preflight["new_tags"]}
+    assert typed[series_name] == "series"
+    assert typed["热销"] == "series"  # 预检按默认类型展示，最终以提交参数为准
+
+    resp = await _post_commit(client, headers, preflight["token"], "overwrite")
+    assert resp.status_code == 200, resp.text
+    data = resp.json()["data"]
+    assert data["created_tags"] == 2, data
+    assert series_name in data["new_tag_names"]
+
+    tag = (
+        await db.execute(
+            select(Tag).where(Tag.tag_name == series_name, Tag.is_deleted.is_(False))
+        )
+    ).scalar_one()
+    assert tag.tag_type == "series"
+
+    product = (
+        await db.execute(select(Product).where(Product.product_no == no))
+    ).scalar_one()
+    links = (
+        await db.execute(
+            select(ProductTag.tag_id).where(
+                ProductTag.product_id == product.id, ProductTag.is_deleted.is_(False)
+            )
+        )
+    ).scalars().all()
+    assert tag.id in links
+
+    # 第二次导入同一份表：标签已存在，不应重复创建
+    again = await _post_preflight(client, headers, sheet)
+    assert again["new_tag_count"] == 0

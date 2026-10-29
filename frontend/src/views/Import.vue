@@ -37,21 +37,29 @@
               ③格里填 http(s) 图片直链（需要管理员先开启外链抓取）
             </li>
             <li>主图列的第一张图设为封面；同一张场景图被多行引用时只入库一份并共享</li>
+            <li>
+              重传同一个产品包时先做<strong>预检</strong>：弹窗里会写清「新增 / 已存在 / 无法导入」各多少条，
+              再由你选择<strong>覆盖</strong>、<strong>追加信息</strong>还是<strong>跳过已存在</strong>
+            </li>
+            <li>
+              覆盖与追加都遵循「<strong>空白 = 不改</strong>」：表格里没填的单元格不会把系统里已有的名称、
+              面价、状态清掉；覆盖模式下图片会整套替换，追加模式下图片只增不减
+            </li>
             <li>每行独立提交，一行失败不影响其它行；失败明细会给出行号、编号和原因</li>
           </ul>
         </template>
       </el-alert>
 
-      <el-form
-        :inline="true"
-        class="import-form"
+      <el-alert
+        v-if="preflightError"
+        type="error"
+        :closable="false"
+        class="result-alert"
       >
-        <el-form-item label="重复处理">
-          <el-checkbox v-model="skipIfExists">
-            跳过已存在的产品编号
-          </el-checkbox>
-        </el-form-item>
-      </el-form>
+        <template #title>
+          {{ preflightError }}
+        </template>
+      </el-alert>
 
       <div class="upload-area">
         <el-upload
@@ -85,14 +93,14 @@
       >
         <el-button
           type="primary"
-          :loading="importing"
+          :loading="preflighting"
           :disabled="!selectedFile"
-          @click="handleImport"
+          @click="handlePreflight"
         >
           开始导入
         </el-button>
         <el-button
-          :disabled="importing"
+          :disabled="preflighting || confirming"
           @click="handleReset"
         >
           重置
@@ -100,17 +108,15 @@
       </div>
 
       <div
-        v-if="importing"
+        v-if="preflighting || confirming"
         class="import-progress"
       >
         <el-progress
           :percentage="uploadPercent"
-          :status="phase === 'processing' ? 'success' : ''"
+          :status="phase === 'processing' || confirming ? 'success' : ''"
         />
         <div class="progress-hint">
-          {{ phase === 'processing'
-            ? '文件已送达，服务端正在解析图片、上传并写入数据库。带图的大文件可能要几分钟，请不要关闭页面。'
-            : '正在上传…' }}
+          {{ progressHint }}
         </div>
       </div>
 
@@ -130,10 +136,19 @@
           <el-descriptions-item label="数据行数">
             {{ importResult.total }}
           </el-descriptions-item>
-          <el-descriptions-item label="成功">
+          <el-descriptions-item label="新增">
             <el-tag type="success">
-              {{ importResult.successCount }}
+              {{ importResult.createdCount }}
             </el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item label="更新">
+            {{ importResult.updatedCount }}
+          </el-descriptions-item>
+          <el-descriptions-item label="追加">
+            {{ importResult.appendedCount }}
+          </el-descriptions-item>
+          <el-descriptions-item label="跳过">
+            {{ importResult.skippedCount }}
           </el-descriptions-item>
           <el-descriptions-item label="失败">
             <el-tag :type="importResult.failCount > 0 ? 'danger' : 'info'">
@@ -142,15 +157,39 @@
           </el-descriptions-item>
           <el-descriptions-item label="产品图片">
             {{ importResult.imageCount }} 张
+            <span
+              v-if="importResult.imagesReplaced || importResult.imagesAppended"
+              class="muted"
+            >
+              （替换 {{ importResult.imagesReplaced }} · 追加 {{ importResult.imagesAppended }}）
+            </span>
           </el-descriptions-item>
           <el-descriptions-item label="场景图">
             {{ importResult.sceneImageCount }} 张
+          </el-descriptions-item>
+          <el-descriptions-item label="新建标签">
+            {{ importResult.createdTags }} 个
+            <span
+              v-if="importResult.newTagNames.length"
+              class="muted"
+            >（{{ importResult.newTagNames.slice(0, 6).join('、') }}{{ importResult.newTagNames.length > 6 ? '…' : '' }}）</span>
           </el-descriptions-item>
           <el-descriptions-item label="实际上传">
             {{ importResult.uploadedCount }} 个文件（同一张图只存一份）
           </el-descriptions-item>
           <el-descriptions-item label="表头行">
             第 {{ importResult.headerRow }} 行
+          </el-descriptions-item>
+          <el-descriptions-item
+            v-if="importResult.backupId"
+            label="覆盖前快照"
+            :span="3"
+          >
+            <span class="cell-code">{{ importResult.backupId }}</span>
+            <span class="muted">
+              如需回滚，让管理员执行
+              <code>python -m app.scripts.restore_import_backup {{ importResult.backupId }}</code>
+            </span>
           </el-descriptions-item>
           <el-descriptions-item
             label="图片来源"
@@ -267,6 +306,15 @@
         </div>
       </div>
     </el-card>
+
+    <!-- 预检弹窗：先看清新增/已存在/无法导入，再决定覆盖、追加还是跳过 -->
+    <ImportConflictDialog
+      v-model="showConflictDialog"
+      :preflight="preflight"
+      :confirming="confirming"
+      @confirm="handleCommit"
+      @cancel="handleCancelPreflight"
+    />
   </div>
 </template>
 
@@ -276,6 +324,8 @@ import { ElMessage } from 'element-plus'
 import { UploadFilled, Download } from '@element-plus/icons-vue'
 import type { UploadUserFile, UploadInstance } from 'element-plus'
 import { productApi } from '@/api'
+import type { ImportMode, ImportPreflightPayload } from '@/api'
+import ImportConflictDialog from '@/components/ImportConflictDialog.vue'
 import { useAuthStore } from '@/stores/auth'
 import { hasPermission } from '@/types/permissions'
 
@@ -285,19 +335,34 @@ const canImport = computed(() => hasPermission(userPermissions.value, 'product:i
 
 const uploadRef = ref<UploadInstance>()
 const selectedFile = ref<UploadUserFile | null>(null)
-const skipIfExists = ref(false)
-const importing = ref(false)
+// 预检阶段（上传 + 解析 + 查重，零写库）与提交阶段分开，界面上的进度条也分两段。
+const preflighting = ref(false)
+const confirming = ref(false)
 const downloading = ref(false)
 const uploadPercent = ref(0)
-// uploading = 请求体还在往上传；processing = 后端在解包/传图/写库（进度条不动的那段）。
+const preflight = ref<ImportPreflightPayload | null>(null)
+const showConflictDialog = ref(false)
+const preflightError = ref('')
+
+// uploading = 请求体还在往上传；processing = 后端在解包/查重或写库（进度条不动的那段）。
 type ImportPhase = 'idle' | 'uploading' | 'processing'
 const phase = ref<ImportPhase>('idle')
-// 走函数赋值，不在 handleImport 里直接写 phase.value = 'uploading'：那样 TS 的控制流
+// 走函数赋值，不在 handle 里直接写 phase.value = 'uploading'：那样 TS 的控制流
 // 分析会把 phase.value 收窄成字面量 'uploading'，catch 里再比 'processing' 就成了
 // 「两个类型没有交集」的编译错误（上传回调里的赋值它看不到）。
 const setPhase = (next: ImportPhase) => {
   phase.value = next
 }
+
+const progressHint = computed(() => {
+  if (confirming.value) {
+    return '正在按你选择的模式写入数据库（含图片替换 / 追加）。带图的大文件可能要几分钟，请不要关闭页面。'
+  }
+  if (phase.value === 'processing') {
+    return '文件已送达，服务端正在解析表格并查重（不会写库）。带图的大文件可能要一两分钟。'
+  }
+  return '正在上传…'
+})
 
 type ImportFailure = { row: number; product_no: string; reason: string }
 
@@ -305,6 +370,15 @@ const importResult = ref<{
   total: number
   successCount: number
   failCount: number
+  createdCount: number
+  updatedCount: number
+  appendedCount: number
+  skippedCount: number
+  imagesReplaced: number
+  imagesAppended: number
+  createdTags: number
+  newTagNames: string[]
+  backupId: string | null
   failures: ImportFailure[]
   notes: string[]
   imageCount: number
@@ -330,17 +404,33 @@ const sourceLabel = (source: string) => SOURCE_LABELS[source] || source
 
 const handleFileChange = (file: UploadUserFile) => {
   selectedFile.value = file
+  preflightError.value = ''
 }
 
 const handleFileRemove = () => {
+  void cancelPendingPreflight()
   selectedFile.value = null
   importResult.value = null
 }
 
-const handleReset = () => {
+const cancelPendingPreflight = async () => {
+  const token = preflight.value?.token
+  preflight.value = null
+  showConflictDialog.value = false
+  if (token) {
+    try {
+      await productApi.cancelImportPreflight(token)
+    } catch {
+      // 取消只是尽力清理暂存，TTL 到期也会被扫掉，不打扰用户
+    }
+  }
+}
+
+const handleReset = async () => {
+  await cancelPendingPreflight()
   selectedFile.value = null
   importResult.value = null
-  skipIfExists.value = false
+  preflightError.value = ''
   uploadPercent.value = 0
   setPhase('idle')
   uploadRef.value?.clearFiles()
@@ -363,72 +453,135 @@ const handleDownloadTemplate = async () => {
   }
 }
 
-const handleImport = async () => {
+const importErrorMessage = (e: any, stage: 'preflight' | 'commit'): string => {
+  if (e?.code === 'ECONNABORTED' || e?.code === 'ETIMEDOUT') {
+    return stage === 'commit'
+      ? '等待服务端处理超时。导入可能仍在后台继续，请先去产品列表确认，再决定是否重传'
+      : '解析预检超时，请检查网络或把文件拆小后重试'
+  }
+  if (e?.response?.status === 413) {
+    return '文件超过网关允许的大小，请拆分成多个文件，或让管理员调大 nginx 的 client_max_body_size'
+  }
+  return e?.response?.data?.detail?.msg || e?.message || '导入失败'
+}
+
+/**
+ * 第一步：上传 + 预检。服务端只解析与查重，不写库，返回 token 与冲突清单。
+ * 预检失败不弹窗——文件根本没被接收，用户改完直接重传即可。
+ */
+const handlePreflight = async () => {
   if (!selectedFile.value?.raw) {
     ElMessage.warning('请先选择文件')
     return
   }
 
-  importing.value = true
+  preflighting.value = true
   importResult.value = null
+  preflightError.value = ''
   uploadPercent.value = 0
   setPhase('uploading')
   try {
     const formData = new FormData()
     formData.append('file', selectedFile.value.raw)
 
-    const res = await productApi.import(
-      formData,
-      { skipIfExists: skipIfExists.value },
-      (percent) => {
-        uploadPercent.value = percent
-        if (percent >= 100) setPhase('processing')
-      }
-    )
-    const data = res.data || {}
-    importResult.value = {
-      total: data.total || 0,
-      successCount: data.success_count || 0,
-      failCount: data.fail_count || 0,
-      failures: data.failures || [],
-      notes: data.notes || [],
-      imageCount: data.image_count || 0,
-      sceneImageCount: data.scene_image_count || 0,
-      uploadedCount: data.uploaded_count || 0,
-      imageSources: data.image_sources || [],
-      imageWarnings: data.image_warnings || [],
-      headerRow: data.header_row || 1,
-      unknownHeaders: data.unknown_headers || [],
-    }
-
-    const images = importResult.value.imageCount + importResult.value.sceneImageCount
-    const withImages = images > 0 ? `，图片 ${images} 张` : ''
-    if (importResult.value.failCount === 0) {
-      ElMessage.success(`导入完成，成功 ${importResult.value.successCount} 条${withImages}`)
-    } else {
-      ElMessage.warning(
-        `导入完成，成功 ${importResult.value.successCount} 条，` +
-        `失败 ${importResult.value.failCount} 条${withImages}`
-      )
-    }
+    const res = await productApi.importPreflight(formData, (percent) => {
+      uploadPercent.value = percent
+      if (percent >= 100) setPhase('processing')
+    })
+    preflight.value = res.data
+    showConflictDialog.value = true
   } catch (e: any) {
-    // productApi.import 带 suppressErrorMessage，这里是唯一的报错出口。
-    // 超时和 413 都不带后端的 detail.msg（前者压根没响应，后者是 nginx 的 HTML），
-    // 单独给话术，否则用户只会看到 "Request failed with status code 413"。
-    let msg: string
-    if (e?.code === 'ECONNABORTED' || e?.code === 'ETIMEDOUT') {
-      msg = phase.value === 'processing'
-        ? '等待服务端处理超时。导入可能仍在后台继续，请先去产品列表确认，再决定是否重传'
-        : '上传超时，请检查网络或把文件拆小后重试'
-    } else if (e?.response?.status === 413) {
-      msg = '文件超过网关允许的大小，请拆分成多个文件，或让管理员调大 nginx 的 client_max_body_size'
-    } else {
-      msg = e?.response?.data?.detail?.msg || e?.message || '导入失败'
-    }
-    ElMessage.error(msg)
+    preflightError.value = importErrorMessage(e, 'preflight')
+    ElMessage.error(preflightError.value)
   } finally {
-    importing.value = false
+    preflighting.value = false
     setPhase('idle')
+  }
+}
+
+/**
+ * 第二步：按用户在弹窗里选的模式真正写库（覆盖 / 追加 / 跳过）。
+ * token 单次消费：重复点确认、或预检已过期，后端都会回 409/404，这里关掉弹窗
+ * 让用户重新选文件，绝不自动重试（重试等于把同一份包写两遍）。
+ */
+const handleCommit = async ({
+  mode,
+  backup,
+  new_tag_type,
+}: {
+  mode: ImportMode
+  backup: boolean
+  new_tag_type: string
+}) => {
+  const token = preflight.value?.token
+  if (!token) {
+    ElMessage.warning('预检已过期，请重新选择文件')
+    showConflictDialog.value = false
+    return
+  }
+
+  confirming.value = true
+  uploadPercent.value = 100
+  try {
+    const res = await productApi.importCommit({ token, mode, backup, new_tag_type })
+    showConflictDialog.value = false
+    preflight.value = null
+    applyCommitResult(res.data || {})
+  } catch (e: any) {
+    ElMessage.error(importErrorMessage(e, 'commit'))
+    const status = e?.response?.status
+    if (status === 404 || status === 409) {
+      showConflictDialog.value = false
+      preflight.value = null
+    }
+  } finally {
+    confirming.value = false
+  }
+}
+
+const handleCancelPreflight = async () => {
+  await cancelPendingPreflight()
+  ElMessage.info('已取消，这轮预检的暂存文件已清理')
+}
+
+const applyCommitResult = (data: Record<string, any>) => {
+  importResult.value = {
+    total: data.total || 0,
+    successCount: data.success_count || 0,
+    failCount: data.fail_count || 0,
+    createdCount: data.created_count || 0,
+    updatedCount: data.updated_count || 0,
+    appendedCount: data.appended_count || 0,
+    skippedCount: data.skipped_count || 0,
+    imagesReplaced: data.images_replaced || 0,
+    imagesAppended: data.images_appended || 0,
+    createdTags: data.created_tags || 0,
+    newTagNames: data.new_tag_names || [],
+    backupId: data.backup_id || null,
+    failures: data.failures || [],
+    notes: data.notes || [],
+    imageCount: data.image_count || 0,
+    sceneImageCount: data.scene_image_count || 0,
+    uploadedCount: data.uploaded_count || 0,
+    imageSources: data.image_sources || [],
+    imageWarnings: data.image_warnings || [],
+    headerRow: data.header_row || 1,
+    unknownHeaders: data.unknown_headers || [],
+  }
+
+  const result = importResult.value
+  const parts = [
+    result.createdCount ? `新增 ${result.createdCount}` : '',
+    result.updatedCount ? `更新 ${result.updatedCount}` : '',
+    result.appendedCount ? `追加 ${result.appendedCount}` : '',
+    result.skippedCount ? `跳过 ${result.skippedCount}` : '',
+    result.failCount ? `失败 ${result.failCount}` : '',
+  ].filter(Boolean)
+
+  if (result.failCount > 0) {
+    ElMessage.warning(`导入完成：${parts.join('，')}`)
+  } else {
+    ElMessage.success(`导入完成：${parts.join('，') || '没有需要写入的行'}`)
   }
 }
 

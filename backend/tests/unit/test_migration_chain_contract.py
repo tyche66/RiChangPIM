@@ -12,7 +12,7 @@ def test_track_a_migrations_follow_one_linear_head():
     config.set_main_option("script_location", str(backend / "alembic"))
     scripts = ScriptDirectory.from_config(config)
 
-    assert scripts.get_heads() == ["0031_ai_provider_config"]
+    assert scripts.get_heads() == ["0033_sales_media_permissions"]
     expected = [
         "0017_operation_log_username",
         "0018_qwen_embedding_hnsw",
@@ -29,8 +29,10 @@ def test_track_a_migrations_follow_one_linear_head():
         "0029_project_remark",
         "0030_content_dna_fields",
         "0031_ai_provider_config",
+        "0032_proposal_floor_plans",
+        "0033_sales_media_permissions",
     ]
-    revision = scripts.get_revision("0031_ai_provider_config")
+    revision = scripts.get_revision("0033_sales_media_permissions")
     actual = []
     while revision is not None and revision.revision != "0016_embedding_dim_2048":
         actual.append(revision.revision)

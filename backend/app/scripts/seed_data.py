@@ -189,6 +189,9 @@ ROLE_PERMISSIONS = {
         "share:delete",
         "file:view",
         "file:upload",
+        # Track D：方案平面图要能从媒体库选用与上传（不含 delete / replace）
+        "media:view",
+        "media:upload",
         "stats:view",
         "ai:use",
         "ai:access",

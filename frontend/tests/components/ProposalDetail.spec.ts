@@ -37,6 +37,16 @@ vi.mock('@/api', () => ({
   },
 }))
 
+vi.mock('@/api/proposalFloorPlans', () => ({
+  proposalFloorPlanApi: {
+    list: vi.fn().mockResolvedValue({ code: 200, data: { list: [], total: 0, limit: 20 } }),
+    create: vi.fn(),
+    batchCreate: vi.fn(),
+    update: vi.fn(),
+    remove: vi.fn(),
+  },
+}))
+
 vi.mock('@/stores/auth', () => ({
   useAuthStore: () => ({
     permissions: ['proposal:edit', 'quotation:create', 'ai:use'],

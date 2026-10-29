@@ -1,54 +1,25 @@
-# RiChangPIM v1.9.5 更新包
+# RiChangPIM v1.9.7 更新包
 
-本包用于已有生产环境从 v1.9.4 升级到 v1.9.5，只包含源码、配置模板、迁移与构建脚本，**不含业务数据、对象存储、`.env` 或任何凭据**。
+本包用于已有生产环境从 v1.9.6 升级到 v1.9.7，只包含源码、配置模板、迁移与构建脚本，不含业务数据、对象存储、`.env` 或任何凭据。
 
-## 本版改了什么
+## 本版改动
 
-- **AI 配置中心**（`AI 功能 → AI 配置中心`，仅管理员）：选品检索与内容工坊两个域的 API 地址、API Key、对话模型 ID、可选模型列表、嵌入模型与超时改为后台可维护；数据库覆盖优先、留空回落环境变量，保存后约 15 秒生效，无需重启后端。
-- **内容生成质量**：内容工坊两套 DNA 与独立选题提示词重写，写作规则前置、合规规则改为后台执行；产品事实从 3 个字段扩展到 12 个（含受治理属性），价格/库存/供应商等隐私字段一律不进外部提示词。
-- 迁移 `0031_ai_provider_config`：新建 `ai_provider_config` 表并插入 `ai:config` 权限码（仅 admin）。
-
-## 发布后修复（已并入本包）
-
-- **迁移 0031 列名错误**：原版向 `permission` 插入 `ai:config` 时使用了不存在的 `code`/`name` 列，会导致 backend 容器启动即退出；已改为真实的 `perm_code`/`perm_name`。若在本包之前升级过并遇到 backend 反复重启，升级后即可恢复。
-- **AI 配置中心页面空白**：前端响应多读了一层 envelope，页面只剩标题和刷新按钮；已修正。
-- **发布后白屏（须刷新才好）**：nginx 原本不发送任何 `Cache-Control`，浏览器会 heuristic 缓存旧 `index.html`，代码更新后它引用的旧内容哈希 chunk 已不存在从而 404。本包起入口 HTML 一律 `no-cache`（每次重新校验），带内容哈希的 `/admin/assets/` 与 `/assets/` 为长缓存 `immutable`。升级后首次访问如遇白屏，强制刷新一次即可，之后不会再出现。
-
-数据库迁移 head 从 `0030_content_dna_fields` 前进到 `0031_ai_provider_config`；生产库会沿单步幂等升级。
+- **方案平面图**：新增 `proposal_floor_plan` 表及迁移 `0032_proposal_floor_plans`，图片本体仍由媒体库和 MinIO 管理；增加方案平面图 API、后台维护界面、媒体引用保护和分享页缩放查看器。
+- **销售角色媒体权限**：迁移 `0033_sales_media_permissions` 为 `sales` 增加 `media:view` 和 `media:upload`，不授予删除或替换权限。
+- **产品包重传**：新增零写入预检和单次消费的提交流程，支持覆盖、追加、跳过；覆盖会保存可恢复的 JSON 快照。
+- **导入合并规则**：覆盖时未填写的单元格保留现值，追加只填充空值；图片替换与追加分开处理，标签可按单元格类型或预检默认类型创建。
 
 ## 升级步骤
 
-```bash
-# 0. 校验外层 SHA-256
-sha256sum -c RiChangPIM_update_v1.9.5_*.tar.gz.sha256
+1. 运行 `scripts/where-am-i.sh`，确认目标是生产 Compose 栈。
+2. 升级前备份 PostgreSQL 和 MinIO，并确认两份备份成功。生产 PostgreSQL 使用容器内 `pg_dump`，不要使用连接宿主机 `localhost:5432` 的备份脚本默认配置。
+3. 发布源码包含迁移 `backend/alembic/versions/0032_proposal_floor_plans.py` 和 `0033_sales_media_permissions.py`。backend entrypoint 会在容器启动时自动升级数据库；本版没有需要手动执行的数据回填。
+4. 使用 `PATH="$HOME/.nvm/versions/node/v24.18.0/bin:$PATH" bash scripts/build_frontends.sh` 构建两个前端，并记录其输出的 `APP_VERSION`、`BUILD_ID`、`GIT_COMMIT`、`BUILD_TIME`。
+5. 将同一组构建元数据导出给 Compose，设置 `APP_VERSION=1.9.7`、`APP_ENV=production`，然后执行 `docker compose build backend nginx` 和 `docker compose up -d --no-deps backend nginx`。不要重启 worker、knowledge-indexer、数据库或对象存储。
+6. 执行 `docker exec richangpim-backend-1 alembic current`，确认 `0033_sales_media_permissions (head)`；执行 `docker exec richangpim-backend-1 python -m app.scripts.seed_data --check`。
+7. 运行健康检查，登录后台验证「系统管理 → 版本」中的前后端版本、构建 ID、Git commit、北京时间构建时间均有值且一致；验证产品包预检与提交、方案平面图权限及分享页展示。
 
-# 1. 备份（必须先做）
-docker exec richangpim-postgres-1 pg_dump -U pim -Fc ai_pim > ai_pim_pre_1.9.5.dump
-# MinIO 备份状态确认 ok
+## 配置与回滚说明
 
-# 2. 解压并核对源码基线
-tar -xzf RiChangPIM_update_v1.9.5_*.tar.gz
-cat RiChangPIM/UPDATE_MANIFEST.txt
-
-# 3. 构建前端（注入版本与构建元数据）
-export PATH="/root/.nvm/versions/node/v24.18.0/bin:$PATH"
-cd RiChangPIM
-bash scripts/build_frontends.sh
-#    记下输出的 APP_VERSION / BUILD_ID / GIT_COMMIT / BUILD_TIME
-
-# 4. 构建并切换容器
-export APP_VERSION=1.9.5 BUILD_ID=<上一步> GIT_COMMIT=<上一步> BUILD_TIME=<上一步> APP_ENV=production
-docker compose build backend nginx
-docker compose up -d --no-deps backend nginx
-
-# 5. 验收
-docker exec richangpim-backend-1 alembic current      # 0031_ai_provider_config (head)
-docker exec richangpim-backend-1 python -m app.scripts.seed_data --check
-```
-
-## 升级后的配置说明
-
-- AI 配置是**覆盖层**：升级后不填任何值，系统行为与 v1.9.4 完全一致（继续读环境变量）。
-- 需要在后台维护时：管理员进入 `AI 功能 → AI 配置中心`，填写目标域并保存；密钥只在保存时写入，读取只显示掩码。
-- 关闭某个域的「启用数据库配置」开关即可立即回落环境变量，数据库中的值保留。
-- 若曾在「Skills 管理」里手动改过内置 Skill 提示词，`python -m app.scripts.seed_default_skills --refresh --check` 可查看将被代码模板刷新的字段，确认后再 `--refresh --apply`。
+- 导入预检暂存目录默认是 `/tmp/pim_import_staging`，有效期默认 7200 秒；预检 token 只能提交一次。
+- 保留旧 backend 和 nginx 镜像，直到生产验收完成。迁移回滚会删除平面图关系记录；评估数据保留要求后再回滚。删除平面图绑定不会删除 MinIO 图片对象。

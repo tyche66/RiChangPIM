@@ -25,7 +25,7 @@ SCOPES: tuple[tuple[str, str], ...] = (
 
 CACHE_TTL_SECONDS = 15.0
 
-_cache: dict[str, tuple[float, "AiConfig | None"]] = {}
+_cache: dict[str, tuple[float, AiConfig | None]] = {}
 
 
 @dataclass(frozen=True)

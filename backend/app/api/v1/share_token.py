@@ -15,6 +15,12 @@ from app.middleware.audit import audit_action
 from app.models.audit import Share, ShareLog, ShareToken, Visitor
 from app.models.product import Attachment, Product, ProductImage, SceneImage, product_scene_image
 from app.models.sales import ProjectSpace, Proposal, ProposalItem, Quotation, QuotationItem
+from app.services.proposal_floor_plans import (
+    content_url as floor_plan_content_url,
+)
+from app.services.proposal_floor_plans import (
+    load_floor_plans,
+)
 
 router = APIRouter()
 
@@ -170,6 +176,19 @@ async def _build_content(db: AsyncSession, share_type: str, target_id: UUID) -> 
             .scalars()
             .all()
         )
+        # Track D：平面图与商品明细数量无关，没有明细的分享也要能展示平面图。
+        # 地址走 15 分钟短 token，匿名访客拿不到 MinIO 地址。
+        floor_plans = [
+            {
+                "id": str(fp.id),
+                "name": fp.name,
+                "floor_label": fp.floor_label,
+                "space_label": fp.space_label,
+                "sort": fp.sort,
+                "image_url": floor_plan_content_url(fp.attachment_id),
+            }
+            for fp in await load_floor_plans(db, prop.id)
+        ]
         product_ids = [it.product_id for it in rows]
         if not product_ids:
             return {
@@ -178,6 +197,7 @@ async def _build_content(db: AsyncSession, share_type: str, target_id: UUID) -> 
                 "customer_name": prop.customer_name,
                 "status": prop.status,
                 "total_face_value": 0.0,
+                "floor_plans": floor_plans,
                 "items": [],
             }
 
@@ -330,6 +350,7 @@ async def _build_content(db: AsyncSession, share_type: str, target_id: UUID) -> 
             "customer_name": prop.customer_name,
             "status": prop.status,
             "total_face_value": round(total_face_value, 2),
+            "floor_plans": floor_plans,
             "items": items,
         }
 

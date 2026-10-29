@@ -289,6 +289,16 @@
             compact
           />
         </el-form-item>
+        <el-form-item
+          label="方案平面图"
+          class="floor-plan-form-item"
+          label-width="0"
+        >
+          <ProposalFloorPlanManager
+            v-model="createForm.floor_plans"
+            compact
+          />
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button
@@ -387,12 +397,14 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { ArrowDown } from '@element-plus/icons-vue'
 import { proposalApi, shareApi } from '@/api'
+import { proposalFloorPlanApi } from '@/api/proposalFloorPlans'
 import { customerApi } from '@/api/customer'
 import { projectApi } from '@/api/project'
 import { useAuthStore } from '@/stores/auth'
 import { hasPermission } from '@/types/permissions'
-import type { Proposal, ProposalItem, ShareCreateRequest, ShareForm, ProposalToken } from '@/types/sales'
+import type { Proposal, ProposalItem, FloorPlanDraft, ShareCreateRequest, ShareForm, ProposalToken } from '@/types/sales'
 import ProposalItemEditor from '@/components/ProposalItemEditor.vue'
+import ProposalFloorPlanManager from '@/components/ProposalFloorPlanManager.vue'
 import ShareResultDialog from '@/components/ShareResultDialog.vue'
 
 const router = useRouter()
@@ -430,6 +442,8 @@ const createForm = reactive({
   customer_id: null as string | null,
   project_id: null as string | null,
   items: [] as ProposalItem[],
+  // Track D：新增时先暂存平面图，方案创建成功后再一次性绑定
+  floor_plans: [] as FloorPlanDraft[],
 })
 // 客户/项目选项。方案明细的楼层/空间名称由业务员直接输入；
 // ProjectSpace API 仍保留给后台空间维护，不作为方案通用选项来源。
@@ -632,7 +646,7 @@ const handleCreateSubmit = async () => {
       return
     }
 
-    await proposalApi.create({
+    const created = await proposalApi.create({
       proposal_name: createForm.proposal_name.trim(),
       customer_name: createForm.customer_name.trim() || null,
       customer_id: createForm.customer_id || undefined,
@@ -649,6 +663,22 @@ const handleCreateSubmit = async () => {
       })),
     }, { suppressErrorMessage: true })
 
+    // 平面图是附加物料：绑定失败不回滚已创建的方案，但要明确告知去哪里补
+    if (createForm.floor_plans.length && created?.data?.id) {
+      try {
+        await proposalFloorPlanApi.batchCreate(
+          created.data.id,
+          createForm.floor_plans.map((plan, index) => ({
+            attachment_id: plan.attachment_id,
+            name: plan.name,
+            sort: index,
+          })),
+        )
+      } catch {
+        ElMessage.warning('方案已创建，但平面图绑定失败，请到方案详情页重新添加')
+      }
+    }
+
     ElMessage.success('创建成功')
     showCreateDialog.value = false
     createForm.proposal_name = ''
@@ -656,6 +686,7 @@ const handleCreateSubmit = async () => {
     createForm.customer_id = null
     createForm.project_id = null
     createForm.items = []
+    createForm.floor_plans = []
     queryParams.page = 1
     await fetchProposals()
   } catch (error) {

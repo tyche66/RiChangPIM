@@ -42,6 +42,7 @@ from app.models.reminder import Notification, Reminder
 from app.models.sales import (
     ProjectSpace,
     Proposal,
+    ProposalFloorPlan,
     ProposalItem,
     Quotation,
     QuotationItem,
@@ -88,6 +89,7 @@ __all__ = [
     "ProjectAsset",
     "ProjectMember",
     "Proposal",
+    "ProposalFloorPlan",
     "ProposalItem",
     "Quotation",
     "QuotationItem",

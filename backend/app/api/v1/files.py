@@ -24,7 +24,13 @@ from app.models.product import (
     SceneImage,
     product_scene_image,
 )
-from app.schemas.file import FilePresignResponse, FileReferences, FileUploadResponse
+from app.models.sales import Proposal, ProposalFloorPlan
+from app.schemas.file import (
+    FilePresignResponse,
+    FileReferences,
+    FileUploadResponse,
+    ProposalFloorPlanRef,
+)
 from app.services.thumbnails import THUMB_WIDTHS, purge_thumbnails, thumbnail_bytes
 
 router = APIRouter()
@@ -189,10 +195,20 @@ async def list_files(
             .where(SceneImage.attachment_id == Attachment.id, SceneImage.is_deleted.is_(False))
             .exists()
         )
+        has_floor_plan = (
+            select(1)
+            .where(
+                ProposalFloorPlan.attachment_id == Attachment.id,
+                ProposalFloorPlan.is_deleted.is_(False),
+            )
+            .exists()
+        )
         if referenced:
-            query = query.where(or_(has_product_image, has_manual, has_scene))
+            query = query.where(or_(has_product_image, has_manual, has_scene, has_floor_plan))
         else:
-            query = query.where(~or_(has_product_image, has_manual, has_scene))
+            query = query.where(
+                ~or_(has_product_image, has_manual, has_scene, has_floor_plan)
+            )
 
     total_result = await db.execute(select(func.count()).select_from(query.subquery()))
     total = total_result.scalar()
@@ -237,6 +253,7 @@ async def _count_refs(db: AsyncSession, attachment_id: UUID) -> int:
         (ProductImage, ProductImage.attachment_id),
         (ProductManual, ProductManual.attachment_id),
         (SceneImage, SceneImage.attachment_id),
+        (ProposalFloorPlan, ProposalFloorPlan.attachment_id),
     ]:
         result = await db.execute(
             select(func.count())
@@ -272,6 +289,17 @@ async def _check_refs(db: AsyncSession, attachment_id: UUID) -> list[str]:
     )
     if scene_result.scalar() > 0:
         refs.append("场景图")
+
+    floor_plan_result = await db.execute(
+        select(func.count())
+        .select_from(ProposalFloorPlan)
+        .where(
+            ProposalFloorPlan.attachment_id == attachment_id,
+            ProposalFloorPlan.is_deleted.is_(False),
+        )
+    )
+    if floor_plan_result.scalar() > 0:
+        refs.append("方案平面图")
 
     return refs
 
@@ -353,6 +381,28 @@ async def _fetch_references(db: AsyncSession, attachment_id: UUID) -> FileRefere
             "product_name": p.product_name,
             "doc_type": pm.doc_type,
         })
+
+    # Track D：方案平面图
+    pfp_result = await db.execute(
+        select(ProposalFloorPlan, Proposal)
+        .join(Proposal, Proposal.id == ProposalFloorPlan.proposal_id)
+        .where(
+            ProposalFloorPlan.attachment_id == attachment_id,
+            ProposalFloorPlan.is_deleted.is_(False),
+            Proposal.is_deleted.is_(False),
+        )
+    )
+    for pfp, prop in pfp_result.fetchall():
+        refs.proposal_floor_plans.append(
+            ProposalFloorPlanRef(
+                floor_plan_id=pfp.id,
+                proposal_id=prop.id,
+                proposal_no=prop.proposal_no,
+                proposal_name=prop.proposal_name,
+                floor_plan_name=pfp.name,
+                project_id=pfp.project_id,
+            )
+        )
 
     return refs
 

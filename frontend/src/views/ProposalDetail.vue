@@ -97,6 +97,19 @@
         content-position="left"
         class="glass-divider"
       >
+        方案平面图
+      </el-divider>
+
+      <!-- Track D：平面图直接挂在详情页，管理完即可在分享页右侧看到 -->
+      <ProposalFloorPlanManager
+        :proposal-id="proposalId"
+        :disabled="!hasPerm('proposal:edit')"
+      />
+
+      <el-divider
+        content-position="left"
+        class="glass-divider"
+      >
         方案商品明细
       </el-divider>
 
@@ -381,6 +394,7 @@ import type { PolishContent } from '@/types/ai'
 import { tryParseJson, isPolishFailed } from '@/types/ai'
 import type { Proposal, ProposalItem } from '@/types/sales'
 import ProposalItemEditor from '@/components/ProposalItemEditor.vue'
+import ProposalFloorPlanManager from '@/components/ProposalFloorPlanManager.vue'
 
 const route = useRoute()
 const router = useRouter()

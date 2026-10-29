@@ -14,12 +14,15 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 
 import AppHeader from '@/components/AppHeader.vue'
+import FloorPlanGallery from '@/components/FloorPlanGallery.vue'
+import FloorPlanViewer from '@/components/FloorPlanViewer.vue'
 import ShareDetailDialog from '@/components/ShareDetailDialog.vue'
 import ShareSceneDialog from '@/components/ShareSceneDialog.vue'
 import {
   ShareAccessError,
   getShareContent,
   type ShareEnvelopeData,
+  type ShareFloorPlan,
   type ShareProductItem,
   type ShareProposalContent,
   type ShareQuotationContent,
@@ -54,6 +57,24 @@ const quotation = computed(() =>
 const items = computed<ShareProductItem[]>(
   () => (isProposal.value ? proposal.value?.items : quotation.value?.items) || [],
 )
+
+/**
+ * Track D：平面图只在方案分享里出现；报价分享与旧分享没有这个字段，
+ * 一律当成「没有平面图」，不渲染右侧栏。
+ */
+const floorPlans = computed<ShareFloorPlan[]>(() =>
+  isProposal.value
+    ? (proposal.value?.floor_plans || []).filter((plan) => Boolean(plan.image_url))
+    : [],
+)
+
+const planOpen = ref(false)
+const planIndex = ref(0)
+
+function openPlan(index: number) {
+  planIndex.value = index
+  planOpen.value = true
+}
 
 const headline = computed(() => {
   if (!share.value) return '分享预览'
@@ -274,11 +295,30 @@ onMounted(load)
           <div class="panel__title"><h2>{{ isProposal ? '方案信息' : '报价信息' }}</h2></div>
           <span class="status-pill status-pill--ok">有效链接</span>
         </div>
-        <div class="kv-grid">
-          <template v-for="row in summaryRows" :key="row[0]">
-            <span>{{ row[0] }}</span>
-            <strong>{{ row[1] }}</strong>
-          </template>
+        <!-- 右侧留给平面图：没有平面图时退回单列，卡片不会无故变窄 -->
+        <div
+          class="summary-layout"
+          :class="{ 'summary-layout--with-plans': floorPlans.length > 0 }"
+        >
+          <div class="kv-grid">
+            <template v-for="row in summaryRows" :key="row[0]">
+              <span>{{ row[0] }}</span>
+              <strong>{{ row[1] }}</strong>
+            </template>
+          </div>
+          <div
+            v-if="floorPlans.length"
+            class="summary-plans"
+          >
+            <p class="summary-plans__label">
+              平面图
+              <span class="summary-plans__count">{{ floorPlans.length }} 张</span>
+            </p>
+            <FloorPlanGallery
+              :images="floorPlans"
+              @open="openPlan"
+            />
+          </div>
         </div>
       </section>
 
@@ -368,6 +408,13 @@ onMounted(load)
     </template>
 
     <ShareSceneDialog :images="sceneOpen ? scenes : null" @close="sceneOpen = false" />
+
+    <!-- 平面图全屏：缩略图只是入口，缩放与多张切换都在这里 -->
+    <FloorPlanViewer
+      :images="planOpen ? floorPlans : null"
+      :start-index="planIndex"
+      @close="planOpen = false"
+    />
 
     <!-- 商品详情：明细表只放摘要，规格/材质/颜色/材质说明与场景图在点击后展开 -->
     <ShareDetailDialog :item="detailOpen ? detailItem : null" @close="closeDetail" @open-scenes="openScenes" />

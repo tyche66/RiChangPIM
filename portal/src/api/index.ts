@@ -178,6 +178,16 @@ export type ShareSceneImage = {
   sort?: number | null
 }
 
+/** Track D：方案平面图。`image_url` 是 15 分钟有效的后端代理地址。 */
+export type ShareFloorPlan = {
+  id?: string
+  name?: string | null
+  floor_label?: string | null
+  space_label?: string | null
+  image_url?: string | null
+  sort?: number | null
+}
+
 export type ProductSnapshot = {
   product_no?: string | null
   product_name?: string | null
@@ -220,6 +230,8 @@ export type ShareProposalContent = {
   customer_name?: string | null
   status?: string | null
   total_face_value?: number | null
+  // Track D：方案平面图（可空，旧分享没有这个字段）
+  floor_plans?: ShareFloorPlan[]
   items?: ShareProductItem[]
 }
 

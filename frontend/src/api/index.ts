@@ -224,6 +224,73 @@ export interface ProductListParams {
   size?: number
 }
 
+/** 重传产品包时可选的重复处理方式。 */
+export type ImportMode = 'overwrite' | 'append' | 'skip'
+
+export interface ImportConflictRow {
+  row: number
+  product_no: string
+  product_name: string
+  existing_name: string
+  existing_image_count: number
+}
+
+export interface ImportInvalidRow {
+  row: number
+  product_no: string
+  reason: string
+}
+
+export interface ImportPreflightPayload {
+  token: string
+  expires_at: string
+  file_name: string
+  size: number
+  sha256: string
+  header_row: number
+  total_rows: number
+  new_count: number
+  existing_count: number
+  invalid_count: number
+  /** 会被新建的标签（表格里还没有的），用于在弹窗里先告知用户 */
+  new_tags: Array<{ name: string; tag_type: string | null }>
+  new_tag_count: number
+  new_tag_type_default: string
+  conflicts: ImportConflictRow[]
+  conflicts_truncated: boolean
+  invalid: ImportInvalidRow[]
+  invalid_truncated: boolean
+  notes: string[]
+  image_warnings: string[]
+  unknown_headers: string[]
+}
+
+export interface ImportCommitPayload {
+  total: number
+  success_count: number
+  fail_count: number
+  failures: Array<{ row: number; product_no: string; reason: string }>
+  created_count: number
+  updated_count: number
+  appended_count: number
+  skipped_count: number
+  images_replaced: number
+  images_appended: number
+  created_tags: number
+  new_tag_names: string[]
+  mode: ImportMode | 'create'
+  backup_id: string | null
+  notes: string[]
+  image_count: number
+  scene_image_count: number
+  uploaded_count: number
+  image_sources: string[]
+  image_warnings: string[]
+  header_row: number
+  unknown_headers: string[]
+  blank_rows: number
+}
+
 export const productApi = {
   list: (params?: ProductListParams) =>
     api.get('/products', { params }) as Promise<ApiEnvelope<Paginated<ProductListItem>>>,
@@ -261,6 +328,36 @@ export const productApi = {
             if (event.total) onProgress(Math.round((event.loaded * 100) / event.total))
           }
         : undefined,
+    }),
+  /*
+   * 重传产品包的两段式入口：
+   *   preflight 只上传 + 解析 + 查重，零写库，返回 token 与冲突清单；
+   *   commit    带着 token 和用户选的模式（overwrite / append / skip）真正写库。
+   * 两段都用 905s 超时，理由同上：大包在服务端解图/传 MinIO 的时间远超默认 30s。
+   */
+  importPreflight: (data: unknown, onProgress?: (percent: number) => void) =>
+    api.post('/products/import/preflight', data, {
+      timeout: 905000,
+      suppressErrorMessage: true,
+      onUploadProgress: onProgress
+        ? (event: AxiosProgressEvent) => {
+            if (event.total) onProgress(Math.round((event.loaded * 100) / event.total))
+          }
+        : undefined,
+    }) as Promise<{ code: number; data: ImportPreflightPayload }>,
+  importCommit: (payload: {
+    token: string
+    mode: ImportMode
+    backup?: boolean
+    new_tag_type?: string
+  }) =>
+    api.post('/products/import/commit', payload, {
+      timeout: 905000,
+      suppressErrorMessage: true,
+    }) as Promise<{ code: number; data: ImportCommitPayload }>,
+  cancelImportPreflight: (token: string) =>
+    api.delete(`/products/import/preflight/${encodeURIComponent(token)}`, {
+      suppressErrorMessage: true,
     }),
   bindProductImages: (id: string, data: { attachment_ids: string[] }) =>
     api.post(`/products/${id}/images`, data),
