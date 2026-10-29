@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-20T08:25:05Z",
-  "updated_at": "2026-10-29T05:09:16Z",
+  "updated_at": "2026-10-29T05:26:23Z",
   "files": {
     ".dockerignore": {
       "role": "index",
@@ -269,9 +269,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "3a9327b434acca8f7655534cfe94ecaf33e6bc5739a4e46730b935a6b0dcdb8e",
-      "size": 185631,
-      "normalized_sha256": "3a9327b434acca8f7655534cfe94ecaf33e6bc5739a4e46730b935a6b0dcdb8e"
+      "sha256": "387e117afe9eeceb17fa29daf30c2c0f61477383945b274c41c0c0816c2b801f",
+      "size": 185647,
+      "normalized_sha256": "387e117afe9eeceb17fa29daf30c2c0f61477383945b274c41c0c0816c2b801f"
     },
     "aoci.meta.txt": {
       "role": "index",
@@ -3016,9 +3016,9 @@
     },
     "frontend/src/components/MediaPicker.vue": {
       "role": "index",
-      "sha256": "45588378133e2d511c6ef7d6d739eb69481eee7a538c7de766f43fdf8a106a3c",
+      "sha256": "16ed4fb376908d3efa6a19903c3d2f7c90383a3f4a542c7d9694afdbaf8500aa",
       "size": 7107,
-      "normalized_sha256": "45588378133e2d511c6ef7d6d739eb69481eee7a538c7de766f43fdf8a106a3c"
+      "normalized_sha256": "16ed4fb376908d3efa6a19903c3d2f7c90383a3f4a542c7d9694afdbaf8500aa"
     },
     "frontend/src/components/MediaUploader.vue": {
       "role": "index",
@@ -3052,9 +3052,9 @@
     },
     "frontend/src/components/ProposalItemEditor.vue": {
       "role": "index",
-      "sha256": "70ca2997f8d5745b1fed70052bf272a651c94c58f18bebfd0cc6b5031d7c25f0",
-      "size": 13935,
-      "normalized_sha256": "70ca2997f8d5745b1fed70052bf272a651c94c58f18bebfd0cc6b5031d7c25f0"
+      "sha256": "133c2411164909bb6a7480af334f98be3d7b6dacefa8df8f3f4e306c11d79129",
+      "size": 13988,
+      "normalized_sha256": "133c2411164909bb6a7480af334f98be3d7b6dacefa8df8f3f4e306c11d79129"
     },
     "frontend/src/components/SceneImageSelector.vue": {
       "role": "index",
@@ -3064,9 +3064,9 @@
     },
     "frontend/src/components/ShareResultDialog.vue": {
       "role": "index",
-      "sha256": "b4443f4ae7186914f287c8132ead354edafe466e068e827d82e2b1465287133e",
-      "size": 5546,
-      "normalized_sha256": "b4443f4ae7186914f287c8132ead354edafe466e068e827d82e2b1465287133e"
+      "sha256": "1a347d6aa8ad28500ffe5e5e66951f1e39e80ee102e73abe9fc789efb8026403",
+      "size": 5568,
+      "normalized_sha256": "1a347d6aa8ad28500ffe5e5e66951f1e39e80ee102e73abe9fc789efb8026403"
     },
     "frontend/src/components/ThemeToggle.vue": {
       "role": "index",
@@ -3214,9 +3214,9 @@
     },
     "frontend/src/views/Categories.vue": {
       "role": "index",
-      "sha256": "1d644cf2d1b369990e742b331c06c513c12f6288b02987b235328e4cf8c40630",
-      "size": 14230,
-      "normalized_sha256": "1d644cf2d1b369990e742b331c06c513c12f6288b02987b235328e4cf8c40630"
+      "sha256": "4d7819562e702b2582a712b438ff64f53b2d3d31cc06549840058e89e9656d52",
+      "size": 14448,
+      "normalized_sha256": "4d7819562e702b2582a712b438ff64f53b2d3d31cc06549840058e89e9656d52"
     },
     "frontend/src/views/ContentPublications.vue": {
       "role": "index",
@@ -3232,15 +3232,15 @@
     },
     "frontend/src/views/ContentTopics.vue": {
       "role": "index",
-      "sha256": "be5e00fbd594ce22de8004d948150cc8f969c950079c6599771b719af114a6ee",
-      "size": 15976,
-      "normalized_sha256": "be5e00fbd594ce22de8004d948150cc8f969c950079c6599771b719af114a6ee"
+      "sha256": "0a3e8161df509494d2078386ed759b3f616fca9992b73b02aaff88eac01f4693",
+      "size": 16133,
+      "normalized_sha256": "0a3e8161df509494d2078386ed759b3f616fca9992b73b02aaff88eac01f4693"
     },
     "frontend/src/views/ContentWorkshop.vue": {
       "role": "index",
-      "sha256": "e357288484c45e92ce335cdf521e17a0742b8b44961b5c84afafc285768d732e",
-      "size": 21627,
-      "normalized_sha256": "e357288484c45e92ce335cdf521e17a0742b8b44961b5c84afafc285768d732e"
+      "sha256": "1b706c153f9a229647e17ef5603fe475c7cd10716de908e6a7a01e0231371cb9",
+      "size": 21679,
+      "normalized_sha256": "1b706c153f9a229647e17ef5603fe475c7cd10716de908e6a7a01e0231371cb9"
     },
     "frontend/src/views/CustomerDetail.vue": {
       "role": "index",
@@ -3316,9 +3316,9 @@
     },
     "frontend/src/views/ProposalDetail.vue": {
       "role": "index",
-      "sha256": "f477bf74447b87b0ef7827c79e40c8d6a5e6525520c526381403ab7c33304ec1",
-      "size": 25432,
-      "normalized_sha256": "f477bf74447b87b0ef7827c79e40c8d6a5e6525520c526381403ab7c33304ec1"
+      "sha256": "6dce1ae93a41fc0f9e94c018ff161a0aa613a1912e5b3a5b872cd25b191149cb",
+      "size": 25474,
+      "normalized_sha256": "6dce1ae93a41fc0f9e94c018ff161a0aa613a1912e5b3a5b872cd25b191149cb"
     },
     "frontend/src/views/Proposals.vue": {
       "role": "index",
@@ -3334,9 +3334,9 @@
     },
     "frontend/src/views/Quotations.vue": {
       "role": "index",
-      "sha256": "385e8f87aeb364e6c7510c98b0b46dd76dc77c92b1849e79b53d894322fbd1a6",
-      "size": 38752,
-      "normalized_sha256": "385e8f87aeb364e6c7510c98b0b46dd76dc77c92b1849e79b53d894322fbd1a6"
+      "sha256": "69c28d4cc6e8d3085fb52dfa4c1a8a6d97be41f0079225537dc1bfca5931e555",
+      "size": 39183,
+      "normalized_sha256": "69c28d4cc6e8d3085fb52dfa4c1a8a6d97be41f0079225537dc1bfca5931e555"
     },
     "frontend/src/views/Roles.vue": {
       "role": "index",
@@ -3358,9 +3358,9 @@
     },
     "frontend/src/views/SharePage.vue": {
       "role": "index",
-      "sha256": "da8443eee79c624fc64f6a02e39442e0a4865eee01da2e60afe71b5a75919995",
-      "size": 28562,
-      "normalized_sha256": "da8443eee79c624fc64f6a02e39442e0a4865eee01da2e60afe71b5a75919995"
+      "sha256": "ab7dfaabf7ed04e27180b16847859cd8798b601a985200d934089c9182235ed1",
+      "size": 28672,
+      "normalized_sha256": "ab7dfaabf7ed04e27180b16847859cd8798b601a985200d934089c9182235ed1"
     },
     "frontend/src/views/Suppliers.vue": {
       "role": "index",
