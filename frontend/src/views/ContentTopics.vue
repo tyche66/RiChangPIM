@@ -41,7 +41,10 @@
                 clearable
                 placeholder="自动选择"
               >
-                <el-option label="自动选择" :value="null" />
+                <el-option
+                  label="自动选择"
+                  :value="null"
+                />
                 <el-option
                   v-for="skill in topicSkills"
                   :key="skill.code"
@@ -233,13 +236,22 @@
           >
             <b>建议平台：</b>{{ item.suggested_platform }}
           </p>
-          <p v-if="item.pillar_code" class="topic-item__meta">
+          <p
+            v-if="item.pillar_code"
+            class="topic-item__meta"
+          >
             <b>内容支柱：</b>{{ pillarLabel(item.pillar_code) }}（{{ item.pillar_code }}）
           </p>
-          <p v-if="item.source_skill_code" class="topic-item__meta">
+          <p
+            v-if="item.source_skill_code"
+            class="topic-item__meta"
+          >
             <b>DNA：</b>{{ skillLabel(item.source_skill_code) }}
           </p>
-          <p v-if="item.verification_gaps?.length" class="topic-item__meta">
+          <p
+            v-if="item.verification_gaps?.length"
+            class="topic-item__meta"
+          >
             <b>待核验：</b>{{ item.verification_gaps.join('；') }}
           </p>
           <div class="topic-item__actions">

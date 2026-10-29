@@ -23,16 +23,16 @@
             >
               生成报价单
             </el-button>
-             <el-button
-               v-if="hasPerm('proposal:edit') && proposal?.status === 'confirmed'"
-               type="warning"
-               class="capsule-btn capsule-btn-warn"
-               @click="handleRevertConfirmation"
-             >
-               撤销确认
-             </el-button>
-             <el-button
-               v-if="hasPerm('ai:use')"
+            <el-button
+              v-if="hasPerm('proposal:edit') && proposal?.status === 'confirmed'"
+              type="warning"
+              class="capsule-btn capsule-btn-warn"
+              @click="handleRevertConfirmation"
+            >
+              撤销确认
+            </el-button>
+            <el-button
+              v-if="hasPerm('ai:use')"
               type="warning"
               :loading="polishLoading"
               class="capsule-btn capsule-btn-warn"
@@ -133,8 +133,11 @@
                   :src="row.cover_image_url"
                   class="product-thumb-img"
                   @error="onImgError(row)"
-                />
-                <div class="product-thumb-placeholder" v-else>
+                >
+                <div
+                  v-else
+                  class="product-thumb-placeholder"
+                >
                   {{ row.product_name ? row.product_name.slice(0, 2) : '无图' }}
                 </div>
                 <div class="product-cell-info">

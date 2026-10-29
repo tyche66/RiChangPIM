@@ -38,7 +38,12 @@
               <div>
                 <div class="category-name-row">
                   <span class="category-name">{{ root.categoryName }}</span>
-                  <el-tag size="small" type="info">L{{ root.level }}</el-tag>
+                  <el-tag
+                    size="small"
+                    type="info"
+                  >
+                    L{{ root.level }}
+                  </el-tag>
                 </div>
                 <p class="category-meta">
                   排序 {{ root.sort || 0 }} · {{ root.children?.length || 0 }} 个子分类
@@ -77,7 +82,12 @@
                   <div>
                     <div class="child-title-row">
                       <span class="child-name">{{ child.categoryName }}</span>
-                      <el-tag size="small" type="info">L{{ child.level }}</el-tag>
+                      <el-tag
+                        size="small"
+                        type="info"
+                      >
+                        L{{ child.level }}
+                      </el-tag>
                     </div>
                     <p class="child-meta">
                       排序 {{ child.sort || 0 }}

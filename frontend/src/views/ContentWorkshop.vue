@@ -93,7 +93,10 @@
                 clearable
                 placeholder="自动选择"
               >
-                <el-option label="自动选择" :value="null" />
+                <el-option
+                  label="自动选择"
+                  :value="null"
+                />
                 <el-option
                   v-for="skill in contentSkills"
                   :key="skill.code"

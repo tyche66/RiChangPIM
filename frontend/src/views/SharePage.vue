@@ -89,7 +89,10 @@
                 {{ proposalContent?.customer_name || '-' }}
               </el-descriptions-item>
               <el-descriptions-item label="状态">
-                <el-tag :type="proposalContent?.status === 'confirmed' ? 'success' : 'info'" class="capsule-tag">
+                <el-tag
+                  :type="proposalContent?.status === 'confirmed' ? 'success' : 'info'"
+                  class="capsule-tag"
+                >
                   {{ statusMap[proposalContent?.status || ''] || proposalContent?.status }}
                 </el-tag>
               </el-descriptions-item>
@@ -194,7 +197,10 @@
                 <span class="mono-text">{{ quotationContent?.quotation_no || '-' }}</span>
               </el-descriptions-item>
               <el-descriptions-item label="状态">
-                <el-tag :type="quotationContent?.status === 'confirmed' ? 'success' : 'info'" class="capsule-tag">
+                <el-tag
+                  :type="quotationContent?.status === 'confirmed' ? 'success' : 'info'"
+                  class="capsule-tag"
+                >
                   {{ statusMap[quotationContent?.status || ''] || quotationContent?.status }}
                 </el-tag>
               </el-descriptions-item>
@@ -319,7 +325,7 @@
         </div>
       </div>
 
-<!-- 商品详情弹窗：规格 / 材质 / 颜色 / 材质说明 / 场景图在点击后展开 -->
+      <!-- 商品详情弹窗：规格 / 材质 / 颜色 / 材质说明 / 场景图在点击后展开 -->
       <el-dialog
         v-model="detailVisible"
         :title="detailItem?.product_name || '商品详情'"
@@ -402,7 +408,7 @@
             >
               {{ detailItem.tax_rate !== undefined && detailItem.tax_rate !== null ? (detailItem.tax_rate * 100).toFixed(0) + '%' : '-' }}
             </el-descriptions-item>
-            </el-descriptions>
+          </el-descriptions>
 
           <div
             v-if="detailItem.scene_images?.length"

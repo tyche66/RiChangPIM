@@ -31,7 +31,10 @@
     </el-input>
 
     <div class="qr-section">
-      <canvas ref="qrCanvas" class="qr-canvas" />
+      <canvas
+        ref="qrCanvas"
+        class="qr-canvas"
+      />
     </div>
 
     <div class="share-actions">

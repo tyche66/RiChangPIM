@@ -25,7 +25,7 @@
             <span class="option-name">{{ p.product_name }}</span>
             <span class="option-no">{{ p.product_no }}</span>
             <span class="option-price">¥{{ p.face_price?.toFixed(2) ?? '-' }}</span>
-             <span class="option-stock">库存状态 {{ p.stock_status || '-' }}</span>
+            <span class="option-stock">库存状态 {{ p.stock_status || '-' }}</span>
           </div>
         </el-option>
       </el-select>
@@ -40,7 +40,10 @@
       </el-button>
     </div>
 
-    <div v-if="items.length" class="items-list">
+    <div
+      v-if="items.length"
+      class="items-list"
+    >
       <el-card
         v-for="(item, idx) in items"
         :key="idx"
@@ -53,14 +56,14 @@
               :src="item.cover_image_url"
               class="item-cover"
               @error="onCoverError"
-            />
+            >
             <div class="item-name-no">
               <span class="item-name">{{ item.product_name || '-' }}</span>
               <span class="item-no">{{ item.product_no || '-' }}</span>
             </div>
             <div class="item-meta">
               <span class="item-face-price">面价 ¥{{ item.face_price?.toFixed(2) ?? '-' }}</span>
-               <span class="item-stock">库存状态 {{ item.stock_status || '-' }}</span>
+              <span class="item-stock">库存状态 {{ item.stock_status || '-' }}</span>
             </div>
           </div>
           <el-button
@@ -139,8 +142,14 @@
       </el-card>
     </div>
 
-    <div v-else class="items-empty">
-      <el-empty description="暂未添加商品" :image-size="80" />
+    <div
+      v-else
+      class="items-empty"
+    >
+      <el-empty
+        description="暂未添加商品"
+        :image-size="80"
+      />
     </div>
   </div>
 </template>

@@ -250,7 +250,9 @@
         </el-form-item>
 
         <!-- Quotation items -->
-        <el-divider content-position="left">商品明细</el-divider>
+        <el-divider content-position="left">
+          商品明细
+        </el-divider>
         <div class="quote-items-header">
           <span class="quote-col-product">商品</span>
           <span class="quote-col-qty">数量</span>
@@ -271,7 +273,7 @@
                 :src="item.cover_image_url"
                 class="product-thumb-img"
                 @error="onCoverError"
-              />
+              >
             </span>
             <div>
               <span class="quote-product-name">{{ item.product_name || '-' }}</span>
@@ -375,12 +377,19 @@
       :close-on-click-modal="false"
       width="760px"
     >
-      <el-descriptions :column="2" border class="glass-descriptions">
+      <el-descriptions
+        :column="2"
+        border
+        class="glass-descriptions"
+      >
         <el-descriptions-item label="报价单号">
           <span class="mono-text">{{ viewQuotation?.quotation_no }}</span>
         </el-descriptions-item>
         <el-descriptions-item label="状态">
-          <el-tag :type="viewQuotation?.status === 'confirmed' ? 'success' : 'info'" class="capsule-tag">
+          <el-tag
+            :type="viewQuotation?.status === 'confirmed' ? 'success' : 'info'"
+            class="capsule-tag"
+          >
             {{ quotationStatusMap[viewQuotation?.status || ''] || viewQuotation?.status }}
           </el-tag>
         </el-descriptions-item>
@@ -404,10 +413,20 @@
         </el-descriptions-item>
       </el-descriptions>
 
-      <el-divider content-position="left">商品明细</el-divider>
+      <el-divider content-position="left">
+        商品明细
+      </el-divider>
       <div class="table-wrapper">
-        <el-table :data="viewQuotation?.items || []" border stripe class="items-table">
-          <el-table-column label="商品信息" min-width="220">
+        <el-table
+          :data="viewQuotation?.items || []"
+          border
+          stripe
+          class="items-table"
+        >
+          <el-table-column
+            label="商品信息"
+            min-width="220"
+          >
             <template #default="{ row }">
               <div class="product-cell">
                 <img
@@ -415,7 +434,7 @@
                   :src="row.cover_image_url"
                   class="product-thumb-img"
                   @error="onCoverError"
-                />
+                >
                 <div>
                   <span class="product-cell-name">{{ row.product_name || '-' }}</span>
                   <span class="product-cell-no">{{ row.product_no || '-' }}</span>
@@ -436,18 +455,39 @@
               </div>
             </template>
           </el-table-column>
-          <el-table-column prop="quantity" label="数量" class-name="cell-num" width="80" align="center" />
-          <el-table-column label="单价" class-name="cell-num" width="100" align="right">
+          <el-table-column
+            prop="quantity"
+            label="数量"
+            class-name="cell-num"
+            width="80"
+            align="center"
+          />
+          <el-table-column
+            label="单价"
+            class-name="cell-num"
+            width="100"
+            align="right"
+          >
             <template #default="{ row }">
               <span class="price-text">¥{{ row.unit_price?.toFixed(2) ?? '-' }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="税率" class-name="cell-num" width="80" align="center">
+          <el-table-column
+            label="税率"
+            class-name="cell-num"
+            width="80"
+            align="center"
+          >
             <template #default="{ row }">
               {{ row.tax_rate !== undefined ? (row.tax_rate * 100).toFixed(0) + '%' : '-' }}
             </template>
           </el-table-column>
-          <el-table-column label="未税小计" class-name="cell-num" width="120" align="right">
+          <el-table-column
+            label="未税小计"
+            class-name="cell-num"
+            width="120"
+            align="right"
+          >
             <template #default="{ row }">
               <span class="subtotal-text">¥{{ row.subtotal?.toFixed(2) ?? '-' }}</span>
             </template>

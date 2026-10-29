@@ -20,7 +20,7 @@
           class="picker-search"
         />
         <el-select
-          v-model="typeFilter"
+          v-model="activeType"
           placeholder="类型筛选"
           class="picker-filter"
         >
@@ -141,7 +141,7 @@ const emit = defineEmits<{
 }>()
 
 const searchQuery = ref('')
-const typeFilter = ref('all')
+const activeType = ref('all')
 const loading = ref(false)
 const items = ref<MediaItem[]>([])
 const selectedIds = ref<string[]>([])
@@ -149,7 +149,7 @@ const selectedIds = ref<string[]>([])
 watch(
   () => props.typeFilter,
   (val) => {
-    if (val) typeFilter.value = val
+    if (val) activeType.value = val
   },
   { immediate: true }
 )
@@ -157,7 +157,7 @@ watch(
 const filteredItems = computed(() =>
   items.value.filter((item) => {
     const matchSearch = item.name.toLowerCase().includes(searchQuery.value.toLowerCase())
-    const matchType = typeFilter.value === 'all' || item.type === typeFilter.value
+    const matchType = activeType.value === 'all' || item.type === activeType.value
     return matchSearch && matchType
   })
 )
@@ -165,13 +165,13 @@ const filteredItems = computed(() =>
 async function fetchItems() {
   loading.value = true
   try {
-    items.value = await mediaApi.list({ search: searchQuery.value, type: typeFilter.value })
+    items.value = await mediaApi.list({ search: searchQuery.value, type: activeType.value })
   } finally {
     loading.value = false
   }
 }
 
-watch([searchQuery, typeFilter], fetchItems)
+watch([searchQuery, activeType], fetchItems)
 
 watch(
   () => props.modelValue,
