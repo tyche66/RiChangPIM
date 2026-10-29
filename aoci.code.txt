@@ -119,9 +119,10 @@ env.py[PD5T]: F:Alembic迁移环境：导入全部模型作为target_metadata，
 0028_project_spaces.py[PD6S]: F:Track C方案空间：project_spaces空间树，proposal_item/quotation_item加空间归属与产品快照列 | R:code:backend/alembic/versions/0027_content_skills.py | A:- | S:新增列全部可空旧数据无需回填；material_description已在0026引入不重复
 0029_project_remark.py[PD4T]: F:补齐projects.remark列，修复POST /projects因缺列在_project_to_dict上AttributeError | R:code:backend/app/models/project.py | A:- | S:纯增量可空不回填；ORM已序列化remark但迁移遗漏属于模型-迁移漂移
 0030_content_dna_fields.py[PD5T]: F:给content_skills/topic_items/content_items补source_dna、pillar_code与verification_gaps列的增量迁移 | R:code:backend/app/services/content_dna.py | A:- | S:_add只在缺列时执行保证幂等；verification_gaps用JSONB默认'[]'旧行不回填
-0031_ai_provider_config.py[PD6T]: F:AI配置中心：新建ai_provider_config表并用NOT EXISTS插入ai:config权限码（列名为perm_code/perm_name） | R:code:backend/app/services/ai_config.py | A:- | S:表是覆盖层，行缺失或字段为空即回落环境变量；downgrade先删权限再删表；权限码须与seed_data和0004三处一致
+0031_ai_provider_config.py[PD6T]: F:AI配置中心迁移，创建ai_provider_config并幂等插入ai:config权限，回滚先清角色映射 | R:code:backend/app/services/ai_config.py | A:- | S:配置缺失时回落环境变量；回滚先解除外键映射；权限须与seed同步
 0032_proposal_floor_plans.py[PD6T]: F:创建方案平面图绑定表，关联proposal、可空project与不可硬删attachment，保存展示名/楼层/空间快照/排序并建活动记录索引 | R:code:backend/app/models/sales.py,code:backend/alembic/versions/0031_ai_provider_config.py | A:- | S:表已存在时upgrade直接返回；proposal删除级联绑定、project删除仅清空project_id、attachment受RESTRICT保护；downgrade会删除所有平面图绑定
 0033_sales_media_permissions.py[PI5T]: F:为sales角色补授media:view与media:upload角色映射，不授予媒体删除或替换 | R:code:backend/alembic/versions/0011_add_media_permissions.py,code:backend/app/scripts/seed_data.py | A:- | S:只增角色映射、不创建权限码；upgrade按未删除映射幂等插入，downgrade按角色和权限码删除映射
+0034_user_token_version.py[PD6T]: F:token_version数据库迁移，给user增加非空会话版本列并默认0 | R:code:backend/app/models/user.py,code:backend/app/api/v1/auth.py | A:- | S:新JWT携带tv并校验数据库版本；历史无tv兼容；回滚只删列
 
 ===/home/AI-PIM/RiChangPIM/backend/app/adapters/===
 base.py[IA6S]: F:AI适配器抽象基类：chat/chat_stream/embed/embed_one/parse_tool_calls/manage_session/aclose七契约，统一响应六字段与五种流事件 | R:code:backend/app/adapters/openai.py,code:backend/app/adapters/none.py | A:- | S:chat()必须返回全部六键即使值为空；流事件error为终态不再有后续帧；适配器不做权限与业务校验
@@ -136,7 +137,7 @@ openai.py[IA7L]: F:OpenAI兼容适配器：chat/chat_stream/embed/embed_one、to
 __init__.py[EB3T]: F:v1路由聚合导入并导出业务router，新增proposal_floor_plans_router | R:code:backend/app/main.py,code:backend/app/api/v1/proposal_floor_plans.py | A:- | S:新增路由必须在这里导入并列入__all__，并由main挂载后才进入FastAPI应用
 audit.py[EO3T]: F:审计查询API：GET /operation-logs按action/module/user/username/状态码/时间范围过滤分页 | R:code:backend/app/models/audit.py,code:backend/app/middleware/audit.py | A:- | S:需audit:view权限；username为包含匹配；size上限100
 ai.py[IA8L]: F:AI能力API提供chat/SSE、embedding、RAG检索与索引、推荐和方案润色，将适配器异常映射成脱敏HTTP错误 | R:code:backend/app/services/ai_config.py | A:- | S:AI未配置时必须fail-closed返回503；运行模型配置应经解析层get_config读取而非直接使用环境设置
-auth.py[EI6S]: F:认证API：/login签发access+refresh token、/refresh换发、/me、/logout与改密码，JWT载荷含role_code与perms | R:code:backend/app/core/security.py,code:backend/app/core/permission.py | A:- | S:admin登录时拉取全部权限码而非角色映射；last_login_time写失败只降级日志不卡登录；refresh token有效期7天且type必须为refresh
+auth.py[EI6S]: F:认证API签发与刷新access/refresh token，并支持登录、注销、查询当前用户和改密码 | R:code:backend/app/core/security.py,code:backend/app/core/permission.py,code:backend/app/models/user.py | A:- | S:改密递增token_version使旧tv令牌失效；历史无tv令牌兼容；refresh必须校验type和版本
 categories.py[ED4S]: F:品类API：树形列表(按level+sort)、新增时按父级算level、更新与删除 | R:code:backend/app/models/product.py,code:backend/app/api/v1/brands.py | A:- | S:列表一次性全查后在内存递归建树；level由创建时父级深度决定；删除同为软删
 content.py[EB6L]: F:内容工坊API：批次生成/详情、条目列表/编辑/采纳/驳回、发布登记与曝光查询，AI未配置时生成返503 | R:code:backend/app/services/content_service.py,code:backend/app/services/content_facts.py | A:- | S:NoneAdapter时生成端点503；采纳仅允许draft状态且有警告需confirm=true；已发布条目正文锁定不可改；platform限五平台
 brands.py[ED3T]: F:品牌CRUD：由create_crud_router生成的列表/新增/更新/软删四端点，权限码brand:*四件套 | R:code:backend/app/models/product.py,code:backend/app/api/v1/categories.py | A:- | S:item_data须有schema注解否则body被当query；delete是软删
@@ -150,12 +151,12 @@ observability.py[OO5S]: F:可观测性API：GET /metrics(Prometheus文本无鉴�
 pending_actions.py[IA5S]: F:AI待确认动作API：列表/详情/创建/确认/取消，开关AI_PENDING_ACTIONS_ENABLED关闭返503，非admin只能看自己的 | R:code:backend/app/services/pending_actions.py,code:backend/app/models/ai_action.py | A:- | S:需ai:pending_action权限；非admin查询强制按created_by过滤；确认走幂等键；动作类型仅两种方案草稿
 version.py[OV3T]: F:版本API：GET /version返回后端构建指纹(版本/build_id/git_commit/build_time/environment) | R:code:backend/app/core/config.py,code:frontend/src/config/version.ts | A:- | S:只报后端版本不返回frontend_version；一致性由前端compareBuilds比对
 stats.py[EB4S]: F:统计API：/stats/shares分享总量/活跃/访问量与Top10、/stats/products/hot热门产品，按日期范围过滤 | R:code:backend/app/models/audit.py,code:backend/app/models/sales.py | A:- | S:需stats:view；日期范围含当天23:59:59；Top访问逐条查方案名
-products.py[EB9L]: F:产品查询/CRUD/媒体/质量与批量导入API；导入支持零写库预检、单次token提交、创建/覆盖/追加/跳过、冲突诊断、自动标签和覆盖前快照 | R:code:backend/app/services/product_import.py,code:backend/app/services/import_staging.py,code:backend/app/services/product_import_backup.py | A:- | S:标签筛选按product_id与未删除关联join；total必须对子查询id去重；预检token绑定用户/2小时过期且消费标记先于写库；空单元格不改原值；99999联动pending
+products.py[EB9L]: F:产品查询、CRUD、媒体、质量与批量导入API，预检识别P-编号别名并要求明确处理 | R:code:backend/app/services/product_import.py,code:backend/app/services/import_staging.py,code:backend/app/services/product_import_backup.py | A:- | S:别名不改存储编号；安全候选才可全局覆盖；高风险逐行确认；未选择返回409且token不消费
 dashboard.py[EB6L]: F:驾驶舱API：overview/funnel/sales/todos/content五端点，聚合查询过数据范围，金额字段按角色剔除，Redis 45s缓存带防击穿锁 | R:code:backend/app/core/data_scope.py,code:backend/app/api/v1/customers.py | A:- | S:Redis不可用fail-open直查；金额字段不进缓存直查合并；空态返回null加empty_reason禁止0占位；缓存键含user_id与role_code
 tags.py[ED3T]: F:标签CRUD：列表/新增/更新/软删四端点，权限码tag:*四件套 | R:code:backend/app/models/product.py,code:backend/app/api/v1/brands.py | A:- | S:delete是软删；更新用exclude_unset且None不覆盖；列表不分页全量返回
 suppliers.py[ED3T]: F:供应商CRUD：列表/新增/更新/软删四端点，权限码supplier:*四件套 | R:code:backend/app/models/product.py,code:backend/app/api/v1/tags.py | A:- | S:delete是软删；更新None值不覆盖；列表不分页全量返回
 roles.py[EI5S]: F:角色API：列表(带权限码)、创建(编码唯一409)、更新(权限同步软删/恢复)、软删；更新写审计role_perm_change | R:code:backend/app/models/user.py,code:backend/app/api/v1/users.py | A:- | S:permission_ids支持权限码或UUID两种写法，不存在即400；同步用软删is_deleted而非物理删映射；角色编码重复返409
-users.py[EI5S]: F:用户API：列表/详情/创建(用户名唯一409)/更新/停用/软删，密码经hash落库 | R:code:backend/app/core/security.py,code:backend/app/api/v1/roles.py | A:- | S:创建与删除写审计；停用是status=disabled非软删；username重复返409；UserResponse不返回password_hash
+users.py[EI5S]: F:用户列表、CRUD、停用、软删与管理员重设密码API | R:code:backend/app/core/security.py,code:backend/app/core/permission.py,code:backend/app/models/user.py | A:- | S:重复用户名含软删记录返409；重设只准admin且审计脱敏；密码哈希存储并递增token_version
 shares.py[EB4S]: F:分享API：创建(方案/报价单)、列表、撤销；token形如tk_加12位hex，支持过期与访问次数上限 | R:code:backend/app/models/audit.py,code:backend/app/api/v1/share_token.py | A:- | S:creator_id只从登录态取；proposal仅draft/confirmed可分享；撤销同时禁用全部token
 reminders.py[EB4M]: F:提醒与通知API：列表(默认pending)、done/snooze/cancel状态操作、通知列表与批量已读；非admin/manager只能操作分配给自己的 | R:code:backend/app/models/reminder.py,code:backend/app/api/v1/dashboard.py | A:- | S:需reminder:edit；非admin/manager强制按assignee过滤；已读支持ids或all
 quotations.py[EB6L]: F:报价单API：列表/详情/创建/更新/确认、明细计算(行小计=单价*数量、总额=Σ小计*(1+税率)*折扣)、Gotenberg PDF导出、封面短token URL | R:code:backend/app/models/sales.py | A:- | S:金额计算在服务端完成不信前端；PDF经Gotenberg渲染失败时返502不返回半成品
@@ -170,7 +171,7 @@ proposal_floor_plans.py[EB6M]: F:方案平面图列表/新增/批量新增/改�
 
 ===/home/AI-PIM/RiChangPIM/backend/app/core/===
 security.py[SS5T]: F:安全原语：bcrypt(12轮)口令哈希与校验、JWT签发/解码(算法与密钥来自settings) | R:code:backend/app/core/config.py,code:backend/app/core/permission.py | A:- | S:校验失败吞异常返False不抛；decode失败返None由调用方判401；密钥轮换会让所有已发token立即失效
-permission.py[EI6T]: F:权限依赖：PermissionChecker校验Bearer token、写request.state(user_id/role_code/permissions)，admin直通否则校验perms包含 | R:code:backend/app/core/security.py,code:backend/app/core/permissions.py | A:- | S:role_code=admin跳过权限码校验；空required_permission只验登录；token无效返40102；permissions来自JWT载荷perms
+permission.py[EI6T]: F:Bearer鉴权、权限校验与JWT会话版本校验 | R:code:backend/app/core/security.py,code:backend/app/core/database.py,code:backend/app/models/user.py | A:- | S:带tv令牌须命中未删用户且版本相等，否则40104；无tv历史令牌兼容；无权限先403
 permissions.py[II3T]: F:权限加载辅助：load_user_perms按角色查权限码、get_user_role_code查用户角色码 | R:code:backend/app/models/user.py,code:backend/app/core/permission.py | A:- | S:只查is_deleted=false的权限与映射；用户不存在返回空列表不抛错
 serializers.py[CS4T]: F:敏感字段过滤：按角色剔除cost_price/supplier_*/margin/profit，递归处理嵌套dict与list | R:code:backend/app/api/v1/products.py,code:backend/app/api/v1/share_token.py | A:- | S:admin及admin前缀角色不过滤；未知角色按全部敏感字段过滤；只滤key不动值
 database.py[PD6T]: F:数据库引擎：asyncpg异步engine、session工厂、declarative Base；导入期强制加载pgvector的Vector与HalfVector类型 | R:code:backend/app/core/config.py,code:backend/app/models/user.py | A:- | S:缺pgvector依赖import期即抛RuntimeError不静默退回普通类型；URL强制转postgresql+asyncpg；expire_on_commit=False
@@ -260,7 +261,7 @@ __init__.py[OM1T]: F:中间件包入口：再导出AuditMiddleware与audit_actio
 
 ===/home/AI-PIM/RiChangPIM/backend/app/models/===
 __init__.py[PD3T]: F:导入并统一导出业务ORM模型，供metadata/create_all及应用加载 | R:code:backend/app/core/database.py,code:backend/app/models/sales.py | A:- | S:新模型必须在此导入并列入__all__，否则create_all不建表
-user.py[II4T]: F:RBAC模型：Role(role_code唯一)、Permission(perm_code唯一、resource/action/type)、RolePermission映射、User(username唯一、password_hash、role外键、last_login_time) | R:code:backend/app/models/base.py,code:backend/app/api/v1/auth.py | A:- | S:role_code与username有DB唯一约束；映射级联delete-orphan；密码哈希不直接暴露
+user.py[II4T]: F:RBAC模型及User会话版本字段 | R:code:backend/app/models/base.py,code:backend/app/api/v1/auth.py,code:backend/alembic/versions/0034_user_token_version.py | A:- | S:role_code和username唯一；token_version非空默认0并由改密递增；密码哈希不暴露
 ai_action.py[ID4T]: F:待确认动作模型：action_type/status受CHECK约束、idempotency_key软删唯一、payload/source_ids JSONB、过期与确认人字段 | R:code:backend/app/api/v1/pending_actions.py,code:backend/app/services/pending_actions.py | A:- | S:action_type仅两种proposal草稿动作；status五态；幂等键在未删行内唯一；generation_version默认p3.1
 base.py[PD3T]: F:模型基类CommonBase：表名=类名小写、UUID主键默认uuid4、create_time/update_time服务端默认、deleted_at/is_deleted软删字段 | R:code:backend/app/core/database.py,code:backend/app/models/user.py | A:- | S:表名由类名小写推导；update_time靠onupdate刷新；AsyncAttrs支持异步属性
 doc_chunk.py[PD3T]: F:旧说明书切片模型：product_manual_chunk含chunk_index/text/tokens/hash与HalfVector(2048)嵌入，唯一约束(manual,index) | R:code:backend/app/models/product.py,code:backend/app/knowledge/documents/manual_provider.py | A:- | S:类型是HalfVector(2048)由0016迁移更改；两侧CASCADE删除
@@ -291,7 +292,7 @@ proposal.py[CB3T]: F:方案schema：Item(数量≥1)、Create(明细不可为空
 quotation.py[CB3T]: F:报价schema：Item(单价≥0、税率0-1)、Create(明细不可空、默认税率0.13折扣1.0)、Update、Response与PDF任务响应 | R:code:backend/app/api/v1/quotations.py | A:- | S:税率是比例不是百分数；折扣默认1.0；金额字段服务端计算
 file.py[IM3T]: F:文件上传/详情/预签名响应与媒体引用schema，含产品/场景图、说明书和平面图 | R:code:backend/app/api/v1/files.py,code:backend/app/models/sales.py | A:- | S:删除保护须统计完整活动引用；预览token默认900秒
 product.py[CD5S]: F:产品schema：Base(face_price≥0、占位价99999必须配pending的model_validator)、Update(面价不可置空)、Response(含margin/profit、封面与场景图、tags序列化)及品类/品牌/供应商/标签CRUD | R:code:backend/app/api/v1/products.py,code:backend/app/models/product.py | A:- | S:schema层与DB层双重强制占位价规则；margin与profit只对有权角色返回；tags支持ORM对象或字符串两种输入；CategoryResponse自引用实现树
-user.py[II3T]: F:用户/角色/权限schema：Token、UserCreate(含password与role_id)、UserResponse(不返回password_hash)、RoleCreate(permission_ids兼容权限码或UUID)、Login/ChangePassword | R:code:backend/app/api/v1/users.py,code:backend/app/models/user.py | A:- | S:UserResponse不暴露password_hash；permission_ids兼容两种写法
+user.py[II3T]: F:用户、角色、权限、登录与重设密码schema | R:code:backend/app/api/v1/users.py,code:backend/app/models/user.py | A:- | S:新密码限制8-72字符；UserResponse不暴露password_hash
 customer.py[IB4S]: F:客户schema：Create/Update(level限ABC、source白名单、预算≥0)、Response(列表不返回PII只给has_phone)、Detail(掩码字段)、PII(明文端点)、Summary/Timeline | R:code:backend/app/api/v1/customers.py,code:backend/app/models/customer.py | A:- | S:明文PII只在PIIResponse出现；Summary有金额可见开关；owner_sales_id服务层再校验
 project.py[IB3S]: F:项目schema：Create/Update、CustomerBrief(设计师可见无PII)、Member(角色pattern)、Asset(类别pattern、状态仅approved/obsolete)、StageUpdate | R:code:backend/app/api/v1/projects.py,code:backend/app/models/project.py | A:- | S:CustomerBrief只含编号与名；资产状态仅可改approved/obsolete
 content.py[IB4S]: F:内容工坊schema：Generate(平台pattern、数量1-5、topic≤2000)、ItemResult(verified/warnings)、Publish、MetricEntry(非负、日期格式、来源)与Excel导入结果(错误文件URL) | R:code:backend/app/api/v1/content.py,code:backend/app/models/content.py | A:- | S:verified表示经合规守卫；captured_date必须YYYY-MM-DD；display_state是派生字段
@@ -322,7 +323,7 @@ content_facts.py[KD4T]: F:产品事实装配：把ORM产品压成提示词事实
 content_skill_router.py[KA5M]: F:服务端Skill选择：接受两个运营Skill码或不选，自动选择用一次有界JSON路由调用，超时/无效/不可用时确定性回落到默认DNA | R:code:backend/app/services/content_dna.py | A:- | S:客户端不能选任意Skill或模型；路由调用有超时且不影响主链路；回落到yuc-content是确定性默认
 product_snapshot.py[KD4T]: F:产品事实快照(Track C)：创建/修改方案报价明细时从产品表读事实生成快照，不信任前端传入 | R:code:backend/app/models/sales.py | A:- | S:读取优先级历史快照优先于当前产品字段，保证老方案不漂移；快照字段与产品卡一致
 topic_service.py[KA6M]: F:按选题Skill生成条目，校验JSON schema/合规并按滚动窗口配额落库 | R:code:backend/app/services/content_dna.py,code:backend/app/models/content_skill.py | A:- | S:只允许enabled topic Skill；模板错误显式回落内置模板；支柱配额按20条窗口
-import_staging.py[OR5T]: F:管理导入预检暂存文件及其元数据、用户归属、SHA256、过期和单次消费 | R:code:backend/app/api/v1/products.py,code:backend/app/core/config.py,code:backend/app/services/product_import_backup.py | A:- | S:token防路径穿越并绑定用户/TTL；先消费标记阻止重放；多worker共享文件系统
+import_staging.py[OR5T]: F:管理产品导入预检暂存文件、元数据归属、过期、别名信息和单次消费 | R:code:backend/app/api/v1/products.py,code:backend/app/core/config.py,code:backend/app/services/product_import_backup.py | A:- | S:token防穿越并绑定用户；别名写meta供commit消费前409；原子改名防重放；多worker共享目录
 product_import_backup.py[OR4T]: F:把覆盖导入前产品字段与图片附件绑定写成按backup_id检索的JSON快照 | R:code:backend/app/api/v1/products.py,code:backend/app/scripts/restore_import_backup.py | A:- | S:快照在staging目录backups子目录；恢复不删附件且保留产品主键
 proposal_floor_plans.py[EB5T]: F:加载方案活动平面图和附件，组装显示payload及短期file_content代理URL | R:code:backend/app/models/sales.py,code:backend/app/api/v1/proposals.py,code:backend/app/api/v1/share_token.py | A:- | S:图片URL token默认900秒；登录和匿名路径均不暴露MinIO直链
 
@@ -347,6 +348,7 @@ fix_category_option_codes.py[XD5L]: F:一次性维护脚本：清理category选�
 seed_attribute_dictionary.py[XD6L]: F:幂等播种受治理属性定义/选项/别名并可选派生类目选项，供查询解析器读取 | R:code:backend/app/models/catalog_attribute.py,code:backend/app/knowledge/attributes.py | A:- | S:词典是解析唯一业务词表；播种不回填产品事实
 seed_default_skills.py[XD5M]: F:运营Skill种子：把两套DNA各派生内容/选题共4个 operational Skill 写入content_skills，--refresh可按代码模板原地刷新已存在行 | R:code:backend/app/services/content_dna.py | A:- | S:默认模式遇已存在行只跳过不覆盖；--refresh会覆盖后台对这4个内置Skill的手动修改，用前先--check
 restore_import_backup.py[XD4T]: F:按backup_id列出、演练或恢复产品覆盖导入前快照，原位恢复产品字段和图片附件绑定 | R:code:backend/app/services/product_import_backup.py,code:backend/app/api/v1/products.py | A:- | S:dry-run回滚事务不提交；恢复不删除附件并保持product.id
+migrate_duplicate_product_images.py[OD5S]: F:按重复产品审计配对迁移安全产品图关联，默认dry-run、确认后单事务提交且幂等 | R:code:docs/audit/20261029_duplicate_products/pairs_minimal.csv,code:backend/app/models/product.py | A:- | S:只迁416条产品图并软删旧关联；不迁场景图、不改字段状态标签、不退役来源；校验失败整批停止
 
 ===/home/AI-PIM/RiChangPIM/backend/docker/===
 backend-entrypoint.sh[OV4T]: F:容器入口：等DB(psycopg2探测30次)→alembic upgrade head→init_admin→seed_data→exec uvicorn | R:code:backend/app/main.py | A:- | S:必要步骤真实失败即非零退出绝不对外服务；迁移用临时ini避免依赖仓库路径
@@ -377,7 +379,7 @@ Dockerfile[OV1T]: F:OCR镜像：python:3.11-slim加poppler-utils加tesseract(中
 04-接口规范(OpenAPI).md[SD6L]: F:API契约：统一envelope(code/msg/data)、分页约定(page/size≤100)、标准错误码表(40001-50301)、各模块接口总览；运行时/openapi.json为机器可读基准 | R:code:backend/app/api/v1/__init__.py,code:backend/app/schemas/product.py | A:- | S:接口计数与错误码表会漂移，以代码和/openapi.json为准；人工契约与运行时规范须一致维护
 05-业务流程(BPM).md[SD4M]: F:BPM：Mermaid时序/流程图覆盖产品上传归档(OCR双写)、AI推荐(向量候选加业务回查闭环)、方案分享等链路；含库存乐观锁说明 | R:code:docs/02-系统架构与设计(HLD).md,code:AI-Docs/02-目标架构与核心流程.md | A:- | S:MinerU实现是自建tesseract；乐观锁version字段实际未加；入口/ai/chat目标态是/knowledge/query
 06-部署方案.md[OD4T]: F:部署方案(v1.9.1)：生产Compose七服务表、首次部署步骤(build_frontends.sh→up -d)、入口与网络(仅888)、本地开发方式；实机运维以README-OPS为准 | R:code:docker-compose.yml,code:README-OPS.md | A:- | S:文档版本v1.9.1已过期当前v1.9.3；头部已标注与实机偏差；实机运维以README-OPS为准
-07-开发规范.md[SD5M]: F:开发规范：仓库结构(单仓多模块)、后端四层约定(api→services→models→DB、schemas做字段级过滤)、Python/TS命名与工具、Git工作流与提交规范 | R:code:CHANGELOG.md,code:.github/workflows/ci.yml | A:- | S:目录图里的fastgpt/dify/ragflow适配器实际未实现只有openai与none；store目录实际是stores；表名单数非文档写的复数；mypc可选未进CI门禁
+07-开发规范.md[SD5M]: F:开发规范、分层约定、编码工具、Git工作流与审计动作清单 | R:code:CHANGELOG.md,code:.github/workflows/ci.yml,code:backend/app/middleware/audit.py | A:- | S:user_password_reset须挂审计装饰器并脱敏请求体；新增动作同步本表与测试
 09-测试计划.md[SQ5M]: F:测试计划：金字塔策略、工具选型(pytest/Vitest/Playwright/Locust)、接口契约测试八场景、AI Adapter回归(FastGPT/Dify/RagFlow结构一致)、字段权限与E2E | R:code:RELEASE_GATE.md,code:backend/tests/unit/conftest.py | A:- | S:文档列的FastGPT/Dify/RagFlow适配器测试实际不存在只有openai与none；实际门禁以scripts/gate.sh与CI为准；集成默认只跑仅依赖PG安全子集
 10-客户项目与新媒体(CRM-Lite).md[SB6L]: F:CRM-Lite终稿(v3)：决策登记A1-A9/D1-D10/R1-R8、验收追溯矩阵、硬约束十条、数据模型DDL(customers/projects/content/reminders)与实施门禁 | R:code:backend/alembic/versions/0020_crm_perms.py,code:backend/app/models/customer.py | A:- | S:唯一执行依据历史稿冲突以本文为准；PII本期不加密明文加脱敏加phone_norm；pending_action本期零改动；迁移0018-0022且revision≤32字符必带downgrade；越权一律404
 9-17新增数据仪表盘需求实现计划.md[SB6L]: F:仪表盘需求实施计划(v2.0)：需求背景、现状与差距(无客户/项目/新媒体/提醒/驾驶舱/数据范围)、总体架构(AI上下文/增强直写/RAG)、分阶段PR与门禁 | R:code:docs/10-客户项目与新媒体(CRM-Lite).md,code:backend/app/api/v1/dashboard.py | A:- | S:本计划是10号文档的上游需求稿，冲突以10终稿为准；文中迁移head 0017已过期现0022；project_context与ai/context等未全部落地
@@ -480,7 +482,7 @@ design-system.css[FS5L]: F:全局设计系统：自托管HarmonyOS Sans拉丁四
 crm.css[FS4M]: F:CRM/内容域共享样式：crm-page/crm-card/工具栏/KPI/表格等类，7视图加3组件共用，颜色全走design-system Token | R:code:frontend/src/main.ts,code:frontend/src/styles/design-system.css | A:- | S:main.ts全局引入非scoped；深色跟随Token；改动影响全部CRM页
 
 ===/home/AI-PIM/RiChangPIM/frontend/src/api/===
-index.ts[IN6L]: F:后台Axios封装，处理Bearer、envelope、401单飞refresh和错误提示 | R:code:backend/app/api/v1/__init__.py,code:frontend/src/stores/auth.ts,code:frontend/src/api/proposalFloorPlans.ts | A:- | S:公开请求移除Authorization；并发401共用refreshPromise；登录跳转保留/admin base
+index.ts[IN6L]: F:后台Axios客户端处理Bearer、envelope、401 refresh、错误提示及产品导入/用户管理请求 | R:code:backend/app/api/v1/products.py,code:backend/app/api/v1/users.py,code:frontend/src/stores/auth.ts | A:- | S:用户管理请求可抑制全局toast以显示后端业务错误；并发401共用refreshPromise
 media.ts[IM4M]: F:媒体库API：list/listPage(关键词/类型/引用/排序透传)、上传/删除/预览与引用检查(三类引用结构)，MediaItem与FileItem双形状兼容 | R:code:backend/app/api/v1/files.py,code:frontend/src/views/MediaLibrary.vue | A:- | S:拦截器已剥一层仍兼容两种形状；list默认size100；sort走后端白名单
 customer.ts[IB4M]: F:客户域API封装：CRUD、阶段迁移(PATCH body)、移交(PUT query new_owner_id)、PII明文端点、对话/需求/跟进/方案子资源(写用Query参数不用body) | R:code:backend/app/api/v1/customers.py,code:frontend/src/views/Customers.vue | A:- | S:子资源写用Query参数不是body；列表无PII只有has_phone；明文走/pii有审计限速
 project.ts[IB4S]: F:项目域API：CRUD、成员、图纸资产(两步上传：先/files/upload拿attachment_id再绑定，同名自动+version)、阶段迁移、CustomerBrief | R:code:backend/app/api/v1/projects.py,code:frontend/src/views/Projects.vue | A:- | S:图纸上传两步先拿attachment_id再绑定；brief只含编号与名；更新不可改customer_id
@@ -502,6 +504,7 @@ jwt.ts[IS2T]: F:JWT工具：decodeJwt手拆三段base64(header/payload/signature
 beijingTime.ts[IU3T]: F:北京时间工具：formatBeijingTime(UTC→Asia/Shanghai 24小时制，Intl formatToParts自拼)、beijingLocalToInstant(筛选字面量→UTC instant，固定-8h偏移) | R:code:frontend/src/views/Logs.vue,code:backend/app/api/v1/audit.py | A:- | S:无时区标记按UTC解析；筛选用固定-8h偏移无夏令时；解析失败原样回显
 columnFill.ts[IU4T]: F:表格列宽水填充算法(纯函数)：按自然宽clamp后按grow权重分配剩余空间、撞max退出、残差记到锚列；空间不够转横向滚动不压缩 | R:code:frontend/src/views/Products.vue,code:frontend/tests/unit/columnFill.spec.ts | A:- | S:container>=Σmin时Σ列宽恒等于container；不用element fit；残差记锚列
 productDetailError.ts[IU2T]: F:产品详情错误分类：axios错误按404/403/401/其他分not-found/forbidden/unauthorized/server-error，无响应或非axios归network-error | R:code:frontend/src/views/ProductDetail.vue | A:- | S:网络错误与超时都归network-error；401单独态供触发刷新；只供UI不重试
+passwordRules.ts[CU4T]: F:用户重设密码表单的长度与确认值校验规则 | R:code:frontend/src/views/Users.vue,code:backend/app/schemas/user.py | A:- | S:前后端保持8-72字符范围并校验两次密码一致
 
 ===/home/AI-PIM/RiChangPIM/frontend/src/composables/===
 useTheme.ts[FU4T]: F:主题单例：light/dark/system三态、持久化localStorage theme、applyTheme落html.dark-mode类、system监听matchMedia、initTheme挂载前初始化 | R:code:frontend/src/main.ts,code:frontend/src/components/ThemeToggle.vue | A:- | S:模块级单例经storage事件跨iframe同步；无记录默认system；类名dark-mode
@@ -522,7 +525,7 @@ SceneImageSelector.vue[CU4L]: F:产品场景图绑定组件：网格展示(缩�
 ProductSceneCarousel.vue[CU3M]: F:场景图灯片：全屏overlay(点遮罩关闭)、大图加名称、上一张/下一张、圆点跳转、计数器、触摸滑动 | R:code:frontend/src/views/SharePage.vue | A:- | S:键盘左右与Esc必须绑定且在overlay挂载后才生效；触摸阈值防止误触翻页
 ProductImageManager.vue[CU4L]: F:产品图片管理：网格(缩略图/错误占位/主图徽章)、设为主图、上移下移排序、解绑、添加对话框，上限10 | R:code:backend/app/api/v1/products.py,code:frontend/src/views/ProductDetail.vue | A:- | S:解绑不删文件只移关联；10上限与导入配置一致；主图即is_cover唯一
 MediaUploader.vue[CU4M]: F:媒体上传组件：拖拽区(auto-upload=false手动队列)、accept白名单、上传队列(进度/成功/错误/移除)、beforeUpload前端预检 | R:code:frontend/src/api/media.ts,code:backend/app/api/v1/files.py | A:- | S:手动队列非自动上传；提示50MB与后端图片上限一致视频100MB；accept须与后端白名单一致
-ImportConflictDialog.vue[EU5M]: F:展示预检计数/冲突/无效行并选覆盖追加跳过、快照与新标签类型 | R:code:frontend/src/views/Import.vue,code:backend/app/api/v1/products.py | A:- | S:无效行任何模式不写；skip不改已有产品；提交使用单次token
+ImportConflictDialog.vue[EU5M]: F:展示导入预检计数、精确/别名冲突、无效行并选择覆盖追加跳过及别名处理 | R:code:frontend/src/views/Import.vue,code:backend/app/api/v1/products.py | A:- | S:别名未明确选择时不允许提交；高风险别名必须逐行确认
 ProposalFloorPlanManager.vue[EU6L]: F:方案平面图管理器，上传/选用媒体并维护缩略图、改名、排序、删除绑定和预览，支持已有方案与新建暂存 | R:code:frontend/src/api/proposalFloorPlans.ts,code:frontend/src/components/MediaPicker.vue,code:backend/app/api/v1/proposal_floor_plans.py | A:- | S:每方案20张；confirmed仍可维护；删除只解除绑定；创建流程先暂存待方案创建后批量绑定
 
 ===/home/AI-PIM/RiChangPIM/frontend/src/views/===
@@ -532,7 +535,7 @@ Brands.vue[EU3M]: F:品牌管理页：表格(名称/Logo外链/描述)、新增/
 Categories.vue[EU4L]: F:分类管理页：层级卡片化展示(根卡片加子分类列表)、名称搜索过滤、新增/编辑/删除按权限显隐 | R:code:backend/app/api/v1/categories.py,code:frontend/src/router.ts | A:- | S:children来自后端build_tree前端不再递归；搜索仅名称前端过滤；删含子分类的行为以后端为准
 Customers.vue[EU5L]: F:客户管理页：关键词/阶段/等级筛选(STAGE_MAP/LEVEL_MAP来自constants/crm)、表格、新增按customer:edit权限、空态 | R:code:frontend/src/api/customer.ts,code:frontend/src/constants/crm.ts | A:- | S:列表不展示PII明文入口在详情页/pii；筛选选项来自前端常量须与后端枚举一致；q支持名称与手机号
 Dashboard.vue[EU6M]: F:驾驶舱页：KPI卡(EmptyMetric渲染空态、趋势箭头)、客户漏斗VChart、待办数、时间范围7/30/90天切换与刷新 | R:code:frontend/src/api/dashboard.ts,code:frontend/src/components/EmptyMetric.vue | A:- | S:echarts按需引入VChart加autoresize；金额卡visible=false时不渲染数值；漏斗无数据显示暂无而非空图
-Import.vue[EU6L]: F:产品批量导入界面，上传后预检冲突并选择覆盖/追加/跳过，再展示行级失败、图片变化及快照结果 | R:code:backend/app/api/v1/products.py,code:frontend/src/components/ImportConflictDialog.vue | A:- | S:预检与提交分离，结果必须按服务端模式计数；覆盖备份ID供管理员恢复，取消预检应释放暂存
+Import.vue[EU6L]: F:产品批量导入界面，上传后预检冲突并选择覆盖/追加/跳过及P-别名处理，再展示图片变化、失败和快照结果 | R:code:frontend/src/components/ImportConflictDialog.vue,code:frontend/src/api/index.ts,code:backend/app/api/v1/products.py | A:- | S:预检与提交分离；别名未选动作时不消费token；结果按服务端模式计数
 ContentWorkshop.vue[EU6L]: F:内容工坊页：生成表单(标题/平台/语气/产品远程多选，按content:generate显隐)、条目列表、采纳/驳回/发布动作、曝光入口 | R:code:frontend/src/api/content.ts | A:- | S:平台与语气选项来自前端常量；生成表单按content:generate权限显隐；AI未配置时后端返503需界面处理；待核验与合规警告分区展示
 Logs.vue[EO5L]: F:操作日志/分享统计页：分享统计卡(总数/访问/活跃/平均访问率)、热门Top10表、审计日志表(时间范围/状态/操作人过滤) | R:code:backend/app/api/v1/audit.py,code:frontend/src/utils/beijingTime.ts | A:- | S:审计表时间用beijingTime格式化UTC转+8；权限stats:view；平均访问率是前端算的非后端字段
 Manuals.vue[IU5L]: F:产品知识库页：上传创建说明书(product_id加doc_type加PDF/DOCX)、状态列表(parse/index双状态)、触发索引、RAG问答(带来源) | R:code:backend/app/api/v1/manuals.py,code:frontend/src/types/manuals.ts | A:- | S:手动填product_id无产品选择器易填错；只收pdf与docx旧doc后端拒；问答来源含chunk_id可追溯
@@ -540,7 +543,7 @@ MediaLibrary.vue[EU6L]: F:媒体库页：上传对话框(MediaUploader)、关键
 Roles.vue[EI5L]: F:角色管理页：角色表格、新增/编辑/分配权限(树形选择器按role:*权限显隐按钮)、删除 | R:code:backend/app/api/v1/roles.py,code:frontend/src/types/permissions.ts | A:- | S:权限选择用PERMISSIONS清单渲染新增码不同步会缺；分配即sync软删旧映射非物理删；hasPermission前端判定后端仍校验
 Products.vue[EB9L]: F:产品列表页：多维筛选(关键词/分类级联/品牌/供应商/系列/状态/库存/质量旗标)、表格与卡片视图切换、水填充列宽(columnFill)、缩略图档位(表格192/卡片480)、分页 | R:code:frontend/src/utils/columnFill.ts | A:- | S:筛选参数变更需重置到第一页；大批量分页用total控制禁用越界页
 ShareManagement.vue[ES4M]: F:分享管理页：分享表格(ID/类型tag/目标/状态/时间)、查看(仅proposal)、撤销(share:delete且active)、ShareResultDialog结果展示 | R:code:backend/app/api/v1/shares.py,code:frontend/src/components/ShareResultDialog.vue | A:- | S:撤销会禁用全部token；查看只对proposal开放；状态映射active与disabled
-Users.vue[EI4L]: F:用户管理页：角色/状态筛选、用户表格、新增/编辑/停用/删除按user:*权限显隐 | R:code:backend/app/api/v1/users.py,code:frontend/src/types/permissions.ts | A:- | S:停用走user:disable非delete；删除是软删；密码仅编辑时填写
+Users.vue[EI4L]: F:用户管理页提供角色/状态筛选、新增/编辑/停用/删除及系统管理员重设密码操作 | R:code:frontend/src/api/index.ts,code:frontend/src/utils/passwordRules.ts,code:backend/app/api/v1/users.py | A:- | S:重设按钮仅admin显示；密码校验与后端一致；接口错误只显示一次
 Quality.vue[IQ4L]: F:数据质量看板：七类旗标统计pill(待核价/缺图/缺说明书/缺规格/来源不全/OCR失败/长期pending)、待补充清单表、导出 | R:code:backend/app/api/v1/products.py,code:backend/app/services/quality.py | A:- | S:导出走quality-export不含成本价；计数来自quality_summary；视图不判质量
 Version.vue[OV3S]: F:版本页：前端构建指纹(version/buildId/gitCommit/buildTime)与后端/version对比，compareBuilds三档结论(match/mismatch/unknown)与重试 | R:code:frontend/src/config/version.ts,code:backend/app/api/v1/version.py | A:- | S:unknown表示缺构建元数据；mismatch按buildId优先判；只读无修复动作
 Suppliers.vue[ED3L]: F:供应商管理页：表格(名称/联系人/电话/合作状态tag/时间)、新增/编辑/删除按supplier:*权限 | R:code:backend/app/api/v1/suppliers.py,code:frontend/src/types/permissions.ts | A:- | S:合作状态三档受DB CHECK；删除是软删；按钮权限只控显隐
@@ -680,4 +683,17 @@ series_attribute_mapping.json[FD5M]: F:业务确认的20系列属性mapping，�
 ===/home/AI-PIM/RiChangPIM/回收站/===
 build-frontends.sh[XV3S]: F:已回收的前端构建脚本草稿：构建后台与门户并输出版本元数据 | R:code:scripts/build_frontends.sh | A:- | S:回收站内为草稿；正式构建以scripts/build_frontends.sh为准
 node-in-container.sh[XZ1T]: F:一次性脚本：在容器内定位node可执行路径 | R:code:docker-compose.yml | A:- | S:调试产物已弃用；nvm路径随环境变化
+
+===/home/AI-PIM/RiChangPIM/docs/audit/20261029_duplicate_products/===
+attachments.csv[OQ3T]: F:重复产品审计的附件级DB/MinIO证据清单 | R:code:docs/audit/20261029_duplicate_products/report.json,code:backend/app/scripts/migrate_duplicate_product_images.py | A:- | S:只读快照不是业务数据源；写库前必须以当前数据库重新校验
+checks.csv[OQ3T]: F:重复产品审计汇总检查结果，包含匹配、对象完整性、产品图安全迁移与场景图阻断 | R:code:docs/audit/20261029_duplicate_products/report.json,code:docs/audit/20261029_duplicate_products/manual_review.csv | A:- | S:场景宽高比和来源引用warning不能被产品图迁移忽略
+issues.csv[OQ4T]: F:重复产品逐项风险、引用和人工复核清单 | R:code:docs/audit/20261029_duplicate_products/report.json,code:docs/audit/20261029_duplicate_products/manual_review.csv | A:- | S:人工决策、场景阻断、来源引用和软删高清图须保持未决
+manifest.json[OQ3T]: F:重复产品审计证据文件字节与sha256清单 | R:code:docs/audit/20261029_duplicate_products/report.json | A:- | S:证据变化须重新生成manifest哈希，不得手改单项
+manual_review.csv[OQ4T]: F:重复产品人工复核清单，包含引用、软删高清图、未配对产品和场景策略 | R:code:docs/audit/20261029_duplicate_products/report.json,code:docs/audit/20261029_duplicate_products/scene_groups.csv | A:- | S:未决项目须逐项人工确认；引用产品和场景图不自动整单处理
+missing_pairs.csv[OQ4T]: F:审计范围外无前缀产品、模糊候选和业务引用清单 | R:code:docs/audit/20261029_duplicate_products/report.json,code:docs/audit/20261029_duplicate_products/issues.csv | A:- | S:已有高清图或业务引用的产品不得按前缀自动合并或删除
+pairs.csv[OQ4M]: F:来源P-产品与目标无前缀产品的240对完整审计配对及统计 | R:code:docs/audit/20261029_duplicate_products/report.json,code:docs/audit/20261029_duplicate_products/pairs_minimal.csv | A:- | S:仅为审计快照；写库前须重新校验ID、编号、名称、附件和来源状态
+pairs_minimal.csv[OQ3T]: F:240对重复产品来源P-编号、目标无前缀编号、ID和名称的最小审计配对 | R:code:docs/audit/20261029_duplicate_products/report.json,code:backend/app/scripts/migrate_duplicate_product_images.py | A:- | S:只读配对输入；执行前必须重新校验数据库，不能直接当SQL输入
+scene_groups.csv[OQ3T]: F:重复产品共享场景图组成员、宽高比和来源目标映射证据 | R:code:docs/audit/20261029_duplicate_products/report.json,code:docs/audit/20261029_duplicate_products/manual_review.csv | A:- | S:宽高比差异阻断场景图自动迁移，须另行人工确认
+source_images.csv[OQ4M]: F:240对来源产品活动产品图与场景图的附件、对象大小和像素证据 | R:code:docs/audit/20261029_duplicate_products/report.json,code:docs/audit/20261029_duplicate_products/pairs.csv | A:- | S:只读快照；场景图迁移须另行人工确认
+target_images.csv[OQ4M]: F:240对目标产品现有产品图与场景图的低清附件、对象大小和像素证据 | R:code:docs/audit/20261029_duplicate_products/report.json,code:docs/audit/20261029_duplicate_products/pairs.csv | A:- | S:只读快照；迁移前必须确认目标仍为当前业务产品
 
