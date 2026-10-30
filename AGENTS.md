@@ -1,3 +1,50 @@
+# RiChangPIM 项目上下文
+
+## 一句话
+产品信息管理(PIM)系统:产品 / 方案报价 / 媒体资源 / 分享页 + AI 门户。
+
+## 工作区(硬约束)
+- 代码在 Windows `E:\RiChangPIM`;WSL 发行版 `RiChangPIM` 内同一份文件是 `/mnt/e/RiChangPIM`。
+- 在 Windows 侧写代码;构建、测试、Docker 全部在 WSL 内执行。
+- 绝不把 `\\wsl$\...` 或 `\\wsl.localhost\...` 当项目根,否则 OpenCode 报 `Location not found`。
+- `/home/AI-PIM/RiChangPIM` 只是迁移回退快照,不要在里面开发。
+
+## 技术栈与目录
+- `backend/`:FastAPI + SQLAlchemy + Alembic;PostgreSQL(pgvector)、Redis、MinIO、Gotenberg、OCR
+- `frontend/`:Vue + Vite + Element Plus + Pinia,构建产物挂在 `/admin/`
+- `portal/`:独立 AI 门户,承载根路径与 `/share/{token}`
+- `scripts/`:环境体检、前端构建、备份、恢复;`docs/`:需求/架构/接口/运维;`AI-Docs/`:可插拔设计
+
+## 开工顺序
+1. `wsl -d RiChangPIM`,然后 `cd /mnt/e/RiChangPIM`
+2. `bash scripts/where-am-i.sh` —— 先确认在和哪套环境说话
+3. 读本文件下方的 AOCI 区块;新 Run 先调 `aoci_rules`,按返回合同执行,不要臆造 AOCI 流程
+
+## 环境(两个必踩的坑)
+- WSL 内先加载 nvm 里的 Node(以 `scripts/build_frontends.sh` 顶部的 PATH 提示为准),否则 `npm` 会命中 `/mnt/c/Program Files/nodejs` 的 Windows 版,装出平台不匹配的 `node_modules`
+- Docker Desktop 必须在运行;`DOCKER_HOST=unix:///mnt/wsl/docker-desktop/shared-sockets/host-services/docker.proxy.sock`
+- curl 一律加 `--noproxy '*'`;对外入口统一走 nginx(端口以 `docker-compose.yml` 为准),不要直连后端端口
+
+## 构建与运行
+- 前端产物只能走 `bash scripts/build_frontends.sh`(注入版本元数据 + `VITE_BASE_PATH=/admin/`),裸 `npm run build` 会导致后台白屏
+- `dist` 是 COPY 进 nginx 镜像的:`docker compose build nginx && docker compose up -d --no-deps nginx`
+- 后端重建要用与前端相同的 `APP_VERSION / BUILD_ID / GIT_COMMIT / BUILD_TIME`
+- 先提交、再构建,否则版本页显示 `-dirty`
+
+## Git
+- `.gitattributes` 强制 LF;Windows 与 WSL 操作同一仓库,任选一侧提交,不要两边同时改
+- 分支、remote、版本号锚点、tag、CHANGELOG 流程,以 `git` 实际状态和 `版本控制规范和Git.md` 为准,不要凭记忆写数字
+- 推送前先确认工作区干净
+
+## 硬规则
+- 禁止删除文件/目录;弃用内容移入同级 `回收站/`
+- 不做多余的门禁、哈希校验、全量安全扫描
+- 口令与密钥只在 `.env` / 环境变量,不写进文档、聊天或提交
+- 受管理对象改完后,在最终稳定状态只调一次 `aoci_maintain`
+
+## 需要细节时看
+`docs/Windows开发与WSL构建.md`(环境) · `README-OPS.md`(运维) · `MIGRATION_BUNDLE.md`(全量迁移) · `docs/数据卷与持久化存储.md` · `docs/MinIO对象存储.md`
+
 <!-- aoci:begin -->
 ## AOCI 仓库认知
 
@@ -101,11 +148,3 @@ Entry 的语义必须来自模型对真实证据的理解。不得仅依据路�
 
 不预加载、不猜测，也不自行重建这些专项流程。平台调用方式、请求格式、批次上限、审批规则、索引格式细节和恢复步骤由对应Guide、工具说明、模型Prompt和CLI帮助按需提供。
 <!-- aoci:end -->
-
-## 本机工作区约定（非 AOCI 索引内容，AOCI 维护时不覆盖本段）
-
-- 代码仓库位于 Windows `E:\RiChangPIM`；WSL 发行版 `RiChangPIM` 内对应 `/mnt/e/RiChangPIM`。
-- 日常在 Windows 侧编辑代码，构建、测试、docker 运行都在 WSL 内执行。
-- 不要把 `\\wsl$\...` 或 `\\wsl.localhost\...` 这类 UNC 路径当作项目根，否则 OpenCode 会报 `Location not found`。
-- 旧的 `/home/AI-PIM/RiChangPIM` 只是迁移回退快照，不再作为开发目录。
-- 环境体检第一条命令仍是 `bash scripts/where-am-i.sh`；完整说明见 `docs/Windows开发与WSL构建.md`。
