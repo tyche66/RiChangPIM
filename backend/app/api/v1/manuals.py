@@ -17,6 +17,7 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.core.minio_client import get_minio_client
 from app.core.permission import PermissionChecker
+from app.knowledge.jobs.dispatcher import enqueue_product_manual
 from app.middleware.audit import audit_action
 from app.models.doc_chunk import ProductManualChunk
 from app.models.product import Attachment, Product, ProductManual
@@ -121,6 +122,9 @@ async def create_manual(
         index_status="pending",
     )
     db.add(manual)
+    await db.flush()
+    if parsed_content:
+        await enqueue_product_manual(db, manual.id)
     await db.commit()
     await db.refresh(manual)
     return _envelope(ProductManualResponse.model_validate(manual).model_dump(mode="json"))
@@ -213,6 +217,7 @@ async def delete_manual(manual_id: UUID, db: AsyncSession = Depends(get_db)):
         manual = await _fetch_manual(db, manual_id)
         manual.is_deleted = True
 
+    await enqueue_product_manual(db, manual_id, operation="delete")
     await db.commit()
     return _envelope(None)
 
@@ -254,6 +259,7 @@ async def parse_manual(
         manual.page_count = result.page_count
         manual.index_status = "pending"
         manual.index_error = None
+        await enqueue_product_manual(db, manual.id)
         await db.commit()
         await db.refresh(manual)
         return _envelope(ProductManualResponse.model_validate(manual).model_dump(mode="json"))
@@ -305,6 +311,7 @@ async def ocr_manual(
         manual.parse_error = None
         manual.index_status = "pending"
         manual.index_error = None
+        await enqueue_product_manual(db, manual.id)
         await db.commit()
         await db.refresh(manual)
         return _envelope(ProductManualResponse.model_validate(manual).model_dump(mode="json"))

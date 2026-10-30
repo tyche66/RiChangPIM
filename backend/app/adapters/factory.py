@@ -18,6 +18,7 @@ def build_adapter(
     api_key: str | None = None,
     chat_model: str | None = None,
     embedding_model: str | None = None,
+    vision_model: str | None = None,
     embedding_api_url: str | None = None,
     embedding_api_key: str | None = None,
     timeout: float = 30.0,
@@ -45,6 +46,7 @@ def build_adapter(
             api_url=api_url or "https://api.openai.com/v1",
             chat_model=chat_model or "gpt-4o-mini",
             embedding_model=embedding_model or "nvidia/nemotron-3-embed-1b:free",
+            vision_model=vision_model,
             timeout=timeout,
             max_retries=max_retries,
             embedding_api_key=embedding_api_key,
@@ -94,6 +96,8 @@ def get_ai_adapter() -> AIServiceAdapter:
         chat_model=config.chat_model or getattr(settings, "AI_CHAT_MODEL", None),
         embedding_model=config.embedding_model
         or getattr(settings, "AI_EMBEDDING_MODEL", None),
+        vision_model=config.vision_model
+        or getattr(settings, "AI_VISION_MODEL", None),
         embedding_api_url=config.embedding_api_url
         or getattr(settings, "AI_EMBEDDING_API_URL", None),
         embedding_api_key=config.embedding_api_key
@@ -117,6 +121,7 @@ def _config_fingerprint(config) -> tuple:
         config.embedding_model,
         config.embedding_api_url,
         config.embedding_api_key,
+        config.vision_model,
         config.timeout_seconds,
         config.chat_models,
     )

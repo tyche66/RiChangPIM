@@ -44,3 +44,9 @@ MANIFEST.txt
 # AOCI agent host integration (machine-bound; do not commit)
 opencode.json
 opencode.json.backup.*
+
+# Qoder 本机工作区设置（机器本地，不提交；项目共享配置放在 .mcp.json）
+.qoder/settings.local.json
+
+# 回收站：弃用内容一律移入同级 回收站/，不纳入版本控制（匹配任意层级）
+回收站/

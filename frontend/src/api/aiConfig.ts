@@ -24,6 +24,7 @@ export interface AiConfigItem {
   embedding_model: string | null
   embedding_api_url: string | null
   embedding_api_key_masked: string | null
+  vision_model: string | null
   timeout_seconds: number | null
   enabled: boolean
   /** db = 数据库覆盖生效；env = 当前回落自环境变量 */
@@ -38,6 +39,7 @@ export interface AiConfigUpdatePayload {
   embedding_model?: string | null
   embedding_api_url?: string | null
   embedding_api_key?: string | null
+  vision_model?: string | null
   timeout_seconds?: number | null
   enabled?: boolean | null
 }

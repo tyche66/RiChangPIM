@@ -53,6 +53,7 @@ EXPORT_HEADERS: tuple[str, ...] = (
     "描述",
     "规格",
     "颜色",
+    "交货期",
     "数据来源",
     "完整度状态",
     "创建时间",
@@ -310,6 +311,7 @@ def test_parse_row_maps_a_complete_row_and_normalises_enums_and_tags():
             "material": "网布+铝合金",
             "specification": "W650×D620×H1150mm",
             "colors": "黑色,灰色",
+            "delivery_period": "现货",
             "description": "示例描述",
             "data_source": "2026 供应商报价表",
             "stock_status": "有货",
@@ -329,6 +331,7 @@ def test_parse_row_maps_a_complete_row_and_normalises_enums_and_tags():
     # 这四列老代码从来没导进去过（只认 no/name/price），是这次要补的。
     assert (fields.description, fields.specification) == ("示例描述", "W650×D620×H1150mm")
     assert (fields.colors, fields.data_source) == ("黑色,灰色", "2026 供应商报价表")
+    assert fields.delivery_period == "现货"
     assert fields.notes == []
 
 

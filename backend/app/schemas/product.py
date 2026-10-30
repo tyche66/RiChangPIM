@@ -41,6 +41,7 @@ class ProductBase(BaseModel):
     description: str | None = None
     specification: str | None = None
     colors: str | None = None
+    delivery_period: str | None = None
     data_source: str | None = None
     completeness_status: str = "complete"
     tag_ids: list[UUID] = []
@@ -69,6 +70,7 @@ class ProductUpdate(BaseModel):
     description: str | None = None
     specification: str | None = None
     colors: str | None = None
+    delivery_period: str | None = None
     data_source: str | None = None
     completeness_status: str | None = None
     tag_ids: list[UUID] | None = None

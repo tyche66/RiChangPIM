@@ -45,6 +45,15 @@ async def test_knowledge_tables_upgrade_and_downgrade(_test_db_url):
             "idx_knowledge_chunk_text_search",
             "idx_knowledge_chunk_embedding",
         } <= chunk_indexes
+        with engine.connect() as conn:
+            chunk_index_def = conn.execute(
+                text(
+                    "SELECT indexdef FROM pg_indexes "
+                    "WHERE schemaname='public' "
+                    "AND indexname='idx_knowledge_chunk_document_index'"
+                )
+            ).scalar_one()
+        assert "is_deleted = false" in chunk_index_def
         assert {"idx_knowledge_index_job_status_priority"} <= job_indexes
 
         alembic_downgrade(_test_db_url, "0013_ai_permissions")

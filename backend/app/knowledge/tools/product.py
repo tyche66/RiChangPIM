@@ -697,6 +697,7 @@ def _product_card(p: Product, current_user: dict[str, Any]) -> dict[str, Any]:
         "specification": p.specification,
         "specification_length_mm": _specification_length_mm(p.specification),
         "colors": p.colors,
+        "delivery_period": p.delivery_period,
         "description": p.description,
         "tags": [
             tag.tag_name

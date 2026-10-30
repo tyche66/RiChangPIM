@@ -15,6 +15,8 @@ from sqlalchemy import func, select
 import app.models.doc_chunk  # noqa: F401 - register Product relationship target
 from app.core.database import AsyncSessionLocal
 from app.models.product import Brand, Category, Product, ProductTag, Supplier, Tag
+from app.services.category_scope import category_with_descendants
+from app.services.product_filter_options import specification_values_for
 
 FIELD_MAP = {
     "product_id": "id",
@@ -31,6 +33,7 @@ FIELD_MAP = {
     "description": "description",
     "specification": "specification",
     "colors": "colors",
+    "delivery_period": "delivery_period",
     "data_source": "data_source",
     "completeness_status": "completeness_status",
     "create_time": "create_time",
@@ -53,6 +56,7 @@ HEADER_MAP = {
     "description": "描述",
     "specification": "规格",
     "colors": "颜色",
+    "delivery_period": "交货期",
     "data_source": "数据来源",
     "completeness_status": "完整度状态",
     "create_time": "创建时间",
@@ -64,7 +68,9 @@ HEADER_MAP = {
 def _build_query(
     *,
     category_id: UUID | None = None,
+    category_ids: list[UUID] | None = None,
     tag_ids: str | None = None,
+    tag_type: str | None = None,
     keyword: str | None = None,
     brand_id: UUID | None = None,
     supplier_id: UUID | None = None,
@@ -72,11 +78,15 @@ def _build_query(
     stock_status: str | None = None,
     min_price: float | None = None,
     max_price: float | None = None,
+    spec_values: list[str] | None = None,
 ):
     """构建与 GET /products 一致的过滤查询。"""
     query = select(Product).where(Product.is_deleted.is_(False))
 
-    if category_id:
+    if category_ids:
+        # 与列表接口保持一致：导出「一级分类」等于导出它下面的全部产品。
+        query = query.where(Product.category_id.in_(category_ids))
+    elif category_id:
         query = query.where(Product.category_id == category_id)
     if brand_id:
         query = query.where(Product.brand_id == brand_id)
@@ -95,6 +105,8 @@ def _build_query(
         query = query.where(Product.face_price != 99999, Product.face_price >= min_price)
     if max_price is not None:
         query = query.where(Product.face_price != 99999, Product.face_price <= max_price)
+    if spec_values:
+        query = query.where(Product.specification.in_(spec_values))
 
     if tag_ids:
         tag_id_list = [UUID(t.strip()) for t in tag_ids.split(",") if t.strip()]
@@ -104,6 +116,19 @@ def _build_query(
             )
             query = query.where(Product.id.in_(subq))
 
+    if tag_type:
+        query = query.where(
+            Product.id.in_(
+                select(ProductTag.product_id)
+                .join(Tag, Tag.id == ProductTag.tag_id)
+                .where(
+                    ProductTag.is_deleted.is_(False),
+                    Tag.is_deleted.is_(False),
+                    Tag.tag_type == tag_type,
+                )
+            )
+        )
+
     return query
 
 
@@ -111,6 +136,7 @@ async def fetch_products_for_export(
     *,
     category_id: UUID | None = None,
     tag_ids: str | None = None,
+    tag_type: str | None = None,
     keyword: str | None = None,
     brand_id: UUID | None = None,
     supplier_id: UUID | None = None,
@@ -118,21 +144,31 @@ async def fetch_products_for_export(
     stock_status: str | None = None,
     min_price: float | None = None,
     max_price: float | None = None,
+    spec_length_mm: float | None = None,
 ) -> list[dict]:
     """执行查询并返回扁平化的产品记录列表（含关联名）。"""
-    query = _build_query(
-        category_id=category_id,
-        tag_ids=tag_ids,
-        keyword=keyword,
-        brand_id=brand_id,
-        supplier_id=supplier_id,
-        status=status,
-        stock_status=stock_status,
-        min_price=min_price,
-        max_price=max_price,
-    )
-
     async with AsyncSessionLocal() as session:
+        category_ids = (
+            await category_with_descendants(session, category_id) if category_id else None
+        )
+        spec_values = (
+            await specification_values_for(session, spec_length_mm)
+            if spec_length_mm is not None
+            else None
+        )
+        query = _build_query(
+            category_ids=category_ids,
+            tag_ids=tag_ids,
+            tag_type=tag_type,
+            keyword=keyword,
+            brand_id=brand_id,
+            supplier_id=supplier_id,
+            status=status,
+            stock_status=stock_status,
+            min_price=min_price,
+            max_price=max_price,
+            spec_values=spec_values,
+        )
         result = await session.execute(query)
         products = result.scalars().all()
 
@@ -190,6 +226,7 @@ async def fetch_products_for_export(
             "description": p.description,
             "specification": p.specification,
             "colors": p.colors,
+            "delivery_period": p.delivery_period,
             "data_source": p.data_source,
             "completeness_status": p.completeness_status,
             "create_time": p.create_time.isoformat() if p.create_time else "",
@@ -226,6 +263,7 @@ async def count_products_for_export(
     *,
     category_id: UUID | None = None,
     tag_ids: str | None = None,
+    tag_type: str | None = None,
     keyword: str | None = None,
     brand_id: UUID | None = None,
     supplier_id: UUID | None = None,
@@ -233,21 +271,31 @@ async def count_products_for_export(
     stock_status: str | None = None,
     min_price: float | None = None,
     max_price: float | None = None,
+    spec_length_mm: float | None = None,
 ) -> int:
     """返回符合条件的产品总数（用于导出前预估 / 响应头计数）。"""
-    query = _build_query(
-        category_id=category_id,
-        tag_ids=tag_ids,
-        keyword=keyword,
-        brand_id=brand_id,
-        supplier_id=supplier_id,
-        status=status,
-        stock_status=stock_status,
-        min_price=min_price,
-        max_price=max_price,
-    )
-    query = select(func.count()).select_from(query.subquery())
-
     async with AsyncSessionLocal() as session:
+        category_ids = (
+            await category_with_descendants(session, category_id) if category_id else None
+        )
+        spec_values = (
+            await specification_values_for(session, spec_length_mm)
+            if spec_length_mm is not None
+            else None
+        )
+        query = _build_query(
+            category_ids=category_ids,
+            tag_ids=tag_ids,
+            tag_type=tag_type,
+            keyword=keyword,
+            brand_id=brand_id,
+            supplier_id=supplier_id,
+            status=status,
+            stock_status=stock_status,
+            min_price=min_price,
+            max_price=max_price,
+            spec_values=spec_values,
+        )
+        query = select(func.count()).select_from(query.subquery())
         result = await session.execute(query)
         return result.scalar() or 0

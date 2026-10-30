@@ -148,8 +148,27 @@ export async function listProducts(
   return payload.data?.list || []
 }
 
-export async function getSource(sourceId: string, token: string): Promise<KnowledgeSource> {
-  const payload = await apiFetch<{ code: number; data: KnowledgeSource }>(
+/**
+ * 比较结果导出 PDF：只提交产品 ID，字段由后端回库取并交给 Gotenberg 渲染。
+ * 返回二进制，调用方负责触发下载。
+ */
+export async function exportComparePdf(token: string, productIds: string[]): Promise<Blob> {
+  const response = await fetch('/api/v1/products/compare-pdf', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ product_ids: productIds }),
+  })
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}))
+    throw new Error(payload?.detail?.msg || payload?.msg || 'PDF 导出失败')
+  }
+  return response.blob()
+}
+
+export async function getSource(sourceId: string, token: string): Promise<KnowledgeSource> {  const payload = await apiFetch<{ code: number; data: KnowledgeSource }>(
     `/api/v1/knowledge/sources/${encodeURIComponent(sourceId)}`,
     { method: 'GET' },
     token,

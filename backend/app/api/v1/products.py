@@ -8,9 +8,11 @@ import time
 import unicodedata
 from collections.abc import Callable
 from decimal import Decimal
+from html import escape
 from typing import Any
 from uuid import UUID
 
+import httpx
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 from pydantic import BaseModel
 from sqlalchemy import func, select
@@ -25,6 +27,7 @@ from app.core.minio_client import get_minio_client
 from app.core.permission import PermissionChecker
 from app.core.security import create_access_token
 from app.core.serializers import filter_sensitive_fields
+from app.knowledge.jobs.dispatcher import enqueue_product_card
 from app.middleware.audit import audit_action
 from app.models.product import (
     Attachment,
@@ -44,6 +47,7 @@ from app.schemas.product import (
     ProductResponse,
     ProductUpdate,
 )
+from app.services.category_scope import category_with_descendants
 from app.services.excel_images import extract_embedded_images
 from app.services.import_staging import (
     StagingError,
@@ -53,6 +57,11 @@ from app.services.import_staging import (
     load_staged,
     stage_upload,
     update_staged_meta,
+)
+from app.services.product_filter_options import (
+    FilterOptionError,
+    list_filter_options,
+    specification_values_for,
 )
 from app.services.product_import import (
     PLACEHOLDER_PRICE,
@@ -104,6 +113,7 @@ async def list_products(
     request: Request,
     category_id: UUID | None = None,
     tag_ids: str | None = None,
+    tag_type: str | None = None,
     keyword: str | None = None,
     brand_id: UUID | None = None,
     supplier_id: UUID | None = None,
@@ -111,6 +121,7 @@ async def list_products(
     stock_status: str | None = None,
     min_price: Decimal | None = None,
     max_price: Decimal | None = None,
+    spec_length_mm: float | None = None,
     completeness_status: str | None = None,
     quality_flag: str | None = None,
     page: int = Query(1, ge=1),
@@ -138,7 +149,9 @@ async def list_products(
     )
 
     if category_id:
-        query = query.where(Product.category_id == category_id)
+        # 多级分类导航：选中一级分类要带出全部子分类的产品。
+        scoped_ids = await category_with_descendants(db, category_id)
+        query = query.where(Product.category_id.in_(scoped_ids))
     if brand_id:
         query = query.where(Product.brand_id == brand_id)
     if supplier_id:
@@ -160,6 +173,20 @@ async def list_products(
                 .where(ProductTag.tag_id.in_(parsed_tag_ids))
                 .distinct()
             )
+    if tag_type:
+        # 系列维度的二级计数只算「有系列标签」的产品，点进去也必须用同一口径，
+        # 否则菜单上写 207、列表里却出 300。
+        query = query.where(
+            Product.id.in_(
+                select(ProductTag.product_id)
+                .join(Tag, Tag.id == ProductTag.tag_id)
+                .where(
+                    ProductTag.is_deleted.is_(False),
+                    Tag.is_deleted.is_(False),
+                    Tag.tag_type == tag_type,
+                )
+            )
+        )
     if status:
         query = query.where(Product.status == status)
     if stock_status:
@@ -182,6 +209,11 @@ async def list_products(
         query = query.where(Product.face_price != 99999, Product.face_price >= min_price)
     if max_price is not None:
         query = query.where(Product.face_price != 99999, Product.face_price <= max_price)
+    if spec_length_mm is not None:
+        # 品类三级：按规格第一段（长度）筛选。规格写法不统一，先解析成原值集合再精确匹配，
+        # 保证与筛选菜单的计数同源。
+        spec_values = await specification_values_for(db, spec_length_mm)
+        query = query.where(Product.specification.in_(spec_values))
 
     query = _apply_quality_filter(
         query,
@@ -222,6 +254,7 @@ async def export_products(
     request: Request,
     category_id: UUID | None = None,
     tag_ids: str | None = None,
+    tag_type: str | None = None,
     keyword: str | None = None,
     brand_id: UUID | None = None,
     supplier_id: UUID | None = None,
@@ -229,12 +262,14 @@ async def export_products(
     stock_status: str | None = None,
     min_price: float | None = None,
     max_price: float | None = None,
+    spec_length_mm: float | None = None,
 ):
     role_code = getattr(request.state, "role_code", None) or "sales"
 
     rows = await fetch_products_for_export(
         category_id=category_id,
         tag_ids=tag_ids,
+        tag_type=tag_type,
         keyword=keyword,
         brand_id=brand_id,
         supplier_id=supplier_id,
@@ -242,11 +277,13 @@ async def export_products(
         stock_status=stock_status,
         min_price=min_price,
         max_price=max_price,
+        spec_length_mm=spec_length_mm,
     )
 
     total = await count_products_for_export(
         category_id=category_id,
         tag_ids=tag_ids,
+        tag_type=tag_type,
         keyword=keyword,
         brand_id=brand_id,
         supplier_id=supplier_id,
@@ -254,6 +291,7 @@ async def export_products(
         stock_status=stock_status,
         min_price=min_price,
         max_price=max_price,
+        spec_length_mm=spec_length_mm,
     )
 
     excel_bytes = build_excel_bytes(rows, role_code=role_code)
@@ -290,6 +328,157 @@ async def download_import_template():
             "Content-Disposition": 'attachment; filename="products_import_template.xlsx"',
         },
     )
+
+
+class ProductCompareExportRequest(BaseModel):
+    """门户「逐项比较」导出：只带产品 ID，字段一律回库取，不信客户端。"""
+
+    product_ids: list[UUID]
+
+
+def _build_compare_html(products: list[Product]) -> str:
+    """比较表 PDF 的中间 HTML（Gotenberg 渲染前）。"""
+    headers = [
+        "产品编号",
+        "产品名称",
+        "品牌",
+        "类目",
+        "规格",
+        "材质",
+        "颜色",
+        "交货期",
+        "面价",
+        "库存",
+    ]
+    rows = []
+    for p in products:
+        cells = [
+            p.product_no,
+            p.product_name,
+            p.brand.brand_name if p.brand else "-",
+            p.category.category_name if p.category else "-",
+            p.specification or "-",
+            p.material or "-",
+            p.colors or "-",
+            p.delivery_period or "-",
+            "待核价" if p.face_price == 99999 else f"¥{p.face_price:,.2f}",
+            p.stock_status or "-",
+        ]
+        rows.append("".join(f"<td>{escape(str(cell))}</td>" for cell in cells))
+
+    head = "".join(f"<th>{escape(title)}</th>" for title in headers)
+    body = "".join(f"<tr>{row}</tr>" for row in rows)
+    return f"""<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<style>
+  body {{ font-family: "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+         margin: 24px; color: #1f2329; }}
+  h1 {{ font-size: 20px; margin: 0 0 4px; }}
+  p.meta {{ color: #6b7280; font-size: 12px; margin: 0 0 16px; }}
+  table {{ width: 100%; border-collapse: collapse; font-size: 11px; }}
+  th, td {{ border: 1px solid #d0d5dd; padding: 6px 8px; text-align: left; vertical-align: top; }}
+  th {{ background: #f5f6f8; font-weight: 600; }}
+</style>
+</head>
+<body>
+  <h1>产品比较表</h1>
+  <p class="meta">共 {len(products)} 个产品 · 数据来自 RiChangPIM 产品库</p>
+  <table>
+    <thead><tr>{head}</tr></thead>
+    <tbody>{body}</tbody>
+  </table>
+</body>
+</html>"""
+
+
+# 同样排在 /{product_id} 之前（POST 与 GET 不冲突，但保持静态路径集中）。
+@router.post("/compare-pdf", dependencies=[Depends(PermissionChecker("product:view"))])
+async def export_compare_pdf(
+    payload: ProductCompareExportRequest, db: AsyncSession = Depends(get_db)
+):
+    """把门户比较结果渲染成 PDF（复用报价单的 Gotenberg 通道）。
+
+    只接受 ID 列表：价格、库存等敏感字段以数据库当前值为准，避免客户端
+    篡改出一条「更便宜」的报价表。
+    """
+    if not payload.product_ids:
+        raise HTTPException(status_code=422, detail={"code": 42201, "msg": "请先选择要比较的产品"})
+    if len(payload.product_ids) > 20:
+        raise HTTPException(
+            status_code=422, detail={"code": 42201, "msg": "一次最多比较 20 个产品"}
+        )
+
+    gotenberg_url = (settings.GOTENBERG_URL or "").rstrip("/")
+    if not gotenberg_url:
+        raise HTTPException(status_code=503, detail={"code": 50301, "msg": "PDF 服务未配置"})
+
+    result = await db.execute(
+        select(Product)
+        .options(
+            joinedload(Product.brand),
+            joinedload(Product.category),
+        )
+        .where(Product.id.in_(payload.product_ids), Product.is_deleted.is_(False))
+    )
+    by_id = {p.id: p for p in result.scalars().all()}
+    ordered = [by_id[pid] for pid in payload.product_ids if pid in by_id]
+    if not ordered:
+        raise HTTPException(status_code=404, detail={"code": 40401, "msg": "产品不存在"})
+
+    html = _build_compare_html(ordered)
+    files = {"files": ("index.html", html.encode("utf-8"), "text/html")}
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            pdf_resp = await client.post(
+                f"{gotenberg_url}/forms/chromium/convert/html", files=files
+            )
+    except httpx.RequestError as exc:
+        raise HTTPException(
+            status_code=503, detail={"code": 50302, "msg": "PDF 服务不可用"}
+        ) from exc
+
+    if pdf_resp.status_code >= 400:
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "code": 50201,
+                "msg": "PDF 服务生成失败",
+                "upstream_status": pdf_resp.status_code,
+            },
+        )
+
+    from fastapi.responses import Response as FastAPIResponse
+
+    return FastAPIResponse(
+        content=pdf_resp.content,
+        media_type="application/pdf",
+        headers={"Content-Disposition": 'attachment; filename="product_compare.pdf"'},
+    )
+
+
+# ---------------------------------------------------------------------------
+# 产品列表三级筛选导航：六维度二级 / 三级选项
+# ---------------------------------------------------------------------------
+@router.get("/filter-options", dependencies=[Depends(PermissionChecker("product:view"))])
+async def product_filter_options(
+    dimension: str = Query(..., description="series/brand/supplier/status/stock/category"),
+    parent_id: str | None = Query(None, description="二级选中值；省略时返回二级选项"),
+    db: AsyncSession = Depends(get_db),
+):
+    """返回某个维度下的二级（或三级）筛选项。
+
+    菜单项和计数全部由产品表实时聚合，没有产品的分类/品牌/标签不会出现；
+    三级与筛选条件共用同一套 SQL 表达式，所以「菜单上写着 12 个」点进去就是 12 个。
+    """
+    try:
+        items = await list_filter_options(db, dimension=dimension, parent_id=parent_id)
+    except FilterOptionError as exc:
+        raise HTTPException(
+            status_code=422, detail={"code": 42201, "msg": str(exc)}
+        ) from exc
+    return {"code": 200, "data": {"dimension": dimension, "items": items}}
 
 
 # ---------------------------------------------------------------------------
@@ -561,6 +750,7 @@ def _product_response(product: Product, request: Request) -> dict:
         "description": product.description,
         "specification": product.specification,
         "colors": product.colors,
+        "delivery_period": product.delivery_period,
         "data_source": product.data_source,
         "completeness_status": product.completeness_status,
         "tag_ids": [str(tag.id) for tag in product.tags],
@@ -599,6 +789,7 @@ def _product_list_response(product: Product, request: Request) -> dict:
         "description": product.description,
         "specification": product.specification,
         "colors": product.colors,
+        "delivery_period": product.delivery_period,
         "data_source": product.data_source,
         "completeness_status": product.completeness_status,
         "create_time": product.create_time.isoformat(),
@@ -737,6 +928,8 @@ async def add_product_images(
         db.add(product_image)
         added.append(product_image)
 
+    if added:
+        await enqueue_product_card(db, product_id)
     await db.commit()
 
     return {
@@ -780,6 +973,7 @@ async def delete_product_image(
         raise HTTPException(status_code=404, detail={"code": 40401, "msg": "图片关联不存在"})
 
     product_image.is_deleted = True
+    await enqueue_product_card(db, product_id)
     await db.commit()
     return {"code": 200, "msg": "success"}
 
@@ -817,6 +1011,7 @@ async def set_product_cover_image(
         .values(is_cover=False)
     )
     product_image.is_cover = True
+    await enqueue_product_card(db, product_id)
     await db.commit()
     return {"code": 200, "msg": "success"}
 
@@ -1057,6 +1252,7 @@ async def create_product(
         for tag_id in product_data.tag_ids:
             db.add(ProductTag(product_id=product.id, tag_id=tag_id))
 
+    await enqueue_product_card(db, product.id)
     await db.commit()
     product = await db.scalar(
         select(Product)
@@ -1109,6 +1305,7 @@ async def update_product(
         for tag_id in tag_ids:
             db.add(ProductTag(product_id=product.id, tag_id=tag_id))
 
+    await enqueue_product_card(db, product.id)
     await db.commit()
     product = await db.scalar(
         select(Product)
@@ -1137,6 +1334,7 @@ async def delete_product(request: Request, product_id: UUID, db: AsyncSession = 
         raise HTTPException(status_code=404, detail={"code": 40401, "msg": "产品不存在"})
 
     product.is_deleted = True
+    await enqueue_product_card(db, product.id, operation="delete")
     await db.commit()
     return {"code": 200, "msg": "success"}
 
@@ -1195,6 +1393,7 @@ async def clone_product(
         material=product.material,
         specification=product.specification,
         colors=product.colors,
+        delivery_period=product.delivery_period,
         description=product.description,
         data_source=product.data_source,
         completeness_status=product.completeness_status,
@@ -1209,6 +1408,7 @@ async def clone_product(
     for pt in tag_result.scalars().all():
         db.add(ProductTag(product_id=cloned.id, tag_id=pt.tag_id))
 
+    await enqueue_product_card(db, cloned.id)
     await db.commit()
     await db.refresh(cloned)
     body = ProductCloneResponse.model_validate(cloned).model_dump(mode="json")
@@ -1338,6 +1538,7 @@ _IMPORT_WRITABLE_FIELDS = (
     "material",
     "specification",
     "colors",
+    "delivery_period",
     "description",
     "data_source",
     "stock_status",
@@ -2200,6 +2401,7 @@ async def _run_import(
     images_replaced = 0
     images_appended = 0
     backup_records: list[dict[str, Any]] = []
+    indexed_product_ids: list[UUID] = []
     for row, fields, refs, current, target, effective_mode, alias_step in todo:
         buckets = per_row.get(row.excel_row, empty)
         cover = buckets["cover"]
@@ -2222,6 +2424,7 @@ async def _run_import(
                         material=fields.material,
                         specification=fields.specification,
                         colors=fields.colors,
+                        delivery_period=fields.delivery_period,
                         description=fields.description,
                         data_source=fields.data_source,
                         stock_status=fields.stock_status,
@@ -2302,6 +2505,7 @@ async def _run_import(
             alias_created_count += 1
         image_count += row_images
         scene_count += row_scenes
+        indexed_product_ids.append(product.id)
 
     backup_id = None
     if backup_records:
@@ -2312,6 +2516,10 @@ async def _run_import(
         except OSError:
             logger.warning("批量导入：覆盖前快照写入失败", exc_info=True)
             notes.append("覆盖前的产品快照没能写入，本次覆盖不可回滚，请核对结果")
+
+    # 批量导入同样是「产品变更」：不重建卡片，导入的新品在 AI 选品里就查不到。
+    for product_id in dict.fromkeys(indexed_product_ids):
+        await enqueue_product_card(db, product_id)
 
     await db.commit()
     failures.sort(key=lambda item: item["row"])

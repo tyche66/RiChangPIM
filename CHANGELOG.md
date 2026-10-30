@@ -26,6 +26,35 @@
 
 **不要去改的历史记录**（改了就是篡改发布史）：`BUILD_LOG.md` 的构建记录、`PROJECT_MANAGEMENT.md` 的发布台账、`TODO.md` 的「已发布」条目、`docs/08-开发路线图.md` 的里程碑行。`RELEASE_GATE.md` 已改成版本无关，不需要跟着版本走。
 
+## v1.9.8 — 2026-10-30
+
+本版把产品列表的分类筛选重做成**三级筛选导航**，补齐**产品交货期**字段，并让产品 / 说明书
+变更**自动触发知识卡片重建**（含产品图视觉标注）；门户比较表补上主图与 MD / PDF 导出。
+
+### 产品列表三级筛选导航
+- 新增 `GET /api/v1/products/filter-options`：`series / brand / supplier / status / stock / category` 六个维度的二级、三级选项与计数全部由产品表实时聚合，没有产品的选项不会出现，重复值由 `GROUP BY` 去重。
+- 「系列」三级只取 `tag_type='series'` 的标签，「品类」三级取规格第一段（`1200*600*750` → `1200`，兼容 `W2000*1000*750`）；两个维度的三级数据源相互独立，同名二级分类不会串数据。
+- 产品列表与导出新增 `tag_type`、`spec_length_mm` 过滤参数；分类筛选改为包含全部后代分类，与菜单计数口径一致（系列维度用 `tag_type=series` 对齐「有系列标签」的计数）。
+- 后台产品页：一级滑动标签（系列 / 品牌 / 供应商 / 状态 / 库存 / 品类）+ 二级分类 + 三级标签，胶囊行固定行高、超量滚动，深色模式沿用设计令牌；原品牌 / 供应商 / 系列 / 状态 / 库存表单项与「高级筛选」移除，关键词、价格区间、查询/重置与其余工具栏保留。
+
+### 产品交货期
+- `product.delivery_period`（迁移 0036）+ API schema + 导入表头别名（交货期 / 交期 / 货期 / lead_time）+ 导入模板列 + 导出列，打通「导出 → 改 → 导回」。
+- 产品列表表格 / 卡片、详情页、编辑表单均展示；知识卡片 facts 同步收录，参与检索。
+
+### 知识索引自动重建与视觉标注
+- 产品新增 / 修改 / 删除 / 克隆、图片增删与封面变更、批量导入、说明书创建 / 解析 / OCR / 删除全部接入 `KnowledgeJobDispatcher`，自动登记 upsert / delete 任务。
+- 产品卡片新增「类目路径」「交货期」「外观标签」；新增 `product_image.vision_tags` 与 `ai_provider_config.vision_model`（迁移 0036）。
+- 新增 `app/knowledge/vision/tagger.py`：按需调用多模态模型给产品图打 3–8 个外观标签（每产品最多 3 张），未配置视觉模型时静默跳过；适配器新增 `vision_chat`，AI 配置中心可填视觉模型。
+- 迁移 `0035_knowledge_chunk_partial_unique`：`knowledge_chunk` 唯一索引改为只约束未删除行，避免内容重建与软删除历史行冲突。
+
+### 产品详情与门户
+- 产品详情页顶部新增大图 hero 与缩略图灯箱，点击查看全部产品图。
+- 门户比较表新增主图列（点击灯箱放大）、MD 导出与 PDF 导出（`POST /api/v1/products/compare-pdf`，复用 Gotenberg，只接受产品 ID 并回库取数）。
+
+### 其他
+- `.gitignore` 增加 `回收站/` 与 `.qoder/settings.local.json`；回收站内历史文件清理。
+- `.env.example` 增加 `AI_VISION_MODEL`；新增知识索引常驻脚本 `backend/app/scripts/knowledge_indexer.py`。
+
 ## v1.9.7 — 2026-10-29
 
 两件事：**方案平面图**（分享页「方案信息」右侧展示、可全屏缩放）与**产品包重传**

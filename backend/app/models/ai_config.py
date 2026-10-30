@@ -32,5 +32,8 @@ class AiProviderConfig(CommonBase):
     embedding_model = mapped_column(String(128), nullable=True)
     embedding_api_url = mapped_column(String(512), nullable=True)
     embedding_api_key = mapped_column(Text, nullable=True)
+    # 视觉标注模型（多模态）。空表示不做视觉标注，而不是回落到 chat_model：
+    # 纯文本模型收到 image_url 会直接报错，静默回落只会把索引任务打失败。
+    vision_model = mapped_column(String(128), nullable=True)
     timeout_seconds = mapped_column(String(16), nullable=True)
     enabled = mapped_column(Boolean, nullable=False, default=True)

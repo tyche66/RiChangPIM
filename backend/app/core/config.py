@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     # 这个值是 APP_VERSION 没被注入时的兜底：原来写死 "0.1.0"，于是任何忘记传
     # 构建参数的部署（以及全部开发环境）都会在 /api/v1/version、/health、
     # OpenAPI 文档里报 0.1.0，和真实产品版本差了 8 个 MINOR。兜底值必须是真话。
-    VERSION: str = "1.9.7"
+    VERSION: str = "1.9.8"
     APP_VERSION: str | None = None
     BUILD_ID: str = "dev-local"
     GIT_COMMIT: str = "unknown"
@@ -60,6 +60,8 @@ class Settings(BaseSettings):
     AI_API_KEY_FILE: str | None = None
 
     AI_CHAT_MODEL: str = "gpt-4o-mini"
+    # 视觉标注模型（多模态）。留空表示不启用视觉标注，不回落 chat_model。
+    AI_VISION_MODEL: str | None = None
     AI_EMBEDDING_MODEL: str = "nvidia/nemotron-3-embed-1b:free"
     AI_EMBEDDING_VERSION: str | None = None
     AI_EMBEDDING_CACHE_ENABLED: bool = False

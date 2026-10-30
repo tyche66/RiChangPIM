@@ -62,6 +62,8 @@ class OpenAIConfig:
     api_url: str = "https://api.openai.com/v1"
     chat_model: str = "gpt-4o-mini"
     embedding_model: str = "text-embedding-3-small"
+    # 视觉标注模型；为空表示该配置不提供视觉能力（不回落 chat_model）。
+    vision_model: str | None = None
     timeout: float = 30.0
     max_retries: int = 2
     # Optional separate embedding endpoint (e.g., OpenRouter)
@@ -214,6 +216,30 @@ class OpenAIAdapter(AIServiceAdapter):
             "model": resp.get("model") or requested_model,
             "usage": resp.get("usage"),
         }
+
+    async def vision_chat(
+        self, image_url: str, prompt: str, *, model: str | None = None
+    ) -> str:
+        """多模态识图：image_url 支持 http(s) 直链或 data URL。"""
+        requested_model = self._resolve_chat_model(model or self.cfg.vision_model)
+        payload: dict[str, Any] = {
+            "model": requested_model,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt},
+                        {"type": "image_url", "image_url": {"url": image_url}},
+                    ],
+                }
+            ],
+            "temperature": 0.1,
+            "stream": False,
+        }
+        resp = await self._post(self.cfg.chat_path(), payload)
+        choice = (resp.get("choices") or [{}])[0]
+        msg = choice.get("message") or {}
+        return (msg.get("content") or "").strip()
 
     async def chat_stream(
         self,

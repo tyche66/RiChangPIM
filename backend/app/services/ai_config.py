@@ -40,6 +40,7 @@ class AiConfig:
     embedding_model: str | None = None
     embedding_api_url: str | None = None
     embedding_api_key: str | None = None
+    vision_model: str | None = None
     timeout_seconds: float | None = None
     enabled: bool = True
     source: str = "env"
@@ -95,6 +96,7 @@ def _env_config(scope: str) -> AiConfig:
         embedding_model=_clean(settings.AI_EMBEDDING_MODEL),
         embedding_api_url=_clean(settings.AI_EMBEDDING_API_URL),
         embedding_api_key=_clean(settings.AI_EMBEDDING_API_KEY),
+        vision_model=_clean(settings.AI_VISION_MODEL),
         timeout_seconds=_parse_timeout(settings.AI_TIMEOUT),
         source="env",
     )
@@ -114,6 +116,7 @@ def _merge(row: AiProviderConfig, env: AiConfig) -> AiConfig:
         embedding_model=_clean(row.embedding_model) or env.embedding_model,
         embedding_api_url=_clean(row.embedding_api_url) or env.embedding_api_url,
         embedding_api_key=_clean(row.embedding_api_key) or env.embedding_api_key,
+        vision_model=_clean(row.vision_model) or env.vision_model,
         timeout_seconds=_parse_timeout(row.timeout_seconds) or env.timeout_seconds,
         enabled=True,
         source="db",
@@ -201,6 +204,7 @@ def config_to_dict(config: AiConfig) -> dict[str, Any]:
         "embedding_model": config.embedding_model,
         "embedding_api_url": config.embedding_api_url,
         "embedding_api_key_masked": mask_key(config.embedding_api_key),
+        "vision_model": config.vision_model,
         "timeout_seconds": config.timeout_seconds,
         "enabled": config.enabled,
         "source": config.source,

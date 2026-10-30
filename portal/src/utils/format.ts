@@ -27,6 +27,7 @@ export const COMPARE_FIELDS: Array<{ key: string; label: string }> = [
   { key: 'specification', label: '规格' },
   { key: 'material', label: '材质' },
   { key: 'colors', label: '颜色' },
+  { key: 'delivery_period', label: '交货期' },
 ]
 
 const FIELD_LABELS: Record<string, string> = {

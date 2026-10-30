@@ -1,6 +1,10 @@
 <template>
   <div class="products-page">
     <el-card class="glass-card">
+      <ProductFilterNav
+        ref="filterNavRef"
+        @change="handleNavFilterChange"
+      />
       <div class="toolbar">
         <el-form
           :inline="true"
@@ -14,108 +18,6 @@
               clearable
               class="filter-input capsule-input"
             />
-          </el-form-item>
-          <el-form-item label="分类">
-            <el-cascader
-              v-model="queryParams.categoryId"
-              :options="categoryOptions"
-              :props="{ checkStrictly: true, value: 'id', label: 'categoryName', children: 'children' }"
-              placeholder="全部"
-              clearable
-              class="filter-input capsule-select"
-            />
-          </el-form-item>
-          <el-form-item label="品牌">
-            <el-select
-              v-model="queryParams.brandId"
-              placeholder="全部"
-              clearable
-              class="filter-input capsule-select"
-            >
-              <el-option
-                v-for="b in brands"
-                :key="b.id"
-                :label="b.brandName"
-                :value="b.id"
-              />
-            </el-select>
-          </el-form-item>
-          <el-form-item label="供应商">
-            <el-select
-              v-model="queryParams.supplierId"
-              placeholder="全部"
-              clearable
-              class="filter-input capsule-select"
-            >
-              <el-option
-                v-for="s in suppliers"
-                :key="s.id"
-                :label="s.supplierName"
-                :value="s.id"
-              />
-            </el-select>
-          </el-form-item>
-          <el-form-item label="系列">
-            <el-select
-              v-model="queryParams.seriesTagId"
-              placeholder="全部"
-              clearable
-              filterable
-              class="filter-input capsule-select"
-            >
-              <el-option
-                v-for="tag in seriesTags"
-                :key="tag.id"
-                :label="tag.tagName"
-                :value="tag.id"
-              />
-            </el-select>
-          </el-form-item>
-          <el-form-item label="状态">
-            <el-select
-              v-model="queryParams.status"
-              placeholder="全部"
-              clearable
-              class="filter-input capsule-select"
-            >
-              <el-option
-                label="上架"
-                value="active"
-              />
-              <el-option
-                label="下架"
-                value="inactive"
-              />
-              <el-option
-                label="草稿"
-                value="draft"
-              />
-            </el-select>
-          </el-form-item>
-          <el-form-item label="库存">
-            <el-select
-              v-model="queryParams.stockStatus"
-              placeholder="全部"
-              clearable
-              class="filter-input capsule-select"
-            >
-              <el-option
-                label="有库存"
-                value="in_stock"
-              />
-              <el-option
-                label="缺货"
-                value="out_of_stock"
-              />
-              <el-option
-                label="预售"
-                value="preorder"
-              />
-              <el-option
-                label="未知"
-                value="unknown"
-              />
-            </el-select>
           </el-form-item>
           <el-form-item label="价格区间">
             <div class="price-range">
@@ -340,6 +242,24 @@
             :show-overflow-tooltip="{ teleported: true, placement: 'top' }"
           />
           <el-table-column
+            prop="deliveryPeriod"
+            label="交货期"
+            :width="colWidth('deliveryPeriod')"
+            :min-width="colMin('deliveryPeriod')"
+            align="center"
+          >
+            <template #default="{ row }">
+              <span
+                v-if="row.deliveryPeriod"
+                class="delivery-badge"
+              >{{ row.deliveryPeriod }}</span>
+              <span
+                v-else
+                class="text-muted"
+              >—</span>
+            </template>
+          </el-table-column>
+          <el-table-column
             prop="facePrice"
             label="面价"
             :width="colWidth('facePrice')"
@@ -524,6 +444,10 @@
             <div class="product-tile-body">
               <div class="product-tile-meta">
                 <span class="product-tile-no">{{ row.productNo }}</span>
+                <span
+                  v-if="row.deliveryPeriod"
+                  class="delivery-badge"
+                >{{ row.deliveryPeriod }}</span>
                 <span
                   class="status-text tile-status"
                   :class="`tone-${statusTone(row.status)}`"
@@ -755,6 +679,14 @@
             />
           </el-select>
         </el-form-item>
+        <el-form-item label="交货期">
+          <el-input
+            v-model="productForm.deliveryPeriod"
+            maxlength="64"
+            placeholder="例如 现货 / 7天 / 30天"
+            class="capsule-input"
+          />
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button
@@ -837,6 +769,7 @@ import type { FormInstance, FormRules } from 'element-plus'
 import { View, Hide, Operation, Grid, List, ArrowDown } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 import { productApi, categoryApi, brandApi, supplierApi, tagApi } from '@/api'
+import ProductFilterNav from '@/components/ProductFilterNav.vue'
 import { usePreference } from '@/composables/usePreference'
 import { fillColumnWidths, type FillColumn } from '@/utils/columnFill'
 import { useAuthStore } from '@/stores/auth'
@@ -930,22 +863,62 @@ const handleGridTileClick = (row: any) => {
 const brands = ref<any[]>([])
 const suppliers = ref<any[]>([])
 const tags = ref<any[]>([])
-const seriesTags = computed(() => tags.value.filter((tag) => tag.tagType === 'series'))
 const categoryOptions = ref<any[]>([])
 
 const queryParams = reactive({
   keyword: '',
-  status: '',
-  stockStatus: '',
-  brandId: '' as string | undefined,
-  supplierId: '' as string | undefined,
-  seriesTagId: '' as string | undefined,
-  categoryId: '' as string | string[] | undefined,
   minPrice: undefined as number | undefined,
   maxPrice: undefined as number | undefined,
   page: 1,
   size: 20,
 })
+
+/**
+ * 三级筛选导航选中的条件。维度与后端 dimension 同名，level2/level3 为该侧的
+ * 真实值（分类/品牌/供应商/枚举/规格长度），空串表示该层「全部」。
+ */
+const navFilter = reactive({
+  dimension: 'series',
+  level2: '',
+  level3: '',
+})
+const filterNavRef = ref<InstanceType<typeof ProductFilterNav> | null>(null)
+
+/**
+ * 把导航选择翻译成列表接口参数。每个维度只映射自己那一组字段，
+ * 其他维度一律不写——切换标签时不会把上一个维度的条件带进查询。
+ */
+function applyNavParams(target: Record<string, unknown>) {
+  const { dimension, level2, level3 } = navFilter
+  if (!level2) return
+  if (dimension === 'series') {
+    target.category_id = level2
+    // 二级计数只算「有系列标签」的产品，点进去必须同口径，否则数量和结果对不上。
+    target.tag_type = 'series'
+    if (level3) target.tag_ids = level3
+  } else if (dimension === 'brand') {
+    target.brand_id = level2
+    if (level3) target.category_id = level3
+  } else if (dimension === 'supplier') {
+    target.supplier_id = level2
+    if (level3) target.category_id = level3
+  } else if (dimension === 'status') {
+    target.status = level2
+  } else if (dimension === 'stock') {
+    target.stock_status = level2
+  } else if (dimension === 'category') {
+    target.category_id = level2
+    if (level3) target.spec_length_mm = level3
+  }
+}
+
+function handleNavFilterChange(selection: { dimension: string; level2: string; level3: string }) {
+  navFilter.dimension = selection.dimension
+  navFilter.level2 = selection.level2
+  navFilter.level3 = selection.level3
+  queryParams.page = 1
+  fetchProducts()
+}
 
 const productForm = reactive({
   productNo: '',
@@ -959,6 +932,7 @@ const productForm = reactive({
   stockStatus: 'in_stock',
   status: 'draft',
   tagIds: [] as string[],
+  deliveryPeriod: '',
 })
 
 const productRules: FormRules = {
@@ -983,15 +957,7 @@ const fetchProducts = async () => {
       size: queryParams.size,
     }
     if (queryParams.keyword) params.keyword = queryParams.keyword
-    if (queryParams.status) params.status = queryParams.status
-    if (queryParams.stockStatus) params.stock_status = queryParams.stockStatus
-    if (queryParams.brandId) params.brand_id = queryParams.brandId
-    if (queryParams.supplierId) params.supplier_id = queryParams.supplierId
-    if (queryParams.seriesTagId) params.tag_ids = queryParams.seriesTagId
-    if (queryParams.categoryId) {
-      const catId = Array.isArray(queryParams.categoryId) ? queryParams.categoryId[queryParams.categoryId.length - 1] : queryParams.categoryId
-      params.category_id = catId
-    }
+    applyNavParams(params)
     if (queryParams.minPrice !== undefined && queryParams.minPrice !== null) params.min_price = queryParams.minPrice
     if (queryParams.maxPrice !== undefined && queryParams.maxPrice !== null) params.max_price = queryParams.maxPrice
 
@@ -1062,6 +1028,7 @@ const COLUMNS: ColumnSpec[] = [
   { prop: 'productName', label: '产品名称', min: 180, max: Number.POSITIVE_INFINITY, grow: 3, font: FONT_STRONG },
   { prop: 'brandName', label: '品牌', min: 92, max: 220, grow: 0.7, font: FONT_BODY },
   { prop: 'categoryName', label: '分类', min: 96, max: 240, grow: 0.7, font: FONT_BODY },
+  { prop: 'deliveryPeriod', label: '交货期', min: 84, max: 150, grow: 0.4, font: FONT_STATUS, text: (row) => row.deliveryPeriod || '—' },
   {
     prop: 'facePrice',
     label: '面价',
@@ -1217,6 +1184,7 @@ const normalizeProduct = (item: any) => ({
   stockStatus: item.stock_status,
   completenessStatus: item.completeness_status,
   dataSource: item.data_source,
+  deliveryPeriod: item.delivery_period || '',
   tagIds: item.tag_ids || [],
   createTime: item.create_time,
   updateTime: item.update_time,
@@ -1275,16 +1243,11 @@ const handleSearch = () => {
 
 const handleReset = () => {
   queryParams.keyword = ''
-  queryParams.status = ''
-  queryParams.stockStatus = ''
-  queryParams.brandId = ''
-  queryParams.supplierId = ''
-  queryParams.seriesTagId = ''
-  queryParams.categoryId = ''
   queryParams.minPrice = undefined
   queryParams.maxPrice = undefined
   queryParams.page = 1
-  fetchProducts()
+  // reset() 会清空三级选择并 emit change，列表由 handleNavFilterChange 统一刷新。
+  filterNavRef.value?.reset()
 }
 
 const resetProductForm = () => {
@@ -1299,6 +1262,7 @@ const resetProductForm = () => {
   productForm.stockStatus = 'in_stock'
   productForm.status = 'draft'
   productForm.tagIds = []
+  productForm.deliveryPeriod = ''
 }
 
 const handleSubmit = async () => {
@@ -1317,6 +1281,7 @@ const handleSubmit = async () => {
         stock_status: productForm.stockStatus,
         status: productForm.status,
         tag_ids: productForm.tagIds,
+        delivery_period: productForm.deliveryPeriod.trim() || null,
       }
       if (productForm.costPrice !== undefined && productForm.costPrice !== null) payload.cost_price = productForm.costPrice
       if (productForm.material) payload.material = productForm.material
@@ -1358,6 +1323,7 @@ const handleEdit = (row: any) => {
   productForm.material = row.material || ''
   productForm.stockStatus = row.stockStatus
   productForm.status = row.status
+  productForm.deliveryPeriod = row.deliveryPeriod || ''
   productForm.tagIds = row.tagIds?.length
     ? [...row.tagIds]
     : (row.tags || [])
@@ -1415,15 +1381,9 @@ const handleClone = async (row: any) => {
 const handleExport = async () => {
   const params: Record<string, string> = {}
   if (queryParams.keyword) params.keyword = queryParams.keyword
-  if (queryParams.status) params.status = queryParams.status
-  if (queryParams.stockStatus) params.stock_status = queryParams.stockStatus
-  if (queryParams.brandId) params.brand_id = queryParams.brandId
-  if (queryParams.supplierId) params.supplier_id = queryParams.supplierId
-  if (queryParams.seriesTagId) params.tag_ids = queryParams.seriesTagId
-  if (queryParams.categoryId) {
-    const catId = Array.isArray(queryParams.categoryId) ? queryParams.categoryId[queryParams.categoryId.length - 1] : queryParams.categoryId
-    params.category_id = catId
-  }
+  const navParams: Record<string, unknown> = {}
+  applyNavParams(navParams)
+  for (const [key, value] of Object.entries(navParams)) params[key] = String(value)
   if (queryParams.minPrice !== undefined && queryParams.minPrice !== null) params.min_price = String(queryParams.minPrice)
   if (queryParams.maxPrice !== undefined && queryParams.maxPrice !== null) params.max_price = String(queryParams.maxPrice)
 
@@ -1614,6 +1574,22 @@ watch([viewMode, proposalMode], () => {
   flex-direction: column;
   gap: 16px;
   margin-bottom: 16px;
+}
+
+/* 交货期是「能不能马上发货」的决策信息，用低饱和徽章而不是普通文本。 */
+.delivery-badge {
+  display: inline-block;
+  max-width: 100%;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: rgba(var(--pim-brand), 0.08);
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 20px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
 }
 
 .filter-form {

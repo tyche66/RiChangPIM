@@ -20,6 +20,16 @@ def test_tag_filter_uses_product_tag_relationship():
     assert "product_tag.tag_id" in sql
 
 
+def test_tag_type_filter_keeps_series_counts_consistent():
+    """「系列」维度的二级计数只算有系列标签的产品，导出必须用同一口径。"""
+    sql = str(
+        _build_query(tag_type="series").compile(compile_kwargs={"literal_binds": True})
+    )
+    assert "product_tag" in sql
+    assert "tag.tag_type" in sql
+    assert "'series'" in sql
+
+
 def test_sales_export_hides_sensitive_columns_and_placeholder_value():
     content = build_excel_bytes(
         [

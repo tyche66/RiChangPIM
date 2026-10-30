@@ -224,6 +224,26 @@ export interface ProductListParams {
   size?: number
 }
 
+/** 三级筛选导航的维度：与后端 /products/filter-options 的 dimension 一一对应。 */
+export type ProductFilterDimension =
+  | 'series'
+  | 'brand'
+  | 'supplier'
+  | 'status'
+  | 'stock'
+  | 'category'
+
+export interface ProductFilterOption {
+  value: string
+  label: string
+  count: number
+}
+
+export interface ProductFilterOptionsData {
+  dimension: ProductFilterDimension
+  items: ProductFilterOption[]
+}
+
 /** 重传产品包时可选的重复处理方式。 */
 export type ImportMode = 'overwrite' | 'append' | 'skip'
 
@@ -322,6 +342,12 @@ export interface ImportCommitPayload {
 export const productApi = {
   list: (params?: ProductListParams) =>
     api.get('/products', { params }) as Promise<ApiEnvelope<Paginated<ProductListItem>>>,
+  /*
+   * 三级筛选导航的选项：不带 parent_id 返回二级，带 parent_id 返回该二级下的三级。
+   * 选项与计数全部由后端按产品数据实时聚合，前端不缓存、也不写死任何分类名。
+   */
+  filterOptions: (params: { dimension: ProductFilterDimension; parent_id?: string }) =>
+    api.get('/products/filter-options', { params }) as Promise<ApiEnvelope<ProductFilterOptionsData>>,
   get: (id: string) => api.get(`/products/${id}`, { suppressErrorMessage: true }),
   create: (data: unknown) => api.post('/products', data),
   update: (id: string, data: unknown) => api.put(`/products/${id}`, data),

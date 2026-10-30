@@ -12,6 +12,7 @@ from sqlalchemy import (
     Text,
     func,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import text
@@ -86,6 +87,9 @@ class Product(CommonBase):
     description = Column(Text)
     specification = Column(String(255))
     colors = Column(Text)
+    # 交货期/交期：自由文本标签（「现货」「7天」「30天」），导入导出与卡片共用。
+    # 不给枚举约束：供应商报价单的交期写法千奇百怪，硬枚举只会丢数据。
+    delivery_period = Column(String(64))
     data_source = Column(String(512))
     completeness_status = Column(String(20), nullable=False, default="complete")
     vector = Column(HalfVector(2048), nullable=True)
@@ -197,6 +201,9 @@ class ProductImage(CommonBase):
     attachment_id = Column(PGUUID(as_uuid=True), ForeignKey("attachment.id"), nullable=False)
     sort = Column(Integer, default=0)
     is_cover = Column(Boolean, default=False)
+    # 视觉模型从图片产出的标签（如「圆形会议桌」「木质桌面」），参与产品卡片建向量。
+    # NULL=尚未标注，[]=标注过但没识别出内容；两者语义不同，不要合并。
+    vision_tags = Column(JSONB, nullable=True)
 
     product = relationship("Product", back_populates="images")
     attachment = relationship("Attachment")

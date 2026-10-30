@@ -110,6 +110,16 @@
                 placeholder="留空表示不修改"
               />
             </el-form-item>
+            <el-form-item label="视觉标注模型 ID（多模态，留空则不做产品图标注）">
+              <el-input
+                v-model="forms[item.scope].vision_model"
+                placeholder="例如 gpt-4o-mini / qwen-vl-plus"
+              />
+              <div class="ai-config-hint">
+                产品图会被识别成外观标签并写入知识卡片，参与 AI 选品的向量召回。
+                请填支持 image_url 输入的模型，纯文本模型会导致索引任务失败。
+              </div>
+            </el-form-item>
           </template>
 
           <el-form-item label="超时（秒）">
@@ -190,6 +200,7 @@ interface FormState {
   embedding_model: string
   embedding_api_url: string
   embedding_api_key: string
+  vision_model: string
   timeout_seconds: number | null
   enabled: boolean
 }
@@ -202,6 +213,7 @@ const emptyForm = (): FormState => ({
   embedding_model: '',
   embedding_api_url: '',
   embedding_api_key: '',
+  vision_model: '',
   timeout_seconds: null,
   enabled: true,
 })
@@ -229,6 +241,7 @@ function fillForm(item: AiConfigItem) {
   form.embedding_model = item.embedding_model ?? ''
   form.embedding_api_url = item.embedding_api_url ?? ''
   form.embedding_api_key = ''
+  form.vision_model = item.vision_model ?? ''
   form.timeout_seconds = item.timeout_seconds
   form.enabled = item.enabled
 }
@@ -266,6 +279,7 @@ async function handleSave(scope: AiConfigScope) {
         scope === 'knowledge' ? form.embedding_api_url.trim() || null : null,
       embedding_api_key:
         scope === 'knowledge' ? form.embedding_api_key.trim() || null : null,
+      vision_model: scope === 'knowledge' ? form.vision_model.trim() || null : null,
       timeout_seconds: form.timeout_seconds && form.timeout_seconds > 0 ? form.timeout_seconds : null,
       enabled: form.enabled,
     })

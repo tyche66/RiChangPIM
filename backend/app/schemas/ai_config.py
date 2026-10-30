@@ -16,6 +16,7 @@ class AiConfigRead(BaseModel):
     embedding_model: str | None = None
     embedding_api_url: str | None = None
     embedding_api_key_masked: str | None = None
+    vision_model: str | None = None
     timeout_seconds: float | None = None
     enabled: bool = True
     source: str = "env"
@@ -33,6 +34,7 @@ class AiConfigUpdate(BaseModel):
     embedding_model: str | None = Field(default=None, max_length=128)
     embedding_api_url: str | None = Field(default=None, max_length=512)
     embedding_api_key: str | None = Field(default=None, max_length=4096)
+    vision_model: str | None = Field(default=None, max_length=128)
     timeout_seconds: float | None = Field(default=None, gt=0, le=3600)
     enabled: bool | None = None
 

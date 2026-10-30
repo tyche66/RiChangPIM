@@ -12,8 +12,9 @@ from app.knowledge.documents.base import (
     ProductFactProvider,
     stable_content_hash,
 )
+from app.knowledge.vision import ProductImageVisionTagger
 from app.models.catalog_attribute import ProductAttributeValue
-from app.models.product import Product
+from app.models.product import Category, Product, ProductImage
 
 SENSITIVE_PRODUCT_FIELDS = {
     "face_price",
@@ -42,6 +43,7 @@ class DatabaseProductFactProvider(ProductFactProvider):
                 selectinload(Product.attribute_values).selectinload(
                     ProductAttributeValue.option
                 ),
+                selectinload(Product.images).selectinload(ProductImage.attachment),
             )
             .where(Product.id == product_id, Product.is_deleted.is_(False))
         )
@@ -54,13 +56,21 @@ class DatabaseProductFactProvider(ProductFactProvider):
             "product_no": product.product_no,
             "brand": product.brand.brand_name if product.brand else None,
             "category": product.category.category_name if product.category else None,
+            "category_path": await self._category_path(product.category),
             "material": product.material or None,
             "material_description": product.material_description or None,
             "specification": product.specification or None,
             "colors": product.colors or None,
+            "delivery_period": product.delivery_period or None,
             "tags": sorted(tag.tag_name for tag in product.tags if not tag.is_deleted),
             "description": product.description or None,
         }
+        # 视觉标签：外观词（圆形/弧形/带轮）不在结构化字段里，靠图识别补齐，
+        # 否则买家说「圆形会议桌」时这张卡片永远排不到前面。
+        vision_tags = await ProductImageVisionTagger(self.db).ensure_product_tags(
+            list(product.images or [])
+        )
+        facts["vision_tags"] = vision_tags
         # 受治理属性（Track A）：桌形/风格/系列等以"属性: 取值"进入卡片文本，
         # 使向量/关键词召回能命中，"弧形"不再只出现在 material 自由文本里。
         attribute_lines: list[str] = []
@@ -113,6 +123,32 @@ class DatabaseProductFactProvider(ProductFactProvider):
             ],
         )
 
+    async def _category_path(self, category) -> str | None:
+        """完整类目路径（如「办公家具 > 会议桌 > 圆形会议桌」）。
+
+        买家常用上级类目词检索（「办公家具」），只写叶子类目会漏召回。
+        逐级向上取，深度封顶 5 级，避免脏数据造成的环。
+        """
+        if category is None:
+            return None
+        names = [category.category_name]
+        parent_id = category.parent_id
+        for _ in range(4):
+            if not parent_id:
+                break
+            parent = await self.db.scalar(
+                select(Category).where(
+                    Category.id == parent_id, Category.is_deleted.is_(False)
+                )
+            )
+            if parent is None:
+                break
+            names.append(parent.category_name)
+            parent_id = parent.parent_id
+        if len(names) == 1:
+            return None
+        return " > ".join(reversed(names))
+
     @staticmethod
     def _render_card_text(facts: dict[str, object]) -> str:
         labels = {
@@ -120,11 +156,14 @@ class DatabaseProductFactProvider(ProductFactProvider):
             "product_no": "产品编号",
             "brand": "品牌",
             "category": "类目",
+            "category_path": "类目路径",
             "material": "材质",
             "material_description": "材质说明",
             "specification": "规格",
             "colors": "颜色",
+            "delivery_period": "交货期",
             "tags": "标签",
+            "vision_tags": "外观标签",
             "attributes": "属性",
             "description": "产品描述",
             "applicable_scene": "适用场景",
@@ -135,12 +174,15 @@ class DatabaseProductFactProvider(ProductFactProvider):
             "product_no",
             "brand",
             "category",
+            "category_path",
             "attributes",
             "material",
             "material_description",
             "specification",
             "colors",
+            "delivery_period",
             "tags",
+            "vision_tags",
             "description",
             "applicable_scene",
         ]:

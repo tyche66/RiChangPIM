@@ -108,6 +108,16 @@ HEADER_ALIASES: dict[str, tuple[str, ...]] = {
     "material": ("材质", "material", "材料", "面料"),
     "specification": ("规格", "specification", "spec", "规格尺寸", "尺寸", "size"),
     "colors": ("颜色", "colors", "color", "可选颜色", "颜色选项"),
+    "delivery_period": (
+        "交货期",
+        "delivery_period",
+        "deliveryperiod",
+        "交期",
+        "货期",
+        "lead_time",
+        "leadtime",
+        "生产周期",
+    ),
     "description": ("描述", "description", "产品描述", "说明", "备注", "remark", "desc"),
     "data_source": ("数据来源", "data_source", "datasource", "来源", "source"),
     "stock_status": ("库存状态", "stock_status", "stockstatus", "库存", "现货状态", "stock"),
@@ -622,6 +632,7 @@ class RowFields:
     material: str | None = None
     specification: str | None = None
     colors: str | None = None
+    delivery_period: str | None = None
     description: str | None = None
     data_source: str | None = None
     stock_status: str = "in_stock"
@@ -649,6 +660,7 @@ _TEXT_LIMITS: dict[str, int] = {
     "product_name": 255,
     "material": 128,
     "specification": 255,
+    "delivery_period": 64,
     "data_source": 512,
 }
 
@@ -696,7 +708,7 @@ def parse_row(row: ProductRow) -> RowFields:
         if cost.value is not None:
             out.provided.add("cost_price")
 
-    for key in ("material", "specification", "colors", "description", "data_source"):
+    for key in ("material", "specification", "colors", "delivery_period", "description", "data_source"):
         text = row.get(key)
         limit = _TEXT_LIMITS.get(key)
         if limit and len(text) > limit:
@@ -757,6 +769,7 @@ TEMPLATE_COLUMNS: tuple[tuple[str, str], ...] = (
     ("材质", "网布+铝合金"),
     ("规格", "W650×D620×H1150mm"),
     ("颜色", "黑色,灰色"),
+    ("交货期", "现货"),
     ("描述", "示例描述，可留空"),
     ("数据来源", "2026 供应商报价表"),
     ("库存状态", "有货"),
@@ -785,6 +798,10 @@ TEMPLATE_NOTES: tuple[str, ...] = (
         "【标签】标签列会自动创建系统里没有的标签，默认归入「系列」；"
         "想指定类型就写「系列:摩耳」「风格:新中式」，写「标签:热销」表示不分组。"
         "已有同名标签会直接复用，不会重复创建。"
+    ),
+    (
+        "【交货期】自由文本即可（现货 / 7 天 / 30 天 / 需确认），"
+        "会作为徽章显示在产品列表与详情页，并参与 AI 选品的交期匹配。"
     ),
     (
         "【图片·方式一（推荐）】直接把图片贴进「主图/产品图/场景图」那一格："

@@ -29,6 +29,7 @@ def test_product_card_includes_signed_cover_image_without_exposing_it_to_model(m
         completeness_status="complete",
         specification="2400mm",
         colors=["胡桃木"],
+        delivery_period="现货",
         description="适合多人会议",
         cover_image=SimpleNamespace(
             attachment=SimpleNamespace(id=attachment_id, is_deleted=False),

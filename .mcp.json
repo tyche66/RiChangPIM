@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "aoci": {
+      "command": "wsl",
+      "args": [
+        "-d",
+        "RiChangPIM",
+        "--",
+        "/home/AI-PIM/bin/aoci",
+        "mcp",
+        "--repo",
+        "/mnt/e/RiChangPIM"
+      ]
+    }
+  }
+}

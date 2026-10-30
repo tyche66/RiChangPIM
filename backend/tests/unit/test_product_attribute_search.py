@@ -35,7 +35,8 @@ SCHEMA = (
         brand_id TEXT, supplier_id TEXT, category_id TEXT,
         face_price FLOAT, cost_price FLOAT, material TEXT,
         stock_status TEXT, status TEXT, description TEXT,
-        specification TEXT, colors TEXT, completeness_status TEXT,
+        specification TEXT, colors TEXT, delivery_period TEXT,
+        completeness_status TEXT,
         material_description TEXT, data_source TEXT, vector TEXT,
         create_time TEXT, update_time TEXT, deleted_at TEXT,
         is_deleted BOOLEAN NOT NULL)

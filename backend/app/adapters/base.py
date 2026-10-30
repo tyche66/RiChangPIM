@@ -88,6 +88,16 @@ class AIServiceAdapter(ABC):
         :return: 向量
         """
 
+    async def vision_chat(
+        self, image_url: str, prompt: str, *, model: str | None = None
+    ) -> str:
+        """多模态识图：一张图（URL 或 data URL）+ 提示词，返回模型文本。
+
+        默认不支持。调用方（视觉标注）必须把 ``NotImplementedError`` 当作
+        「该适配器没有视觉能力」处理，而不是重试。
+        """
+        raise NotImplementedError
+
     @abstractmethod
     def parse_tool_calls(self, raw_response: dict[str, Any]) -> list[dict[str, Any]]:
         """统一解析和转化下游平台的 Tool Call / Function Call 格式

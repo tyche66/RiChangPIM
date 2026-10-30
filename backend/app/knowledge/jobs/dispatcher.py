@@ -83,3 +83,27 @@ class KnowledgeJobDispatcher:
             job.status = "dispatched"
         await self.db.flush()
         return len(jobs)
+
+
+async def enqueue_product_card(
+    db, product_id: UUID, *, operation: str = "upsert", created_by=None
+) -> None:
+    """产品增改删后登记卡片重建/下线任务（与调用方同一事务，由调用方 commit）。"""
+    await KnowledgeJobDispatcher(db).enqueue_job(
+        source_type="product_card",
+        source_id=product_id,
+        operation=operation,
+        created_by=created_by,
+    )
+
+
+async def enqueue_product_manual(
+    db, manual_id: UUID, *, operation: str = "upsert", created_by=None
+) -> None:
+    """说明书上传/解析/删除后登记建向量任务。"""
+    await KnowledgeJobDispatcher(db).enqueue_job(
+        source_type="product_manual",
+        source_id=manual_id,
+        operation=operation,
+        created_by=created_by,
+    )

@@ -101,6 +101,47 @@
         </div>
       </template>
 
+      <div
+        v-if="heroImageUrl"
+        class="product-hero"
+      >
+        <button
+          type="button"
+          class="product-hero__media"
+          :aria-label="`查看 ${product.productName} 大图`"
+          @click="openViewer(0)"
+        >
+          <el-image
+            :src="heroImageUrl"
+            fit="cover"
+            class="product-hero__img"
+          >
+            <template #error>
+              <div class="product-hero__placeholder">暂无图片</div>
+            </template>
+          </el-image>
+          <span class="product-hero__hint">点击查看大图</span>
+        </button>
+        <div
+          v-if="productImages.length > 1"
+          class="product-hero__thumbs"
+        >
+          <button
+            v-for="(img, index) in productImages"
+            :key="img.imageId || index"
+            type="button"
+            class="product-hero__thumb"
+            :class="{ 'is-active': img.url === heroImageUrl }"
+            @click="openViewer(index)"
+          >
+            <el-image
+              :src="img.thumbnailUrl || img.url"
+              fit="cover"
+            />
+          </button>
+        </div>
+      </div>
+
       <el-descriptions
         :column="2"
         border
@@ -172,6 +213,20 @@
         </el-descriptions-item>
         <el-descriptions-item label="颜色">
           {{ product.colors || '待补充' }}
+        </el-descriptions-item>
+        <el-descriptions-item label="交货期">
+          <el-tag
+            v-if="product.deliveryPeriod"
+            size="small"
+            type="success"
+            class="capsule-tag"
+          >
+            {{ product.deliveryPeriod }}
+          </el-tag>
+          <span
+            v-else
+            class="cell-meta"
+          >待补充</span>
         </el-descriptions-item>
         <el-descriptions-item label="数据完整性">
           <el-tag
@@ -452,6 +507,14 @@
               />
             </el-select>
           </el-form-item>
+          <el-form-item label="交货期">
+            <el-input
+              v-model="editForm.deliveryPeriod"
+              maxlength="64"
+              placeholder="例如 现货 / 7天 / 30天"
+              class="capsule-input"
+            />
+          </el-form-item>
         </el-form>
         <template #footer>
           <el-button
@@ -470,6 +533,14 @@
           </el-button>
         </template>
       </el-dialog>
+
+      <el-image-viewer
+        v-if="viewerVisible"
+        :url-list="viewerImages"
+        :initial-index="viewerIndex"
+        hide-on-click-modal
+        @close="viewerVisible = false"
+      />
 
       <!-- Status Dialog -->
       <el-dialog
@@ -647,7 +718,28 @@ const editForm = reactive({
   stockStatus: 'in_stock',
   status: 'draft',
   tagIds: [] as string[],
+  deliveryPeriod: '',
 })
+
+// 主图灯箱：hero 大图与缩略图共用一份 url 列表，initial-index 决定从哪张打开。
+const viewerVisible = ref(false)
+const viewerIndex = ref(0)
+const heroImageUrl = computed(
+  () => product.value?.primaryImage?.url || productImages.value[0]?.url || '',
+)
+const viewerImages = computed(() =>
+  productImages.value.length
+    ? productImages.value.map((img) => img.url)
+    : heroImageUrl.value
+      ? [heroImageUrl.value]
+      : [],
+)
+
+function openViewer(index: number) {
+  if (!viewerImages.value.length) return
+  viewerIndex.value = Math.min(Math.max(index, 0), viewerImages.value.length - 1)
+  viewerVisible.value = true
+}
 
 const editRules: FormRules = {
   productName: [{ required: true, message: '请输入产品名称', trigger: 'blur' }],
@@ -688,6 +780,7 @@ const normalizeProduct = (item: any) => ({
   stockStatus: item.stock_status,
   completenessStatus: item.completeness_status,
   dataSource: item.data_source,
+  deliveryPeriod: item.delivery_period || '',
   tagIds: item.tag_ids || [],
   createTime: item.create_time,
   updateTime: item.update_time,
@@ -797,6 +890,7 @@ const populateEditForm = () => {
   editForm.material = product.value.material || ''
   editForm.stockStatus = product.value.stockStatus
   editForm.status = product.value.status
+  editForm.deliveryPeriod = product.value.deliveryPeriod || ''
   editForm.tagIds = product.value.tagIds?.length
     ? [...product.value.tagIds]
     : (product.value.tags || [])
@@ -819,6 +913,7 @@ const handleSaveEdit = async () => {
         stock_status: editForm.stockStatus,
         status: editForm.status,
         tag_ids: editForm.tagIds,
+        delivery_period: editForm.deliveryPeriod.trim() || null,
       }
       if (editForm.costPrice !== undefined && editForm.costPrice !== null) payload.cost_price = editForm.costPrice
       if (editForm.material) payload.material = editForm.material
@@ -935,6 +1030,102 @@ watch(editMode, (val) => {
 
 .glass-card :deep(.el-card__body) {
   padding: 24px;
+}
+
+/* ===== Hero 主图 ===== */
+.product-hero {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 20px;
+}
+
+.product-hero__media {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--brand-lighter);
+  cursor: zoom-in;
+  max-height: 420px;
+}
+
+.product-hero__img {
+  display: block;
+  width: 100%;
+  height: 420px;
+}
+
+.product-hero__placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 420px;
+  color: var(--text-secondary);
+}
+
+.product-hero__hint {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 12px;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.product-hero__media:hover .product-hero__hint,
+.product-hero__media:focus-visible .product-hero__hint {
+  opacity: 1;
+}
+
+.product-hero__thumbs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 96px;
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.product-hero__thumb {
+  padding: 0;
+  width: 96px;
+  height: 72px;
+  border: 2px solid transparent;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  cursor: zoom-in;
+  background: var(--brand-lighter);
+}
+
+.product-hero__thumb.is-active {
+  border-color: var(--pim-brand-strong, currentColor);
+}
+
+.product-hero__thumb :deep(img) {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+@media (max-width: 720px) {
+  .product-hero {
+    flex-direction: column;
+  }
+
+  .product-hero__thumbs {
+    flex-direction: row;
+    width: 100%;
+    max-height: none;
+    overflow-x: auto;
+  }
 }
 
 .skeleton-card {

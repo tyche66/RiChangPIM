@@ -48,6 +48,7 @@ def _row(**overrides):
         embedding_model=None,
         embedding_api_url=None,
         embedding_api_key=None,
+        vision_model=None,
         timeout_seconds="90",
         enabled=True,
     )
