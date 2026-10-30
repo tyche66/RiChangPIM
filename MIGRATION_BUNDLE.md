@@ -69,7 +69,7 @@ v1.9.0 包的 sha256：`cb4f9fc12b43040a219b0b50b6d09b8b11251558adddf3097bdbe9fe
 全程**不停、不重启、不修改任何服务**。数据库走 `docker exec pg_dump`，卷是热归档。
 
 ```bash
-cd /home/AI-PIM/RiChangPIM
+cd /mnt/e/RiChangPIM   # Windows 侧为 E:\RiChangPIM
 export DOCKER_HOST=unix:///mnt/wsl/docker-desktop/shared-sockets/host-services/docker.proxy.sock
 export DOCKER_CONTEXT=default
 TS=$(date +%Y%m%d_%H%M%S)

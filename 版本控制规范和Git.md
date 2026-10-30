@@ -118,7 +118,7 @@ git push -u origin feature/example
 ### 正确顺序（可照抄）
 
 ```bash
-cd /home/AI-PIM/RiChangPIM
+cd /mnt/e/RiChangPIM   # Windows 侧为 E:\RiChangPIM
 export PATH="$HOME/.nvm/versions/node/v24.18.0/bin:$PATH"
 export DOCKER_HOST=unix:///mnt/wsl/docker-desktop/shared-sockets/host-services/docker.proxy.sock
 export DOCKER_CONTEXT=default

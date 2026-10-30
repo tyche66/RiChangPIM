@@ -101,3 +101,11 @@ Entry 的语义必须来自模型对真实证据的理解。不得仅依据路�
 
 不预加载、不猜测，也不自行重建这些专项流程。平台调用方式、请求格式、批次上限、审批规则、索引格式细节和恢复步骤由对应Guide、工具说明、模型Prompt和CLI帮助按需提供。
 <!-- aoci:end -->
+
+## 本机工作区约定（非 AOCI 索引内容，AOCI 维护时不覆盖本段）
+
+- 代码仓库位于 Windows `E:\RiChangPIM`；WSL 发行版 `RiChangPIM` 内对应 `/mnt/e/RiChangPIM`。
+- 日常在 Windows 侧编辑代码，构建、测试、docker 运行都在 WSL 内执行。
+- 不要把 `\\wsl$\...` 或 `\\wsl.localhost\...` 这类 UNC 路径当作项目根，否则 OpenCode 会报 `Location not found`。
+- 旧的 `/home/AI-PIM/RiChangPIM` 只是迁移回退快照，不再作为开发目录。
+- 环境体检第一条命令仍是 `bash scripts/where-am-i.sh`；完整说明见 `docs/Windows开发与WSL构建.md`。

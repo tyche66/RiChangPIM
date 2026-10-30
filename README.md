@@ -24,7 +24,8 @@ RiChangPIM 是当前这套 AI-PIM 项目的工作快照，面向产品信息管�
 
 | 项目项 | 当前状态 |
 | --- | --- |
-| 仓库根目录 | `RiChangPIM/` |
+| 仓库根目录 | `RiChangPIM/`（Windows：`E:\RiChangPIM`；WSL：`/mnt/e/RiChangPIM`） |
+| 开发 / 运行方式 | Windows 侧编辑，WSL 发行版 `RiChangPIM` 内构建运行（见 [docs/Windows开发与WSL构建.md](docs/Windows开发与WSL构建.md)） |
 | 后端 | `backend/`，FastAPI + SQLAlchemy + Alembic |
 | 前端 | `frontend/`，Vue 3 + Vite + Element Plus + Pinia |
 | AI 门户 | `portal/`，独立 AI 对话门户 |

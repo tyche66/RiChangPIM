@@ -1,7 +1,7 @@
 #!/bin/bash
 # G0-3 e2e 基线：chromium + Mobile Chrome，共 3 轮。记录失败用例与耗时。
 export PATH="$HOME/.nvm/versions/node/v24.18.0/bin:$PATH"
-cd /home/AI-PIM/RiChangPIM/frontend || exit 9
+cd "$(cd "$(dirname "$0")" && pwd)/frontend" || exit 9
 export E2E_PORT=5199
 LOG=/tmp/e2e-baseline.log
 : > "$LOG"
