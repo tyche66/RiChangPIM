@@ -66,7 +66,13 @@ cd /mnt/e/RiChangPIM/frontend && npm ci
 cd /mnt/e/RiChangPIM/portal   && npm ci
 ```
 
-Node 版本按仓库脚本要求（`v24.18.0`，见 `e2e_round.sh` / `build_frontends.sh` 的 PATH 设置）。
+Node 版本按仓库脚本要求（`v24.18.0`）。**WSL 内要先加载 nvm 再跑 npm**，否则 `npm` 会解析到 `/mnt/c/Program Files/nodejs/npm`（Windows 版），装出平台不匹配的 `node_modules`：
+
+```bash
+export PATH="$HOME/.nvm/versions/node/v24.18.0/bin:$PATH"
+node -v   # 必须是 v24.18.0
+npm -v    # 必须是 12.x（不是 Windows 的 11.x）
+```
 
 运行数据（PostgreSQL / MinIO / Redis 的命名卷）由 Docker Desktop 管理，与仓库位置无关；只要卷名不变，换路径后数据仍在。
 
@@ -85,6 +91,7 @@ Node 版本按仓库脚本要求（`v24.18.0`，见 `e2e_round.sh` / `build_fron
 3. **不要从 Windows 侧把 `\\wsl$\...` 或 `\\wsl.localhost\...` 当作项目根**，会重新触发 `Location not found`。项目根只用 `E:\RiChangPIM`。
 4. **AOCI 认知索引**：`opencode.json` 中 aoci MCP 的 `--repo` 已改为 `/mnt/e/RiChangPIM`。迁移后若 AOCI 报告 baseline 路径漂移，按 AOCI 维护流程重新对齐，不要手工改 `.aoci` 内部文件。
 5. **旧目录 `/home/AI-PIM/RiChangPIM` 暂不删除**，作为回退快照保留；确认新位置稳定后再按项目规则移入 `回收站/`。
+6. **WSL 默认 PATH 会优先命中 Windows 的 node/npm**（interop 注入 `/mnt/c/Program Files/nodejs`）。`build_frontends.sh` / `e2e_round.sh` 已在脚本内设置正确 PATH，手动执行 `npm` / `npx` 前必须自己 export nvm 的 bin 目录。
 
 ## 七、常见问题
 
