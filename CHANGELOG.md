@@ -26,6 +26,45 @@
 
 **不要去改的历史记录**（改了就是篡改发布史）：`BUILD_LOG.md` 的构建记录、`PROJECT_MANAGEMENT.md` 的发布台账、`TODO.md` 的「已发布」条目、`docs/08-开发路线图.md` 的里程碑行。`RELEASE_GATE.md` 已改成版本无关，不需要跟着版本走。
 
+## v1.9.9 — 2026-10-31
+
+本版把产品知识卡的向量索引从「每分钟常驻轮询」改为「夜间窗口调度」，修复了导致同一批内容被反复 embedding 的重复计费根因；后台新增「向量索引」管理页（启停、窗口、报告、积压、手动灰度）。同时合并一组安全加固：登出撤销 refresh token、Redis 故障时撤销检查 fail closed、分享口令改存哈希、口令长度边界统一、日志路径脱敏、健康检查与 CORS 收敛。
+
+### 夜间向量索引调度（替代常驻 knowledge-indexer）
+
+- 新增 `app/services/knowledge_index_scheduler.py`：默认 **Asia/Shanghai 01:00–02:30** 窗口，**02:25 安全截止**后不再发起新的 embedding；窗口外完全空闲，不再每分钟全表扫描。未完成任务留在队列，次夜续跑。
+- 单例互斥：进程内 `asyncio.Lock` + 跨进程 Postgres advisory lock，多个 backend worker / CLI 进程不会并行跑同一轮。
+- 重复计费根因修复：
+  - reconcile 不再把 `failed` 任务重置为立即 `pending`，也不清空 `next_attempt_at`；只有内容 hash / pipeline / embedding model 变化或管理员显式「重置重试」才重开确定性失败。
+  - embedding 前先比对产品卡内容 hash、embedding model/version 与现存有效向量，全部匹配则跳过外部调用（零 token）。
+  - 上游超时、`AIAdapterError` 与未知错误均递增 `attempt_count` 并走指数退避，达到上限进入 dead/隔离；429 不消耗重试预算。
+  - 写库按产品 `savepoint` + 逐产品提交隔离，单个产品失败不再回滚同批其他产品；确定性数据库错误直接隔离，不反复重算。
+  - `KnowledgeJobDispatcher.enqueue_job` 不再复用 `failed` 任务（编辑/导入/克隆不会绕过退避），改为新建 pending，旧 failed 保留计数并让位。
+  - 领取任务按「同组最新一条非终态」去重，历史多条 failed 并存时同一产品每轮也只 embedding 一次。
+  - 启动恢复只回收本进程启动前遗留的 `running` 报告，且仅在 `current_run_id` 指向该报告时清空；某个 worker 重启不会抹掉其他 worker 正在跑的报告。
+- 管理端手动 run-now 由后端硬限 **200 个不同产品**，CLI `--once` 与 API 共用同一约束（`RUN_NOW_HARD_CAP`），不受配置项放大。
+- dead 任务保留 **90 天**，分批清理；pending / processing / 未过期记录不触碰。
+- 服务心跳、调度状态与下次运行时间落库，`/status` 不再以容器 Up 状态 判断「在工作」；运行报告不外泄任何 Key、口令或 DSN。
+- 迁移 `0037_knowledge_index_scheduler`：`knowledge_index_setting`、`knowledge_index_run`、调度状态单例表；`knowledge_index_job` 活动任务部分唯一索引（pending/dispatched/processing）；`knowledge_document` 活动文档部分唯一索引（同键仅一个未删除文档，重复行软删而非物理删除）；种子 `knowledge:index` 权限并绑定 admin。
+- 新增管理 API（`PermissionChecker` + 审计，仅管理员）：设置读改、运行报告（最近一次 + 近 30 次）、队列积压、run-now、授权失败任务重置。
+- 后台新增「向量索引」页：启停开关、窗口与批大小配置、下次运行/安全截止倒计时、心跳与当前状态、积压与 dead 统计、近 30 晚报表、run-now（标注最多 200 个）、失败/隔离清单与重置；页面时间按调度时区 `Asia/Shanghai` 显示，不随浏览器时区漂移。
+
+### 安全加固
+
+- 登出同时撤销 access 与 refresh token；前端登出显式提交 `refresh_token`，后端仅在 `sub` 一致且类型为 refresh 时撤销。
+- `is_jti_revoked` 在 Redis 不可用或查询异常时按 `APP_ENV=production` **fail closed**：无法确认撤销状态就拒绝该 token，不再静默放行已撤销凭证；测试环境保持不依赖 Redis。
+- 新增迁移 `0038_share_password_hash`：`share_token` 口令改存 bcrypt 哈希（`password_hash`）。存量明文在升级时原地哈希，并同时写回 `password` 列，使回滚到旧版本时分享变为需口令而非变成无口令；`$2a$/$2b$/$2y$` 前缀视为已哈希，幂等。
+- 口令统一 72 字节（bcrypt）上限与最小长度校验，后端 `ensure_bcrypt_compatible` 与前端 `passwordRules` 同规则。
+- 审计中间件、可观测性接口与后台管理接口补充管理员/内部来源约束；`/api/v1/share/{token}`、`/api/v1/files/{id}/*` 在 nginx 与后端访问日志中做路径脱敏，`/share/` 下发 `no-referrer`。
+- 健康检查与 CORS 收敛到显式白名单，不再默认放开。
+
+### 数据与部署
+
+- 迁移链 head：`0038_share_password_hash`（`0037` → `0038`，均为幂等 DDL，可在生产的 `0024` 基线上连续升级）。
+- **切换顺序**：先停旧的常驻 `knowledge-indexer` 容器，再启动新后端。旧容器不走 advisory lock，与新调度器并存会双发 embedding。
+- 首晚建议先用 run-now 灰度（≤100 产品）验证，再放开全量夜间窗口。
+- 回滚：代码回退到 v1.9.8 前，先确认 `0038` 的 `password` 列仍是可用的 bcrypt 哈希（迁移已双写）。
+
 ## v1.9.8 — 2026-10-30
 
 本版把产品列表的分类筛选重做成**三级筛选导航**，补齐**产品交货期**字段，并让产品 / 说明书
