@@ -674,6 +674,7 @@ def _product_card(p: Product, current_user: dict[str, Any]) -> dict[str, Any]:
                 "attachment_id": str(attachment.id),
             },
             expires_delta=timedelta(seconds=_PREVIEW_EXPIRE_SECONDS),
+            token_type="file_content",
         )
         cover_image_url = f"/api/v1/files/{attachment.id}/content?token={token}"
     return {

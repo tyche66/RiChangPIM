@@ -4,9 +4,11 @@ services:
       context: .
       dockerfile: docker/nginx/Dockerfile
     ports:
-      - "888:80"
+      - "${BIND_ADDR:-127.0.0.1}:888:80"
     volumes:
       - ./docker/nginx/certs:/etc/nginx/certs:ro
+    networks:
+      - default
     depends_on:
       backend:
         condition: service_healthy
@@ -21,8 +23,11 @@ services:
         GIT_COMMIT: ${GIT_COMMIT:-unknown}
         BUILD_TIME: ${BUILD_TIME:-unknown}
         APP_ENV: ${APP_ENV:-production}
-    ports:
-      - "8000:8000"
+    expose:
+      - "8000"
+    networks:
+      - default
+      - data
     environment:
       - DATABASE_URL=postgresql://pim:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/ai_pim
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
@@ -41,8 +46,13 @@ services:
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
       - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
+      - ADMIN_PASSWORD_RESET=${ADMIN_PASSWORD_RESET:-0}
       - JWT_ALGORITHM=HS256
-      - ACCESS_TOKEN_EXPIRE_MINUTES=120
+      - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      - ENABLE_API_DOCS=${ENABLE_API_DOCS:-false}
+      - CORS_ALLOW_ORIGINS=${CORS_ALLOW_ORIGINS:-}
+      - METRICS_TOKEN=${METRICS_TOKEN:-}
+      - HEALTH_READY_CACHE_SECONDS=${HEALTH_READY_CACHE_SECONDS:-5}
       - AI_ADAPTER=openai
       - AI_API_URL=${AI_API_URL:-https://apihub.agnes-ai.com/v1}
       - AI_API_KEY=${AI_API_KEY:-}
@@ -104,7 +114,9 @@ services:
       start_period: 30s
 
   postgres:
-    image: pgvector/pgvector:pg16
+    image: pgvector/pgvector:pg16@sha256:ccc6e83d6e35e931dc7c5def2022729d5a6c370318d099181995567ff1fb4d6b
+    networks:
+      - data
     environment:
       - POSTGRES_USER=pim
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
@@ -122,7 +134,9 @@ services:
     restart: always
 
   redis:
-    image: redis:7-alpine
+    image: redis:7-alpine@sha256:520775a41a63e77e06c73e35d2fd9cc15921a609516818796b4ecbb813078bc7
+    networks:
+      - data
     volumes:
       - redis_data:/data
     healthcheck:
@@ -133,7 +147,9 @@ services:
     restart: always
 
   minio:
-    image: minio/minio
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z@sha256:bb541fc1d181feb5faf1ee2ed0ef64a45eb8ff4a518c0fd22ab017c0c0eaba17
+    networks:
+      - data
     environment:
       - MINIO_ROOT_USER=${MINIO_ROOT_USER:?MINIO_ROOT_USER is required}
       - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}
@@ -149,7 +165,9 @@ services:
     restart: always
 
   gotenberg:
-    image: gotenberg/gotenberg:8
+    image: gotenberg/gotenberg:8@sha256:f29984bd1e226bf1b93ba90af06000afa8b315853e99d27b9aaa41b93f15c769
+    networks:
+      - data
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
       interval: 15s
@@ -160,6 +178,8 @@ services:
 
   ocr:
     build: ./docker/ocr
+    networks:
+      - data
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8080/health')\""]
       interval: 15s
@@ -167,6 +187,10 @@ services:
       retries: 5
       start_period: 30s
     restart: always
+
+networks:
+  data:
+    internal: true
 
 volumes:
   postgres_pg16_data:

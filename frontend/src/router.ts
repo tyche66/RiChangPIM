@@ -102,6 +102,16 @@ const routes = [
         },
       },
       {
+        path: 'knowledge-index',
+        name: 'KnowledgeIndexAdmin',
+        component: () => import('@/views/KnowledgeIndexAdmin.vue'),
+        meta: {
+          permissions: ['knowledge:index'],
+          permission: 'knowledge:index',
+          adminOnly: true,
+        },
+      },
+      {
         path: 'manuals',
         name: 'Manuals',
         component: () => import('@/views/Manuals.vue'),

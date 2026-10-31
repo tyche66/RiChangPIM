@@ -61,6 +61,14 @@ class KnowledgeDocument(CommonBase):
             name="check_knowledge_document_visibility",
         ),
         Index("idx_knowledge_document_source", "source_type", "source_id"),
+        # 活动唯一约束：同键只允许一个未删除文档（并发 upsert 兜底，0037）
+        Index(
+            "uq_knowledge_document_active",
+            "source_type",
+            "source_id",
+            unique=True,
+            postgresql_where=text("is_deleted = false"),
+        ),
         Index("idx_knowledge_document_product", "product_id"),
         Index("idx_knowledge_document_category", "category_id"),
         Index("idx_knowledge_document_brand", "brand_id"),
@@ -151,7 +159,7 @@ class KnowledgeIndexJob(CommonBase):
     operation = Column(String(16), nullable=False)
     status = Column(String(20), nullable=False, default="pending")
     content_hash = Column(String(64), nullable=True)
-    pipeline_version = Column(String(32), nullable=True)
+    pipeline_version = Column(String(128), nullable=True)
     priority = Column(Integer, nullable=False, default=100)
     attempt_count = Column(Integer, nullable=False, default=0)
     max_attempts = Column(Integer, nullable=False, default=3)

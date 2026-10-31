@@ -26,26 +26,65 @@ class KnowledgeJobDispatcher:
         created_by=None,
         trace_id: str | None = None,
     ) -> KnowledgeIndexJob:
-        result = await self.db.execute(
+        reusable = await self.db.execute(
             select(KnowledgeIndexJob)
             .where(
                 KnowledgeIndexJob.source_type == source_type,
                 KnowledgeIndexJob.source_id == source_id,
                 KnowledgeIndexJob.operation == operation,
-                KnowledgeIndexJob.status.in_(("pending", "dispatched", "processing", "failed")),
+                KnowledgeIndexJob.status.in_(("pending", "dispatched")),
                 KnowledgeIndexJob.is_deleted.is_(False),
             )
             .order_by(KnowledgeIndexJob.create_time.desc())
             .limit(1)
         )
-        job = result.scalar_one_or_none()
-        if job is None:
-            job = KnowledgeIndexJob(
-                source_type=source_type,
-                source_id=source_id,
-                operation=operation,
+        job = reusable.scalar_one_or_none()
+        if job is not None:
+            job.status = "pending"
+            job.content_hash = content_hash
+            job.pipeline_version = pipeline_version
+            job.priority = priority
+            job.max_attempts = max_attempts or settings.KNOWLEDGE_JOB_MAX_ATTEMPTS
+            job.created_by = created_by
+            job.trace_id = trace_id
+            job.next_attempt_at = None
+            job.error_code = None
+            job.error_message = None
+            job.locked_by = None
+            job.locked_at = None
+            job.heartbeat_at = None
+            await self.db.flush()
+            return job
+
+        # processing 中存在任务：飞行中的工作不劫持、不重置；若本次内容变更
+        # 未被飞行任务覆盖，reconcile 依赖 update_time 对比在下一轮自愈。
+        # （活动任务唯一索引也禁止同一产品同时存在 processing 与新 pending。）
+        processing = await self.db.execute(
+            select(KnowledgeIndexJob)
+            .where(
+                KnowledgeIndexJob.source_type == source_type,
+                KnowledgeIndexJob.source_id == source_id,
+                KnowledgeIndexJob.operation == operation,
+                KnowledgeIndexJob.status == "processing",
+                KnowledgeIndexJob.is_deleted.is_(False),
             )
-            self.db.add(job)
+            .order_by(KnowledgeIndexJob.create_time.desc())
+            .limit(1)
+        )
+        in_flight = processing.scalar_one_or_none()
+        if in_flight is not None:
+            return in_flight
+
+        # 不复用 failed 任务：业务变更（编辑/导入/克隆）入队时，原 failed
+        # 任务的指数退避与失败计数必须原样保留（否则每次编辑都把退避
+        # 清零，产品反复立即重试重复计费）。这里新建一条 pending 任务；
+        # 领取侧按"最新非终态任务"去重，旧 failed 自动让位。
+        job = KnowledgeIndexJob(
+            source_type=source_type,
+            source_id=source_id,
+            operation=operation,
+        )
+        self.db.add(job)
 
         job.status = "pending"
         job.content_hash = content_hash

@@ -152,9 +152,13 @@ class KnowledgeDocumentUpserter:
         source_type: str,
         source_id: UUID | None,
     ) -> KnowledgeDocument | None:
+        # 只认 active 行：软删除的历史文档不参与 upsert 复用，避免
+        # "软删行 + 活动行"并存时 scalar_one_or_none 抛 MultipleResultsFound；
+        # 并发双插由 uq_knowledge_document_active 部分唯一索引兜底。
         stmt = select(KnowledgeDocument).where(
             KnowledgeDocument.source_type == source_type,
             KnowledgeDocument.source_id == source_id,
+            KnowledgeDocument.is_deleted.is_(False),
         )
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()

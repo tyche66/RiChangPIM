@@ -7,7 +7,7 @@ import time
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1 import (
@@ -18,6 +18,7 @@ from app.api.v1 import (
     categories,
     health,
     knowledge,
+    knowledge_index_admin,
     knowledge_sources,
     observability,
     pending_actions,
@@ -46,6 +47,7 @@ from app.api.v1.stats import router as stats_router
 from app.api.v1.suppliers import router as suppliers_router
 from app.api.v1.tags import router as tags_router
 from app.core.config import settings
+from app.core.security_limits import close_security_limits, is_internal_request
 from app.middleware.audit import AuditMiddleware
 
 
@@ -194,9 +196,18 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
 
     refresher = asyncio.create_task(_refresh_ai_config_loop())
 
+    # 夜间向量索引调度（默认 Asia/Shanghai 01:00-02:30；见
+    # app/services/knowledge_index_scheduler.py）。多 worker 下每个进程都有
+    # 一个实例，谁拿到 advisory lock 谁干活，其余进程只做心跳。
+    from app.services.knowledge_index_scheduler import start_scheduler, stop_scheduler
+
+    start_scheduler()
+
     try:
         yield
     finally:
+        await stop_scheduler()
+        await close_security_limits()
         refresher.cancel()
         try:
             await refresher
@@ -213,20 +224,28 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
                 pass
 
 
+docs_enabled = settings.ENABLE_API_DOCS
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION or settings.VERSION,
     description="AI 产品信息管理平台 (AI-PIM) - Business API",
     lifespan=lifespan,
+    docs_url="/docs" if docs_enabled else None,
+    redoc_url="/redoc" if docs_enabled else None,
+    openapi_url="/openapi.json" if docs_enabled else None,
 )
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+cors_origins = [
+    item.strip() for item in settings.CORS_ALLOW_ORIGINS.split(",") if item.strip()
+]
+if cors_origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=cors_origins,
+        allow_credentials=False,
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type", "Accept", "X-Device-Fingerprint", "X-Openid"],
+    )
 
 app.add_middleware(AuditMiddleware)
 
@@ -252,6 +271,7 @@ app.include_router(ai.router, prefix="/api/v1/ai", tags=["ai"])
 app.include_router(ai_config.router, tags=["ai-config"])
 app.include_router(knowledge.router, prefix="/api/v1/knowledge", tags=["knowledge"])
 app.include_router(knowledge_sources.router, prefix="/api/v1/knowledge", tags=["knowledge"])
+app.include_router(knowledge_index_admin.router, tags=["knowledge-index"])
 app.include_router(pending_actions.router, prefix="/api/v1/ai/actions", tags=["ai"])
 app.include_router(audit.router, prefix="/api/v1/audit", tags=["audit"])
 app.include_router(quotations_router, prefix="/api/v1/quotations", tags=["quotations"])
@@ -269,12 +289,12 @@ app.include_router(scene_images_router, prefix="/api/v1/scene-images", tags=["sc
 app.include_router(version.router, prefix="/api/v1", tags=["version"])
 
 
+_READY_CACHE: tuple[float, dict[str, object]] | None = None
+
+
 @app.get("/")
 async def root():
-    return {
-        "code": 200,
-        "data": {"message": "AI-PIM API", "version": settings.APP_VERSION or settings.VERSION},
-    }
+    return {"code": 200, "data": {"message": "AI-PIM API"}}
 
 
 # ---------------------------------------------------------------------------
@@ -288,13 +308,7 @@ async def health_live():
     return {"status": "alive"}
 
 
-@app.get("/health/ready", tags=["health"])
-async def health_ready():
-    """Readiness probe — process is alive AND critical dependencies are reachable.
-
-    Checks DB, Redis, MinIO client construction, and AI config state.
-    Does NOT leak internal URLs, keys, or stack traces.
-    """
+async def _build_ready_payload() -> dict[str, object]:
     components: dict[str, str] = {}
     healthy = True
 
@@ -351,7 +365,6 @@ async def health_ready():
     status = "ready" if healthy else "degraded"
     return {
         "status": status,
-        "app_version": settings.APP_VERSION or settings.VERSION,
         "ai_adapter": settings.AI_ADAPTER or "none",
         "ocr_adapter": settings.OCR_ADAPTER or "none",
         "started_at": started_at,
@@ -359,3 +372,22 @@ async def health_ready():
         "volumes": volume_status,
         "capacity_alert": capacity_alert,
     }
+
+
+@app.get("/health/ready", tags=["health"])
+async def health_ready(request: Request = None):
+    """Readiness probe — internal-only and cached in production."""
+    global _READY_CACHE
+    if request is not None and not is_internal_request(request):
+        raise HTTPException(
+            status_code=403,
+            detail={"code": 40301, "msg": "仅内网可访问健康检查"},
+        )
+    if request is not None and settings.APP_ENV == "production" and _READY_CACHE:
+        cached_at, payload = _READY_CACHE
+        if time.monotonic() - cached_at < settings.HEALTH_READY_CACHE_SECONDS:
+            return payload
+    payload = await _build_ready_payload()
+    if request is not None and settings.APP_ENV == "production":
+        _READY_CACHE = (time.monotonic(), payload)
+    return payload
