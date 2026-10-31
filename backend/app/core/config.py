@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     GIT_COMMIT: str = "unknown"
     BUILD_TIME: str = "unknown"
     APP_ENV: str = "development"
+    ENABLE_API_DOCS: bool = False
+    CORS_ALLOW_ORIGINS: str = ""
+    METRICS_TOKEN: str | None = None
+    HEALTH_READY_CACHE_SECONDS: float = 5.0
 
     DATABASE_URL: str
     DB_POOL_SIZE: int = 10
@@ -40,7 +44,14 @@ class Settings(BaseSettings):
 
     JWT_SECRET: str
     JWT_ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 120
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+
+    LOGIN_MAX_FAILURES: int = 5
+    LOGIN_LOCKOUT_SECONDS: int = 900
+    SHARE_MAX_FAILURES: int = 5
+    SHARE_LOCKOUT_SECONDS: int = 900
+    SHARE_RATE_LIMIT: int = 30
+    SHARE_RATE_WINDOW: int = 60
 
     MINIO_ENDPOINT: str
     MINIO_ACCESS_KEY: str
@@ -149,6 +160,12 @@ class Settings(BaseSettings):
     REMINDER_LLM_POLISH: bool = False
 
     def model_post_init(self, __context) -> None:
+        if self.JWT_ALGORITHM != "HS256":
+            raise ValueError("JWT_ALGORITHM must be HS256")
+        if len(self.JWT_SECRET.encode("utf-8")) < 32:
+            raise ValueError("JWT_SECRET must be at least 32 bytes")
+        if "REPLACE_ME" in self.JWT_SECRET.upper():
+            raise ValueError("JWT_SECRET still contains the example placeholder")
         if self.AI_API_KEY_FILE:
             self.AI_API_KEY = Path(self.AI_API_KEY_FILE).read_text(encoding="utf-8").strip()
         if self.CONTENT_AI_API_KEY_FILE:

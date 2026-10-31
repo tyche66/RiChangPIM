@@ -80,6 +80,16 @@ class AIServiceAdapter(ABC):
         :return: 与 ``texts`` 等长的向量列表
         """
 
+    async def embed_with_usage(
+        self, texts: list[str]
+    ) -> tuple[list[list[float]], dict[str, Any] | None]:
+        """批量向量化并尽量返回上游用量。
+
+        :return: ``(vectors, usage)``；``usage`` 为 ``None`` 表示上游未回报
+            实际用量，调用方只能使用明确标注的估算值，不得当作实测。
+        """
+        return await self.embed(texts), None
+
     @abstractmethod
     async def embed_one(self, text: str) -> list[float]:
         """单条文本向量化。

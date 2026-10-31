@@ -10,14 +10,16 @@ in ``app.middleware.audit`` — here we only expose aggregate state.
 from __future__ import annotations
 
 import os
+import secrets
 import shutil
 import time
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import text
 
 from app.core.config import settings
 from app.core.permission import PermissionChecker
+from app.core.security_limits import is_internal_request
 from app.observability import metrics
 
 router = APIRouter()
@@ -25,8 +27,25 @@ router = APIRouter()
 _START_TIME = time.time()
 
 
+def _metrics_authorized(request: Request) -> bool:
+    token = (settings.METRICS_TOKEN or "").strip()
+    if token:
+        provided = request.headers.get("x-metrics-token", "")
+        if not provided:
+            auth = request.headers.get("authorization", "")
+            if auth.lower().startswith("bearer "):
+                provided = auth.split(" ", 1)[1].strip()
+        return bool(provided) and secrets.compare_digest(provided, token)
+    return is_internal_request(request)
+
+
 @router.get("/metrics")
-async def metrics_endpoint():
+async def metrics_endpoint(request: Request = None):
+    if request is not None and not _metrics_authorized(request):
+        raise HTTPException(
+            status_code=403,
+            detail={"code": 40301, "msg": "指标接口仅限内网或携带 METRICS_TOKEN 访问"},
+        )
     # Refresh pool gauge from live engine before rendering.
     try:
         from app.core.database import engine
@@ -44,8 +63,8 @@ async def metrics_endpoint():
 
 
 @router.get("/observability/metrics")
-async def metrics_endpoint_alias():
-    return await metrics_endpoint()
+async def metrics_endpoint_alias(request: Request = None):
+    return await metrics_endpoint(request)
 
 
 @router.get("/ops/status")

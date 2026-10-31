@@ -1,6 +1,6 @@
 import type { FormRules } from 'element-plus'
 
-export const PASSWORD_MIN_LENGTH = 8
+export const PASSWORD_MIN_LENGTH = 12
 export const PASSWORD_MAX_LENGTH = 72
 
 export function passwordConfirmationError(password: string, confirmation: string): string | null {

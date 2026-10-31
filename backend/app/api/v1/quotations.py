@@ -217,6 +217,7 @@ async def _cover_urls(
                 "attachment_id": str(attachment_id),
             },
             expires_delta=timedelta(minutes=15),
+            token_type="file_content",
         )
         urls[product_id] = f"/api/v1/files/{attachment_id}/content?token={token}"
     return urls

@@ -1,6 +1,4 @@
-from fastapi import APIRouter
-
-from app.core.config import settings
+from fastapi import APIRouter, Request
 
 router = APIRouter()
 
@@ -11,7 +9,6 @@ async def health_check():
         "code": 200,
         "data": {
             "status": "healthy",
-            "version": settings.APP_VERSION or settings.VERSION,
             "components": {
                 "db": "unknown",
                 "redis": "unknown",
@@ -27,7 +24,7 @@ async def liveness_check():
 
 
 @router.get("/health/ready")
-async def readiness_check():
+async def readiness_check(request: Request):
     from app.main import health_ready
 
-    return await health_ready()
+    return await health_ready(request)

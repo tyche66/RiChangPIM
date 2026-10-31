@@ -161,7 +161,7 @@ async def test_sales_cannot_see_cost_price(client):
         "/api/v1/users",
         json={
             "username": "sales_smoke_test",
-            "password": "password123",
+            "password": "password1234",
             "role_id": sales_role_id,
         },
         headers={"Authorization": f"Bearer {admin_token}"},
@@ -170,7 +170,7 @@ async def test_sales_cannot_see_cost_price(client):
 
     resp = await client.post(
         "/api/v1/auth/login",
-        json={"username": "sales_smoke_test", "password": "password123"},
+        json={"username": "sales_smoke_test", "password": "password1234"},
     )
     assert resp.status_code == 200, resp.text
     sales_token = resp.json()["data"]["access_token"]

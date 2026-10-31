@@ -10,14 +10,14 @@ from app.main import app
 
 @pytest.mark.anyio
 async def test_health_contract(client):
-    """P0-3: health check returns status, version, components"""
+    """P0-3: health check returns status and components without version fingerprint"""
     resp = await client.get("/api/v1/health")
     assert resp.status_code == 200
     data = resp.json()
     assert data["code"] == 200
     d = data["data"]
     assert "status" in d
-    assert "version" in d
+    assert "version" not in d
     assert "components" in d
     assert all(k in d["components"] for k in ("db", "redis", "minio"))
 

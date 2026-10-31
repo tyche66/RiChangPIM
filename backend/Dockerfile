@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM python:3.11-slim@sha256:9534e5a8e315485d4061ed659af0fd78a284c015f9b73661b41d6bab25604534
 
 ARG APP_VERSION=dev
 ARG BUILD_ID=dev-local
@@ -25,9 +25,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+RUN useradd --create-home --uid 1000 --shell /usr/sbin/nologin appuser
+COPY --chown=appuser:appuser . .
 
 RUN chmod +x docker/backend-entrypoint.sh
+USER appuser
 
 # 自包含健康探针（Python），不依赖容器内 curl/pg_isready。
 # 通过 docker compose 运行时，compose 的 healthcheck 配置会覆盖此处。

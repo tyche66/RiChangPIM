@@ -335,14 +335,22 @@ class OpenAIAdapter(AIServiceAdapter):
 
     # ---------- embeddings ----------
     async def embed(self, texts: list[str]) -> list[list[float]]:
+        vectors, _ = await self.embed_with_usage(texts)
+        return vectors
+
+    async def embed_with_usage(
+        self, texts: list[str]
+    ) -> tuple[list[list[float]], dict[str, Any] | None]:
         """Batch embedding for RAG ingestion.
 
         OpenAI accepts up to ~2048 inputs per request; we chunk defensively.
+        返回上游 ``usage``（所有子请求都回报时汇总），否则为 ``None``。
         """
         if not texts:
-            return []
+            return [], None
         expected_dim = get_vector_dim()
         out: list[list[float]] = []
+        usage_total: dict[str, Any] | None = None
         BATCH = 96
         client = self._embedding_client or self._client
         for i in range(0, len(texts), BATCH):
@@ -352,6 +360,19 @@ class OpenAIAdapter(AIServiceAdapter):
                 {"model": self.cfg.embedding_model, "input": chunk},
                 client=client,
             )
+            usage = resp.get("usage")
+            if isinstance(usage, dict):
+                if usage_total is None:
+                    usage_total = {
+                        "prompt_tokens": 0,
+                        "total_tokens": 0,
+                        "source": "provider",
+                    }
+                usage_total["prompt_tokens"] += int(usage.get("prompt_tokens") or 0)
+                usage_total["total_tokens"] += int(usage.get("total_tokens") or 0)
+            else:
+                # 任一子请求缺 usage 就整体视为"未回报实测"，宁缺毋假。
+                usage_total = None
             for item in sorted(resp.get("data") or [], key=lambda d: d.get("index", 0)):
                 vec = item.get("embedding")
                 if vec is None:
@@ -362,7 +383,7 @@ class OpenAIAdapter(AIServiceAdapter):
                         f"embedding dimension mismatch: expected {expected_dim}, got {actual_dim}"
                     )
                 out.append(vec)
-        return out
+        return out, usage_total
 
     async def embed_one(self, text: str) -> list[float]:
         result = await self.embed([text])

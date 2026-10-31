@@ -36,6 +36,8 @@ def test_track_a_migrations_follow_one_linear_head():
         "0034_user_token_version",
         "0035_knowledge_chunk_partial_unique",
         "0036_product_delivery_period_vision_tags",
+        "0037_knowledge_index_scheduler",
+        "0038_share_password_hash",
     ]
     # head 必须就是清单末位：新增迁移时忘记登记进清单会在这里暴露。
     assert [head] == expected[-1:], f"head 与清单末位不符：head={head}"

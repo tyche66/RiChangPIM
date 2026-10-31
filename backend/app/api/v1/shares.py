@@ -1,22 +1,26 @@
+import secrets
 from datetime import UTC, datetime, timedelta
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy import update as sa_update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.permission import PermissionChecker, get_current_user
+from app.core.security import ensure_bcrypt_compatible, get_password_hash
 from app.middleware.audit import audit_action
 from app.models.audit import Share, ShareToken
 from app.models.sales import Proposal, Quotation
 
 router = APIRouter()
 
-MAX_EXPIRE_HOURS = 8760  # 1 year
-MAX_ACCESS_COUNT = 100000
+MAX_EXPIRE_HOURS = 720  # 30 days
+MAX_ACCESS_COUNT = 10000
+DEFAULT_EXPIRE_HOURS = 168  # 7 days
+DEFAULT_MAX_ACCESS_COUNT = 100
 
 SHARE_TYPES = {"proposal", "quotation"}
 
@@ -24,9 +28,25 @@ SHARE_TYPES = {"proposal", "quotation"}
 class ShareCreate(BaseModel):
     share_type: str = Field("proposal", pattern="^(proposal|quotation)$")
     target_id: UUID
-    expire_hours: int | None = Field(None, ge=1, le=MAX_EXPIRE_HOURS)
-    max_access_count: int | None = Field(None, ge=1, le=MAX_ACCESS_COUNT)
-    password: str | None = None
+    expire_hours: int | None = Field(DEFAULT_EXPIRE_HOURS, ge=1, le=MAX_EXPIRE_HOURS)
+    max_access_count: int | None = Field(
+        DEFAULT_MAX_ACCESS_COUNT, ge=1, le=MAX_ACCESS_COUNT
+    )
+    password: str | None = Field(None, min_length=8, max_length=72)
+
+    @field_validator("password", mode="before")
+    @classmethod
+    def _empty_password_to_none(cls, value):
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
+
+    @field_validator("password")
+    @classmethod
+    def _password_bytes(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return ensure_bcrypt_compatible(value)
 
 
 @router.post(
@@ -97,17 +117,21 @@ async def create_share(
     db.add(share)
     await db.flush()
 
-    token_str = f"tk_{uuid4().hex[:12]}"
-    expire_time = None
-    if share_data.expire_hours:
-        expire_time = datetime.now(UTC) + timedelta(hours=share_data.expire_hours)
+    token_str = f"tk_{secrets.token_urlsafe(32)}"
+    expire_hours = share_data.expire_hours or DEFAULT_EXPIRE_HOURS
+    max_access_count = share_data.max_access_count or DEFAULT_MAX_ACCESS_COUNT
+    expire_time = datetime.now(UTC) + timedelta(hours=expire_hours)
+    password_hash = (
+        get_password_hash(share_data.password) if share_data.password else None
+    )
 
     share_token = ShareToken(
         share_id=share.id,
         token=token_str,
-        password=share_data.password,
+        password=password_hash,
+        password_hash=password_hash,
         expire_time=expire_time,
-        max_access_count=share_data.max_access_count,
+        max_access_count=max_access_count,
     )
     db.add(share_token)
     await db.commit()
@@ -119,7 +143,7 @@ async def create_share(
             "share_url": f"/share/{token_str}",
             "token": token_str,
             "expire_time": expire_time.isoformat() if expire_time else None,
-            "max_access_count": share_data.max_access_count,
+            "max_access_count": max_access_count,
         },
     }
 

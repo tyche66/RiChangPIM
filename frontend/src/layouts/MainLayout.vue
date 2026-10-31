@@ -151,6 +151,12 @@
           >
             AI 配置中心
           </el-menu-item>
+          <el-menu-item
+            v-if="isAdmin && hasPerm('knowledge:index')"
+            index="/knowledge-index"
+          >
+            向量索引
+          </el-menu-item>
           <el-menu-item index="/manuals">
             产品知识库
           </el-menu-item>
@@ -365,6 +371,7 @@ const routeLabels: Record<string, [string, string]> = {
   logs: ['系统管理', '操作日志'],
   'ai-select': ['AI 功能', 'AI 选品'],
   'ai/config': ['AI 功能', 'AI 配置中心'],
+  'knowledge-index': ['AI 功能', '向量索引'],
   manuals: ['AI 功能', '产品知识库'],
   import: ['AI 功能', '批量导入'],
   dashboard: ['客户与项目', '驾驶舱'],

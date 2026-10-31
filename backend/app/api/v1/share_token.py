@@ -3,14 +3,24 @@ from functools import partial
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import or_, select
 from sqlalchemy import update as sa_update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
-from app.core.security import create_access_token
-from app.core.serializers import filter_sensitive_fields
+from app.core.security import (
+    create_access_token,
+    ensure_bcrypt_compatible,
+    verify_password,
+)
+from app.core.security_limits import (
+    check_share_allowed,
+    clear_share_failures,
+    get_client_ip,
+    record_share_failure,
+)
 from app.middleware.audit import audit_action
 from app.models.audit import Share, ShareLog, ShareToken, Visitor
 from app.models.product import Attachment, Product, ProductImage, SceneImage, product_scene_image
@@ -23,16 +33,6 @@ from app.services.proposal_floor_plans import (
 )
 
 router = APIRouter()
-
-
-def _client_ip(request: Request) -> str | None:
-    xff = request.headers.get("x-forwarded-for")
-    if xff:
-        return xff.split(",")[0].strip() or None
-    client = request.client
-    if client:
-        return client.host
-    return None
 
 
 def _normalize_expire(exp: datetime | None) -> datetime | None:
@@ -102,6 +102,7 @@ def _create_share_content_url(attachment_id: UUID) -> str:
             "attachment_id": str(attachment_id),
         },
         expires_delta=timedelta(minutes=15),
+        token_type="file_content",
     )
     return f"/api/v1/files/{attachment_id}/content?token={token}"
 
@@ -533,30 +534,148 @@ async def _build_content(db: AsyncSession, share_type: str, target_id: UUID) -> 
 # ---------------------------------------------------------------------------
 # 公开接口（无需后台 JWT / RBAC）。
 #
-# 公开依据：C 端访客通过分享链接访问，天然没有后台账号，因此不能挂
-# PermissionChecker / get_current_user；鉴权改由「分享令牌本身」承担。
-# 审计与滥用保护：
-#   - token 有效性 / status（active|disabled|expired）校验；
-#   - expire_time 过期校验；
-#   - max_access_count 访问次数上限（原子自增，超限 403）；
-#   - 可选访问密码校验；
-#   - 每次访问（成功/各类拒绝）均写 ShareLog（IP/UA/指纹/openid/结果），可追溯。
-# 故本路由为唯一豁免后台鉴权的接口，其余阶段①②③接口均已接入 RBAC。
+# 鉴权由分享令牌承担；密码只接受 POST body，不接受 query。访问与密码失败
+# 都走 Redis 限速；公开响应使用显式白名单，避免未来新增字段误泄露成本价。
 # ---------------------------------------------------------------------------
-@router.get("/share/{token}")
-@audit_action("share_access", module="shares", failed_action="share_access_denied")
-async def get_share_content(
+class ShareAccessRequest(BaseModel):
+    password: str | None = Field(None, max_length=72)
+
+    @field_validator("password")
+    @classmethod
+    def _password_bytes(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return ensure_bcrypt_compatible(value)
+
+
+_PUBLIC_ITEM_KEYS = (
+    "product_id",
+    "product_no",
+    "product_name",
+    "category_name",
+    "face_price",
+    "quantity",
+    "line_total",
+    "unit_price",
+    "tax_rate",
+    "subtotal",
+    "cover_image_url",
+    "scene_images",
+    "project_space_id",
+    "floor_label",
+    "space_label",
+    "material_desc",
+    "material",
+    "colors",
+    "material_description",
+    "specification",
+    "product_snapshot",
+)
+_PUBLIC_SNAPSHOT_KEYS = (
+    "product_no",
+    "product_name",
+    "category_name",
+    "material",
+    "colors",
+    "material_description",
+    "specification",
+    "face_price",
+)
+_PUBLIC_SCENE_KEYS = ("id", "name", "image_url", "sort")
+_PUBLIC_FLOOR_PLAN_KEYS = (
+    "id",
+    "name",
+    "floor_label",
+    "space_label",
+    "sort",
+    "image_url",
+)
+_PUBLIC_PROPOSAL_KEYS = (
+    "proposal_no",
+    "proposal_name",
+    "customer_name",
+    "status",
+    "total_face_value",
+    "floor_plans",
+    "items",
+)
+_PUBLIC_QUOTATION_KEYS = (
+    "quotation_no",
+    "status",
+    "total_amount",
+    "subtotal",
+    "items",
+)
+
+
+def _pick(payload: dict, keys: tuple[str, ...]) -> dict:
+    return {key: payload[key] for key in keys if key in payload}
+
+
+def _public_list(payload, keys: tuple[str, ...]) -> list[dict]:
+    if not isinstance(payload, list):
+        return []
+    return [_pick(item, keys) for item in payload if isinstance(item, dict)]
+
+
+def _public_item(payload: dict) -> dict:
+    item = _pick(payload, _PUBLIC_ITEM_KEYS)
+    if "scene_images" in item:
+        item["scene_images"] = _public_list(item["scene_images"], _PUBLIC_SCENE_KEYS)
+    if "product_snapshot" in item:
+        snapshot = item["product_snapshot"]
+        item["product_snapshot"] = (
+            _pick(snapshot, _PUBLIC_SNAPSHOT_KEYS) if isinstance(snapshot, dict) else None
+        )
+    return item
+
+
+def _public_share_content(raw_content: dict | None, share_type: str) -> dict | None:
+    if not isinstance(raw_content, dict):
+        return None
+    keys = _PUBLIC_PROPOSAL_KEYS if share_type == "proposal" else _PUBLIC_QUOTATION_KEYS
+    content = _pick(raw_content, keys)
+    if "floor_plans" in content:
+        content["floor_plans"] = _public_list(
+            content["floor_plans"], _PUBLIC_FLOOR_PLAN_KEYS
+        )
+    if "items" in content:
+        content["items"] = [
+            _public_item(item)
+            for item in content["items"]
+            if isinstance(item, dict)
+        ]
+    return content
+
+
+async def _undo_access_use(db: AsyncSession, token_id: UUID) -> None:
+    await db.execute(
+        sa_update(ShareToken)
+        .where(ShareToken.id == token_id)
+        .values(current_access_count=ShareToken.current_access_count - 1)
+    )
+
+
+async def _serve_share(
     request: Request,
     token: str,
-    password: str | None = None,
-    db: AsyncSession = Depends(get_db),
+    password: str | None,
+    db: AsyncSession,
 ):
     fingerprint = request.headers.get("x-device-fingerprint") or request.headers.get(
         "X-Device-Fingerprint"
     )
     openid = request.headers.get("x-openid") or request.headers.get("X-Openid")
-    ip = _client_ip(request)
+    ip = get_client_ip(request)
     ua = request.headers.get("user-agent")
+
+    allowed, retry_after = await check_share_allowed(token, ip)
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail={"code": 42901, "msg": "访问过于频繁，请稍后再试"},
+            headers={"Retry-After": str(retry_after)},
+        )
 
     result = await db.execute(
         select(ShareToken).where(ShareToken.token == token, ShareToken.is_deleted.is_(False))
@@ -634,12 +753,42 @@ async def get_share_content(
         )
         raise HTTPException(status_code=403, detail={"code": 40303, "msg": "访问次数已用完"})
 
-    if st.password is not None and st.password != password:
-        await db.execute(
-            sa_update(ShareToken)
-            .where(ShareToken.id == st.id)
-            .values(current_access_count=ShareToken.current_access_count - 1)
-        )
+    supplied_password = password or ""
+    password_hash = st.password_hash
+    if password_hash:
+        if not supplied_password:
+            await _undo_access_use(db, st.id)
+            await _write_share_log(
+                db,
+                token_id=st.id,
+                visitor_id=None,
+                ip=ip,
+                ua=ua,
+                fingerprint=fingerprint,
+                openid=openid,
+                access_result="denied_password",
+            )
+            raise HTTPException(
+                status_code=403, detail={"code": 40304, "msg": "需要访问密码"}
+            )
+        if not verify_password(supplied_password, password_hash):
+            await _undo_access_use(db, st.id)
+            await record_share_failure(token, ip)
+            await _write_share_log(
+                db,
+                token_id=st.id,
+                visitor_id=None,
+                ip=ip,
+                ua=ua,
+                fingerprint=fingerprint,
+                openid=openid,
+                access_result="denied_password",
+            )
+            raise HTTPException(
+                status_code=403, detail={"code": 40304, "msg": "访问密码错误"}
+            )
+    elif st.password:
+        await _undo_access_use(db, st.id)
         await _write_share_log(
             db,
             token_id=st.id,
@@ -650,7 +799,12 @@ async def get_share_content(
             openid=openid,
             access_result="denied_password",
         )
-        raise HTTPException(status_code=403, detail={"code": 40304, "msg": "访问密码错误"})
+        raise HTTPException(
+            status_code=403,
+            detail={"code": 40304, "msg": "分享密码需要重新设置"},
+        )
+
+    await clear_share_failures(token, ip)
 
     share = (
         await db.execute(select(Share).where(Share.id == st.share_id, Share.is_deleted.is_(False)))
@@ -671,7 +825,7 @@ async def get_share_content(
     visitor = await _resolve_visitor(db, fingerprint=fingerprint, openid=openid)
 
     raw_content = await _build_content(db, share.share_type, share.target_id)
-    content = filter_sensitive_fields(raw_content, role_code="sales") if raw_content else None
+    content = _public_share_content(raw_content, share.share_type)
 
     await _write_share_log(
         db,
@@ -693,3 +847,24 @@ async def get_share_content(
             "content": content,
         },
     }
+
+
+@router.get("/share/{token}")
+@audit_action("share_access", module="shares", failed_action="share_access_denied")
+async def get_share_content(
+    request: Request,
+    token: str,
+    db: AsyncSession = Depends(get_db),
+):
+    return await _serve_share(request, token, None, db)
+
+
+@router.post("/share/{token}")
+@audit_action("share_access", module="shares", failed_action="share_access_denied")
+async def post_share_content(
+    request: Request,
+    token: str,
+    payload: ShareAccessRequest | None = None,
+    db: AsyncSession = Depends(get_db),
+):
+    return await _serve_share(request, token, payload.password if payload else None, db)

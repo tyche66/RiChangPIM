@@ -34,6 +34,7 @@ def content_url(attachment_id: UUID, *, subject: str | None = None) -> str:
             "attachment_id": str(attachment_id),
         },
         expires_delta=datetime.timedelta(seconds=PREVIEW_EXPIRE_SECONDS),
+        token_type="file_content",
     )
     return f"/api/v1/files/{attachment_id}/content?token={token}"
 

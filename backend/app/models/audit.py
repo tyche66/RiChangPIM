@@ -34,6 +34,7 @@ class ShareToken(Base):
     share_id = Column(PGUUID(as_uuid=True), ForeignKey("share.id"), nullable=False)
     token = Column(String(64), nullable=False)
     password = Column(String(255))
+    password_hash = Column(String(255))
     expire_time = Column(DateTime(timezone=True))
     max_access_count = Column(Integer)
     current_access_count = Column(Integer, default=0)

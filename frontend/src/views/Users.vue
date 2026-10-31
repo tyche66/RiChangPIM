@@ -195,7 +195,7 @@
           <el-input
             v-model="createForm.password"
             type="password"
-            placeholder="请输入密码"
+            placeholder="请输入 12-72 位密码"
             show-password
           />
         </el-form-item>
@@ -367,7 +367,7 @@
           <el-input
             v-model="resetForm.new_password"
             type="password"
-            placeholder="8-72 位新密码"
+            placeholder="12-72 位新密码"
             show-password
           />
         </el-form-item>
@@ -455,7 +455,10 @@ const resetForm = reactive({
 
 const createRules: FormRules = {
   username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
-  password: [{ required: true, message: '请输入密码', trigger: 'blur' }],
+  password: [
+    { required: true, message: '请输入密码', trigger: 'blur' },
+    { min: 12, max: 72, message: '密码长度需为 12-72 位', trigger: 'blur' },
+  ],
   role_id: [{ required: true, message: '请选择角色', trigger: 'change' }],
 }
 

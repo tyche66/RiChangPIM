@@ -74,10 +74,10 @@ export async function login(username: string, password: string): Promise<LoginEn
 }
 
 export async function refreshToken(refreshTokenValue: string): Promise<LoginEnvelope> {
-  return apiFetch<LoginEnvelope>(
-    `/api/v1/auth/refresh?refresh_token=${encodeURIComponent(refreshTokenValue)}`,
-    { method: 'POST' },
-  )
+  return apiFetch<LoginEnvelope>('/api/v1/auth/refresh', {
+    method: 'POST',
+    body: JSON.stringify({ refresh_token: refreshTokenValue }),
+  })
 }
 
 export async function runKnowledgeQuery(
@@ -289,10 +289,10 @@ export async function getShareContent(
   token: string,
   password?: string,
 ): Promise<ShareEnvelopeData> {
-  const query = password ? `?password=${encodeURIComponent(password)}` : ''
-  const response = await fetch(`/api/v1/share/${encodeURIComponent(token)}${query}`, {
-    method: 'GET',
-    headers: { Accept: 'application/json' },
+  const response = await fetch(`/api/v1/share/${encodeURIComponent(token)}`, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify(password ? { password } : {}),
   })
   const payload = await response.json().catch(() => ({}))
   if (!response.ok) {

@@ -54,6 +54,7 @@ def _create_content_url(request: Request, attachment_id: UUID) -> str:
             "attachment_id": str(attachment_id),
         },
         expires_delta=datetime.timedelta(seconds=_PREVIEW_EXPIRE_SECONDS),
+        token_type="file_content",
     )
     return f"/api/v1/files/{attachment_id}/content?token={token}"
 

@@ -32,12 +32,14 @@ async def test_protected_products_no_token_is_401(client):
 
 
 async def test_refresh_bad_token_is_401(client):
-    resp = await client.post("/api/v1/auth/refresh?refresh_token=invalid.token.value")
+    resp = await client.post(
+        "/api/v1/auth/refresh", json={"refresh_token": "invalid.token.value"}
+    )
     assert resp.status_code == 401
 
 
 async def test_refresh_missing_token_is_422(client):
-    resp = await client.post("/api/v1/auth/refresh")
+    resp = await client.post("/api/v1/auth/refresh", json={})
     assert resp.status_code in (422, 401)
 
 
@@ -121,7 +123,7 @@ async def test_user_list_reports_null_for_a_user_that_never_logged_in(client):
         "/api/v1/users",
         json={
             "username": "never-logged-in",
-            "password": "Passw0rd!",
+            "password": "Passw0rd123!",
             "role_id": admin_row["role_id"],
         },
         headers=headers,

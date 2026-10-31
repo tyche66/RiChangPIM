@@ -30,8 +30,16 @@ from app.models.product import (
 # Helpers
 # ---------------------------------------------------------------------------
 
-_IMAGE_JPEG_CONTENT = b"\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00"
-_IMAGE_PNG_CONTENT = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde"
+def _image_bytes(fmt: str) -> bytes:
+    from PIL import Image
+
+    buffer = io.BytesIO()
+    Image.new("RGB", (1, 1), (255, 255, 255)).save(buffer, format=fmt)
+    return buffer.getvalue()
+
+
+_IMAGE_JPEG_CONTENT = _image_bytes("JPEG")
+_IMAGE_PNG_CONTENT = _image_bytes("PNG")
 _PDF_CONTENT = b"%PDF-1.4\r\n%\xe2\xe3\xcf\xd3\r\n"
 
 
@@ -158,6 +166,18 @@ async def test_media_upload_invalid_mime_fails(client: AsyncClient):
 # ---------------------------------------------------------------------------
 # 5. PNG upload keeps type image/png
 # ---------------------------------------------------------------------------
+
+@pytest.mark.anyio
+async def test_media_upload_rejects_fake_image(client: AsyncClient):
+    headers = await _auth_header(client)
+    resp = await client.post(
+        "/api/v1/files/upload",
+        files={"file": ("fake.jpg", b"not an image", "image/jpeg")},
+        headers=headers,
+    )
+    assert resp.status_code == 422
+    assert resp.json()["detail"]["code"] == 42202
+
 
 @pytest.mark.anyio
 async def test_media_upload_png_keeps_type(client: AsyncClient):

@@ -5,7 +5,7 @@ import pytest
 from sqlalchemy import select
 
 from app.api.v1.share_token import _create_share_content_url
-from app.core.security import decode_access_token
+from app.core.security import decode_access_token, get_password_hash
 from app.models.audit import OperationLog, Share, ShareLog, ShareToken
 from app.models.user import User
 
@@ -22,6 +22,7 @@ def test_share_content_url_uses_backend_proxy():
     token = url.split("token=", 1)[1]
     payload = decode_access_token(token)
     assert payload is not None
+    assert payload["type"] == "file_content"
     assert payload["scope"] == "file_content"
     assert payload["attachment_id"] == str(attachment_id)
 
@@ -51,13 +52,15 @@ async def _make_share_and_token(
     session.add(share)
     await session.flush()
     token = f"test_{uuid.uuid4().hex}"
+    password_hash = get_password_hash(password) if password else None
     st = ShareToken(
         share_id=share.id,
         token=token,
         status=status,
         expire_time=expire_time,
         max_access_count=max_access_count,
-        password=password,
+        password=password_hash,
+        password_hash=password_hash,
         current_access_count=0,
     )
     session.add(st)
@@ -197,8 +200,9 @@ async def test_share_access_wrong_password_is_denied(client, _sessionmaker):
         token = await _make_share_and_token(s, password="secret")
         await s.commit()
 
-    resp = await client.get(
+    resp = await client.post(
         f"/api/v1/share/{token}",
+        json={"password": "wrong"},
     )
     assert resp.status_code == 403
 
@@ -226,7 +230,7 @@ async def test_share_access_correct_password_succeeds(client, _sessionmaker):
         token = await _make_share_and_token(s, password="secret")
         await s.commit()
 
-    resp = await client.get(f"/api/v1/share/{token}?password=secret")
+    resp = await client.post(f"/api/v1/share/{token}", json={"password": "secret"})
     assert resp.status_code == 200
 
     async with _sessionmaker() as s:
@@ -236,3 +240,19 @@ async def test_share_access_correct_password_succeeds(client, _sessionmaker):
             .all()
         )
         assert len(op) == 1
+
+
+async def test_share_access_rate_limited_returns_429(client, _sessionmaker, monkeypatch):
+    from app.api.v1 import share_token as share_token_module
+
+    async with _sessionmaker() as s:
+        token = await _make_share_and_token(s)
+        await s.commit()
+
+    async def _blocked(_token, _ip):
+        return False, 60
+
+    monkeypatch.setattr(share_token_module, "check_share_allowed", _blocked)
+    resp = await client.post(f"/api/v1/share/{token}", json={})
+    assert resp.status_code == 429
+    assert resp.headers.get("retry-after") == "60"

@@ -24,6 +24,7 @@ from collections import defaultdict
 from collections.abc import Iterable
 
 _CONTENT_TYPE = "text/plain; version=1.0.0; charset=utf-8"
+_MAX_SERIES = 2000
 
 # Standard Prometheus histogram buckets for HTTP request durations (seconds).
 _DEFAULT_BUCKETS: tuple[float, ...] = (
@@ -44,18 +45,23 @@ _POS_INF = float("inf")
 
 
 class _Counter:
-    __slots__ = ("name", "help", "values", "label_names", "lock")
+    __slots__ = ("name", "help", "values", "label_names", "lock", "max_series")
 
-    def __init__(self, name: str, help: str, label_names: Iterable[str]):
+    def __init__(
+        self, name: str, help: str, label_names: Iterable[str], max_series: int = _MAX_SERIES
+    ):
         self.name = name
         self.help = help
         self.label_names = tuple(label_names)
         self.values: dict[tuple[str, ...], float] = defaultdict(float)
         self.lock = threading.Lock()
+        self.max_series = max_series
 
     def inc(self, labels: dict[str, str], amount: float = 1.0) -> None:
         key = tuple(labels.get(n, "") for n in self.label_names)
         with self.lock:
+            if key not in self.values and len(self.values) >= self.max_series:
+                return
             self.values[key] += amount
 
     def render(self) -> list[str]:
@@ -77,18 +83,23 @@ class _Counter:
 
 
 class _Gauge:
-    __slots__ = ("name", "help", "values", "label_names", "lock")
+    __slots__ = ("name", "help", "values", "label_names", "lock", "max_series")
 
-    def __init__(self, name: str, help: str, label_names: Iterable[str]):
+    def __init__(
+        self, name: str, help: str, label_names: Iterable[str], max_series: int = _MAX_SERIES
+    ):
         self.name = name
         self.help = help
         self.label_names = tuple(label_names)
         self.values: dict[tuple[str, ...], float] = {}
         self.lock = threading.Lock()
+        self.max_series = max_series
 
     def set(self, labels: dict[str, str], value: float) -> None:
         key = tuple(labels.get(n, "") for n in self.label_names)
         with self.lock:
+            if key not in self.values and len(self.values) >= self.max_series:
+                return
             self.values[key] = float(value)
 
     def render(self) -> list[str]:

@@ -32,7 +32,7 @@ from app.api.v1.suppliers import router as suppliers_router
 from app.api.v1.tags import router as tags_router
 from app.api.v1.users import router as users_router
 from app.core.permission import PermissionChecker
-from app.core.security import create_access_token
+from app.core.security import create_access_token, decode_access_token
 from app.scripts.seed_data import PERMISSIONS as SEED_PERMISSIONS
 
 # (METHOD, full_path) -> 期望权限码（None 表示该路由为公开接口，不应要求权限）
@@ -180,10 +180,25 @@ def test_old_route_permissions_are_subset_of_migration_permissions():
     assert not missing, f"以下权限码不在权限迁移 PERMISSIONS 中: {missing}"
 
 
-def _token(perms, role_code="tester"):
+def _token(perms, role_code="tester", sub="00000000-0000-0000-0000-000000000000"):
     return create_access_token(
-        {"sub": "00000000-0000-0000-0000-000000000000", "role_code": role_code, "perms": perms}
+        {
+            "sub": sub,
+            "role_code": role_code,
+            "perms": perms,
+            "tv": 0,
+        }
     )
+
+
+async def _seeded_sub(client) -> str:
+    response = await client.post(
+        "/api/v1/auth/login", json={"username": "admin", "password": "admin123"}
+    )
+    assert response.status_code == 200, response.text
+    payload = decode_access_token(response.json()["data"]["access_token"])
+    assert payload and payload.get("sub")
+    return str(payload["sub"])
 
 
 # GET 敏感路由（均无 @audit_action；缺 Token/缺权限时权限层先于审计落库抛出，无需 DB）
@@ -249,9 +264,9 @@ async def test_ai_routes_require_ai_use_permission(noauth_client):
 
 
 @pytest.mark.anyio
-async def test_ai_admin_routes_require_admin_role(noauth_client):
+async def test_ai_admin_routes_require_admin_role(client):
     """embeddings / rag/index 需 ai:use + admin 角色；非 admin 持 ai:use -> 403。"""
-    token = _token(["ai:use"], role_code="sales")
+    token = _token(["ai:use"], role_code="sales", sub=await _seeded_sub(client))
     bodies = {
         "/api/v1/ai/embeddings": {"texts": ["x"]},
         "/api/v1/ai/rag/index": {
@@ -259,7 +274,7 @@ async def test_ai_admin_routes_require_admin_role(noauth_client):
         },
     }
     for path, body in bodies.items():
-        resp = await noauth_client.post(
+        resp = await client.post(
             path, json=body, headers={"Authorization": f"Bearer {token}"}
         )
         assert resp.status_code == 403, (
@@ -273,7 +288,7 @@ async def test_ai_admin_routes_require_admin_role(noauth_client):
 @pytest.mark.anyio
 async def test_user_view_authorized_enters_business(client):
     """有 user:view 权限时可进入用户列表业务逻辑（返回 200，非 401/403）。"""
-    token = _token(["user:view"], role_code="admin")
+    token = _token(["user:view"], role_code="admin", sub=await _seeded_sub(client))
     resp = await client.get("/api/v1/users", headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 200
     assert resp.json()["code"] == 200
@@ -282,7 +297,7 @@ async def test_user_view_authorized_enters_business(client):
 @pytest.mark.anyio
 async def test_role_view_authorized_enters_business(client):
     """有 role:view 权限时可进入角色列表业务逻辑。"""
-    token = _token(["role:view"], role_code="admin")
+    token = _token(["role:view"], role_code="admin", sub=await _seeded_sub(client))
     resp = await client.get("/api/v1/roles", headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 200
     assert resp.json()["code"] == 200
@@ -291,7 +306,7 @@ async def test_role_view_authorized_enters_business(client):
 @pytest.mark.anyio
 async def test_product_view_authorized_enters_business(client):
     """有 product:view 权限（如 sales）时可进入产品列表业务逻辑。"""
-    token = _token(["product:view"], role_code="sales")
+    token = _token(["product:view"], role_code="sales", sub=await _seeded_sub(client))
     resp = await client.get("/api/v1/products", headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 200
     assert "list" in resp.json()["data"]

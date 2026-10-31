@@ -43,7 +43,7 @@ async def _admin_role_id(client, headers) -> str:
     return admin["role_id"]
 
 
-async def _create_user(client, headers, username: str, password: str = "Passw0rd!") -> dict:
+async def _create_user(client, headers, username: str, password: str = "Passw0rd123!") -> dict:
     resp = await client.post(
         "/api/v1/users",
         json={
@@ -134,7 +134,7 @@ async def test_create_concurrent_unique_violation_returns_409(client, _sessionma
             "/api/v1/users",
             json={
                 "username": "race-winner",
-                "password": "Passw0rd!",
+                "password": "Passw0rd123!",
                 "role_id": role_id,
             },
             headers=headers,
@@ -187,6 +187,7 @@ async def test_reset_password_requires_admin_even_with_user_edit(client):
             "sub": target["id"],
             "role_code": "sales",
             "perms": ["user:edit"],
+            "tv": 0,
         }
     )
     resp = await client.post(

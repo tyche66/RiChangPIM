@@ -147,7 +147,7 @@ async def test_upload_word_doc_writes_doc_type_and_commits(client, minio):
 async def test_upload_word_doc_legacy_mime_writes_doc_type(client, minio):
     token = await _login_admin(client)
     headers = {"Authorization": f"Bearer {token}"}
-    content = b"\xd0\xcf\x11\xe0 fake .doc content"
+    content = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1 fake .doc content"
     resp = await client.post(
         "/api/v1/files/upload",
         files={"file": ("legacy.doc", content, "application/msword")},
@@ -235,7 +235,7 @@ async def test_commit_failure_leaves_minio_object_and_no_compensation(client, mi
         try:
             resp = await client.post(
                 "/api/v1/files/upload",
-                files={"file": ("c.pdf", b"%PDF commit fail", "application/pdf")},
+                files={"file": ("c.pdf", b"%PDF-1.4 commit fail", "application/pdf")},
                 headers=headers,
             )
             status = resp.status_code

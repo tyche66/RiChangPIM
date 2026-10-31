@@ -62,9 +62,9 @@ code() {
 }
 printf '  http://127.0.0.1:888/api/v1/health -> %s\n' "$(code http://127.0.0.1:888/api/v1/health)"
 printf '  http://127.0.0.1:888/  (门户)       -> %s\n' "$(code http://127.0.0.1:888/)"
-# 8000 在 Windows 上被系统服务占着（svchost），docker 的 8000:8000 实际没绑上，
-# 所以后端只能通过 :888 访问。这不是故障，别再去 8000 上找后端。
-printf '  http://127.0.0.1:8000/ (直连后端)   -> %s  <- 预期连不上，8000 被 Windows 占用\n' "$(code http://127.0.0.1:8000/api/v1/health)"
+# backend 现在只 expose 8000，不发布到宿主机；后端只能通过 :888 访问。
+# 8000 上若有响应，说明是宿主机上的其他进程，不是本项目后端。
+printf '  http://127.0.0.1:8000/ (直连后端)   -> %s  <- 已取消发布；有响应说明是其他进程\n' "$(code http://127.0.0.1:8000/api/v1/health)"
 
 echo
 echo "本机原生 PostgreSQL 18（不是生产！平时应该是 down）"

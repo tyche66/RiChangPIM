@@ -268,7 +268,7 @@ async def test_user_id_falls_back_to_bearer_token_decode():
 
     def fake_decode(token):
         assert token == "tok-abc"
-        return {"sub": "user-from-jwt"}
+        return {"sub": "user-from-jwt", "type": "access"}
 
     @audit_action("change_password", module="auth")
     async def handler(request):

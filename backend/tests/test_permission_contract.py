@@ -30,7 +30,7 @@ from app.api.v1.share_token import router as share_token_router
 from app.api.v1.stats import router as stats_router
 from app.api.v1.users import router as users_router
 from app.core.permission import PermissionChecker
-from app.core.security import create_access_token
+from app.core.security import create_access_token, decode_access_token
 from app.scripts.seed_data import PERMISSIONS as SEED_PERMISSIONS
 
 # ---------------------------------------------------------------------------
@@ -218,10 +218,25 @@ async def noauth_client():
         yield ac
 
 
-def _token(perms):
+def _token(perms, sub="00000000-0000-0000-0000-000000000000"):
     return create_access_token(
-        {"sub": "00000000-0000-0000-0000-000000000000", "role_code": "tester", "perms": perms}
+        {
+            "sub": sub,
+            "role_code": "tester",
+            "perms": perms,
+            "tv": 0,
+        }
     )
+
+
+async def _seeded_sub(client) -> str:
+    response = await client.post(
+        "/api/v1/auth/login", json={"username": "admin", "password": "admin123"}
+    )
+    assert response.status_code == 200, response.text
+    payload = decode_access_token(response.json()["data"]["access_token"])
+    assert payload and payload.get("sub")
+    return str(payload["sub"])
 
 
 @pytest.mark.anyio
@@ -262,7 +277,7 @@ async def test_missing_token_401_across_protected_routes(noauth_client):
 @pytest.mark.anyio
 async def test_valid_permission_enters_business(client):
     """有 quotation:view 权限时可进入业务逻辑（返回 200 分页结构，非 401/403）。"""
-    token = _token(["quotation:view"])
+    token = _token(["quotation:view"], sub=await _seeded_sub(client))
     resp = await client.get("/api/v1/quotations", headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 200
     body = resp.json()

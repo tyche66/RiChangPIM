@@ -39,10 +39,10 @@ cd /home/AI-PIM/RiChangPIM && bash scripts/where-am-i.sh
 | 平时状态 | 常驻 | 按需 | **必须 down** |
 | 真实数据 | **只有这一套** | 否 | 否 |
 
-- 对外入口只有 **`http://127.0.0.1:888/`**（nginx `888:80`）：`/` 门户、`/share/<token>` 分享页、
-  `/admin/` 管理后台、`/api/v1/*`。
-- backend 的 `8000:8000` **实际没绑上**——Windows 有系统进程占着 `0.0.0.0:8000`。别在 8000 上找后端。
-- postgres / redis / minio / gotenberg / ocr **都没有发布端口**，只在 compose 网络内可达。
+- 对外入口是 **`http://${BIND_ADDR:-127.0.0.1}:888/`**（nginx `888:80`）：`/` 门户、`/share/<token>` 分享页、
+  `/admin/` 管理后台、`/api/v1/*`。默认只绑回环；员工直接访问时在 `.env` 设 `BIND_ADDR=公司内网IP`。
+- backend **只 expose `8000`，不再 publish 到宿主机**；所有请求必须走 nginx。
+- postgres / redis / minio / gotenberg / ocr **都没有发布端口**，只在 compose internal `data` 网络内可达。
 - `frontend/dist`、`portal/dist` 是 **`COPY` 进 nginx 镜像**的，不是 bind mount。
   只在宿主机 `npm run build` **不会改变 `:888` 上的任何东西**（要 `docker compose build nginx`）。
 - `:888/admin/` 从 2026-07-31 起可用（后台改按 `base '/admin/'` 构建 + `default.conf` 加了
@@ -51,6 +51,27 @@ cd /home/AI-PIM/RiChangPIM && bash scripts/where-am-i.sh
 - **本机原生 PG18 里不允许存在名为 `ai_pim` 的库。** 它和生产库同名但是空的，
   任何后端误指到 `localhost:5432/ai_pim` 都会看到一套「所有密码都错」的假数据
   （2026-07-31 已发生过一次，空库已 dump 后删除）。
+
+## 2026-10-31 安全加固变更（部署必读）
+
+- **端口收敛**：`nginx` 绑定 `${BIND_ADDR:-127.0.0.1}:888`；backend 只 `expose` 8000。
+  部署时必须移除路由器/公网端口映射，防火墙只放行公司网段。Docker publish 会绕过 UFW，
+  如需主机防火墙请同时配置 `DOCKER-USER` 链。
+- **匿名面关闭**：`/docs`、`/openapi.json`、`/redoc` 返回 404；`/api/v1/metrics` 需要
+  `METRICS_TOKEN` 或内网来源 IP；`/health/ready` 仅内网并缓存 5 秒；根路径和 `/api/v1/health`
+  不再返回版本号。
+- **管理员初始化**：`init_admin` 只在账号不存在、或密码仍是种子 `admin123` 时同步
+  `ADMIN_PASSWORD`；之后不再覆盖密码/角色/状态。需要一次性重置时设 `ADMIN_PASSWORD_RESET=1`
+  并重启一次，完成后改回 `0`。`ADMIN_PASSWORD` 必须 ≥12 位且不能是 `admin123`。
+- **登录/会话**：access token 默认 30 分钟；refresh 一次性轮换；logout 会按 `jti` 拉黑。
+  已有 JWT 因新增 `type/tv/jti` 会失效一次，升级后用户需重新登录。
+- **接口契约**：`POST /api/v1/auth/refresh`、`POST /api/v1/auth/change-password` 只接受 JSON body；
+  分享密码改为 `POST /api/v1/share/{token}` JSON body。旧前端/脚本必须同步升级。
+- **分享**：token 熵提升；密码以 bcrypt 存储，存量明文已在迁移 `0038` 中哈希（旧密码仍可用）；
+  默认 7 天/100 次，上限 30 天/10000 次；访问与密码失败走 Redis 限速。
+- **安全头**：已加 `X-Content-Type-Options`、`X-Frame-Options: SAMEORIGIN`、`Referrer-Policy`、
+  `Permissions-Policy` 和 **CSP Report-Only**。先观察后台/门户/分享/PDF 预览/AI iframe 无违规，
+  再把 `Content-Security-Policy-Report-Only` 改成强制策略；本轮**没有** HTTPS/HSTS/TLS 改动。
 
 ## 环境与前提
 
@@ -76,8 +97,8 @@ cd /home/AI-PIM/RiChangPIM && bash scripts/where-am-i.sh
 
 ### 生产环境
 
-- `nginx`：对外入口，宿主机 `888` → 容器 `80`；**`frontend/dist` 与 `portal/dist` 在 build 时 `COPY` 进镜像**
-- `backend`：FastAPI API 服务（`8000:8000` 在本机没能绑上，见上文）
+- `nginx`：对外入口，宿主机 `${BIND_ADDR:-127.0.0.1}:888` → 容器 `80`；**`frontend/dist` 与 `portal/dist` 在 build 时 `COPY` 进镜像**
+- `backend`：FastAPI API 服务（仅容器网络 `8000`，不发布到宿主机）
 - `postgres`：PostgreSQL 16 + pgvector（未发布端口）
 - `redis`：缓存（未发布端口）
 - `minio`：对象存储（未发布端口）
@@ -535,7 +556,8 @@ cd /home/AI-PIM/RiChangPIM/backend && /tmp/pimtestenv/bin/python -m pytest tests
    `dev` / `dev-local` / `unknown`**，`.env.example` 的 `VITE_APP_VERSION=dev` 同理；
    不显式传就会报假版本（`build_frontends.sh` 会给前端注入真值，裸 `npm run build` 不会；
    backend 侧要靠「升级发布 runbook」第 3 步手工 export，漏了后台「版本」页会报「前后端版本不一致」）。
-4. **backend 的 `8000:8000` 绑不上**（Windows 系统进程占着）。不影响使用，但所有「后端地址」都必须写 `:888`。
+4. **backend 不再发布 8000**（只 `expose`），所有「后端地址」都必须写 `http://${BIND_ADDR:-127.0.0.1}:888`；
+   旧文档/脚本里的 `:8000` 直连方式已失效。
 5. **前端没有独立镜像**（无 `frontend/Dockerfile`），dist 由宿主机构建后 `COPY` 进 nginx 镜像，
    所以「构建机 = 宿主机」这个隐含依赖没法从 compose 文件里看出来。
 

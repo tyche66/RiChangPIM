@@ -46,6 +46,7 @@ from _db_probe import (
 # shell. Seeding a dummy ``TEST_DATABASE_URL`` here would only mask misconfig and
 # could be mistaken for a real target.
 _UNIT_TEST_ENV_DEFAULTS = {
+    "APP_ENV": "test",
     "DATABASE_URL": "postgresql+asyncpg://unit:unit@localhost:5432/unit_dummy",
     "REDIS_URL": "redis://localhost:6379/0",
     "JWT_SECRET": "unit-test-dummy-secret-not-for-prod",
@@ -268,7 +269,7 @@ async def test_health_check(client):
     data = resp.json()
     assert data["code"] == 200
     assert "status" in data["data"]
-    assert "version" in data["data"]
+    assert "version" not in data["data"]
     assert "components" in data["data"]
 
 

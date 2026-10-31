@@ -393,9 +393,15 @@ async def test_replace_file_preserves_ref_count(client, _sessionmaker):
         token = await _login_admin(client)
 
     # 替换文件
+    import io
+
+    from PIL import Image
+
+    buffer = io.BytesIO()
+    Image.new("RGB", (1, 1), (255, 255, 255)).save(buffer, format="JPEG")
     resp = await client.put(
         f"/api/v1/files/{att_id}/replace",
-        files={"file": ("new.jpg", b"new content", "image/jpeg")},
+        files={"file": ("new.jpg", buffer.getvalue(), "image/jpeg")},
         headers={"Authorization": f"Bearer {token}"},
     )
     assert resp.status_code == 200, resp.text

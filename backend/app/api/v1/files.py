@@ -5,6 +5,8 @@ from collections.abc import Iterator
 from urllib.parse import quote
 from uuid import UUID, uuid4
 
+from PIL import Image, UnidentifiedImageError
+
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import RedirectResponse, Response, StreamingResponse
 from sqlalchemy import func, or_, select
@@ -77,6 +79,65 @@ def _get_file_extension(filename: str) -> str:
     return "." + filename.rsplit(".", 1)[-1].lower()
 
 
+def _validate_media_magic(data: bytes, content_type: str, file_ext: str) -> None:
+    """Reject files whose bytes do not match the declared media type."""
+    if file_ext in _ALLOWED_EXT_DRAWING and content_type not in _ALLOWED:
+        if not _validate_drawing_magic(data, file_ext):
+            raise HTTPException(
+                status_code=422,
+                detail={"code": 42202, "msg": f"文件魔数校验失败: {file_ext}"},
+            )
+        return
+    if content_type in {"image/jpeg", "image/png", "image/webp"}:
+        expected = {"image/jpeg": "JPEG", "image/png": "PNG", "image/webp": "WEBP"}
+        try:
+            with Image.open(io.BytesIO(data)) as image:
+                image.verify()
+                actual = image.format
+        except (
+            UnidentifiedImageError,
+            Image.DecompressionBombError,
+            OSError,
+            ValueError,
+        ) as exc:
+            raise HTTPException(
+                status_code=422,
+                detail={"code": 42202, "msg": "图片内容无法识别"},
+            ) from exc
+        if actual != expected[content_type]:
+            raise HTTPException(
+                status_code=422,
+                detail={"code": 42202, "msg": "图片内容与声明类型不匹配"},
+            )
+        return
+    if content_type == "application/pdf":
+        if not data.startswith(b"%PDF-"):
+            raise HTTPException(
+                status_code=422, detail={"code": 42202, "msg": "PDF 文件头校验失败"}
+            )
+        return
+    if content_type == "video/mp4":
+        if data[4:8] != b"ftyp":
+            raise HTTPException(
+                status_code=422, detail={"code": 42202, "msg": "MP4 文件头校验失败"}
+            )
+        return
+    if content_type == "application/msword":
+        if not data.startswith(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"):
+            raise HTTPException(
+                status_code=422, detail={"code": 42202, "msg": "DOC 文件头校验失败"}
+            )
+        return
+    if (
+        content_type
+        == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    ):
+        if not data.startswith(b"PK\x03\x04"):
+            raise HTTPException(
+                status_code=422, detail={"code": 42202, "msg": "DOCX 文件头校验失败"}
+            )
+
+
 def _validate_drawing_magic(data: bytes, ext: str) -> bool:
     """魔数校验（HLD §12.4）。
 
@@ -110,6 +171,7 @@ def _create_content_url(request: Request, attachment_id: UUID) -> str:
             "attachment_id": str(attachment_id),
         },
         expires_delta=datetime.timedelta(seconds=_PREVIEW_EXPIRE_SECONDS),
+        token_type="file_content",
     )
     return f"/api/v1/files/{attachment_id}/content?token={token}"
 
@@ -517,13 +579,7 @@ async def upload_file(
             detail={"code": 42203, "msg": f"文件大小超过上限 {max_size} 字节"},
         )
 
-    # HLD §12.4: 魔数校验（DWG/PSD/DXF）
-    if file_ext in _ALLOWED_EXT_DRAWING:
-        if not _validate_drawing_magic(data, file_ext):
-            raise HTTPException(
-                status_code=422,
-                detail={"code": 42202, "msg": f"文件魔数校验失败: {file_ext}"},
-            )
+    _validate_media_magic(data, content_type, file_ext)
 
     extension = content_type.split("/")[-1]
     if content_type == "application/pdf":
@@ -627,13 +683,7 @@ async def replace_file(
             detail={"code": 42203, "msg": f"文件大小超过上限 {max_size} 字节"},
         )
 
-    # HLD §12.4: 魔数校验（DWG/PSD/DXF）
-    if file_ext in _ALLOWED_EXT_DRAWING:
-        if not _validate_drawing_magic(data, file_ext):
-            raise HTTPException(
-                status_code=422,
-                detail={"code": 42202, "msg": f"文件魔数校验失败: {file_ext}"},
-            )
+    _validate_media_magic(data, content_type, file_ext)
 
     extension = content_type.split("/")[-1]
     if content_type == "application/pdf":
@@ -732,6 +782,7 @@ async def get_file_content(
     payload = decode_access_token(token)
     if (
         not payload
+        or payload.get("type") != "file_content"
         or payload.get("scope") != _CONTENT_TOKEN_SCOPE
         or payload.get("attachment_id") != str(attachment_id)
     ):
@@ -769,6 +820,7 @@ async def get_file_content(
             headers={
                 "Content-Disposition": f"inline; filename*=UTF-8''{quote(stem)}.webp",
                 "Cache-Control": f"private, max-age={_PREVIEW_EXPIRE_SECONDS}",
+                "X-Content-Type-Options": "nosniff",
             },
         )
 
@@ -781,11 +833,14 @@ async def get_file_content(
             detail={"code": 40402, "msg": "文件对象不存在或无法读取"},
         ) from exc
 
-    content_disposition = "inline"
+    content_disposition = (
+        "inline" if attachment.file_type in {"image", "pdf"} else "attachment"
+    )
     filename = quote(attachment.file_name)
     headers = {
         "Content-Disposition": f"{content_disposition}; filename*=UTF-8''{filename}",
         "Cache-Control": f"private, max-age={_PREVIEW_EXPIRE_SECONDS}",
+        "X-Content-Type-Options": "nosniff",
     }
     return StreamingResponse(
         _iter_minio_object(obj),

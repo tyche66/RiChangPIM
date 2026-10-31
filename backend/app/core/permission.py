@@ -7,21 +7,37 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.security import decode_access_token
+from app.core.security_limits import is_jti_revoked
 from app.models.user import User
 
 security = HTTPBearer(auto_error=False)
 
 _SESSION_REVOKED = {"code": 40104, "msg": "登录状态已失效，请重新登录"}
+_TOKEN_INVALID = {"code": 40102, "msg": "Token 无效"}
+
+
+async def _decode_user_payload(token: str) -> dict:
+    payload = decode_access_token(token)
+    if not payload or payload.get("type") != "access":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail=_TOKEN_INVALID
+        )
+    if not payload.get("jti") or "tv" not in payload:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail=_SESSION_REVOKED
+        )
+    if await is_jti_revoked(str(payload["jti"])):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail=_SESSION_REVOKED
+        )
+    return payload
 
 
 async def ensure_token_version(payload: dict, db: AsyncSession) -> None:
-    """校验 JWT 的 ``tv`` 声明与用户当前 ``token_version`` 一致。
-
-    历史 token 没有 ``tv`` 声明（功能上线前签发），保持兼容放行，自然过期；
-    上线后签发的 token 一律带 ``tv``，重设密码自增 ``token_version`` 即全部失效。
-    """
     if "tv" not in payload:
-        return
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail=_SESSION_REVOKED
+        )
     try:
         user_id = UUID(str(payload.get("sub")))
     except (TypeError, ValueError):
@@ -30,10 +46,15 @@ async def ensure_token_version(payload: dict, db: AsyncSession) -> None:
         ) from None
 
     result = await db.execute(
-        select(User.token_version, User.is_deleted).where(User.id == user_id)
+        select(User.token_version, User.is_deleted, User.status).where(User.id == user_id)
     )
     row = result.first()
-    if row is None or row.is_deleted or row.token_version != payload["tv"]:
+    if (
+        row is None
+        or row.is_deleted
+        or row.status != "active"
+        or row.token_version != payload["tv"]
+    ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail=_SESSION_REVOKED
         )
@@ -54,12 +75,7 @@ class PermissionChecker:
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail={"code": 40101, "msg": "未登录 / Token 无效"},
             )
-        payload = decode_access_token(credentials.credentials)
-        if not payload:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail={"code": 40102, "msg": "Token 已过期"},
-            )
+        payload = await _decode_user_payload(credentials.credentials)
         request.state.user_id = payload.get("sub")
         request.state.role_code = payload.get("role_code")
         request.state.permissions = payload.get("perms", [])
@@ -88,11 +104,6 @@ async def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={"code": 40101, "msg": "未登录 / Token 无效"},
         )
-    payload = decode_access_token(credentials.credentials)
-    if not payload:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail={"code": 40102, "msg": "Token 已过期"},
-        )
+    payload = await _decode_user_payload(credentials.credentials)
     await ensure_token_version(payload, db)
     return payload

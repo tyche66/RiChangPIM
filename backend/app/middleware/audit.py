@@ -39,6 +39,7 @@ SENSITIVE_MODULES = {
     "ai",
     "auth",
     "users",
+    "shares",
     "customers",
     "customer_dialogues",
     "follow_ups",
@@ -46,13 +47,15 @@ SENSITIVE_MODULES = {
     "content",
     "reminders",
     "dashboard",
+    "knowledge_index",
 }
 
 # Rolling window of (timestamp, status) for 5xx counting in the last 24h.
 # Bounded: at one request per second for 24h this holds ~86k tuples (~few MB);
 # if throughput ever exceeds that, switch to a time-bucketed counter.
 _5XX_WINDOW_SECONDS = 24 * 3600
-_5xx_events: deque[tuple[float, int]] = deque()
+_5XX_MAX_EVENTS = 100_000
+_5xx_events: deque[tuple[float, int]] = deque(maxlen=_5XX_MAX_EVENTS)
 _5xx_lock = None  # lazily created to avoid importing threading at module import time
 
 
@@ -87,7 +90,10 @@ def http_5xx_last_24h() -> int:
 
 
 def _client_ip(request: Request) -> str | None:
-    """§7.2：ip 字段优先取 X-Forwarded-For，回退 client_host。"""
+    """§7.2：ip 字段优先取边缘代理写入的 X-Real-IP。"""
+    real_ip = request.headers.get("x-real-ip")
+    if real_ip:
+        return real_ip.strip() or None
     xff = request.headers.get("x-forwarded-for")
     if xff:
         return xff.split(",")[0].strip() or None
@@ -95,6 +101,12 @@ def _client_ip(request: Request) -> str | None:
     if client:
         return client.host
     return None
+
+
+def _route_path(request: Request) -> str:
+    route = request.scope.get("route")
+    path = getattr(route, "path", None)
+    return path or "<unmatched>"
 
 
 def _user_id_from_request(request: Request) -> str | None:
@@ -116,7 +128,7 @@ def _user_id_from_request(request: Request) -> str | None:
                 from app.core.security import decode_access_token
 
                 payload = decode_access_token(token)
-                if isinstance(payload, dict):
+                if isinstance(payload, dict) and payload.get("type") == "access":
                     for key in ("sub", "user_id", "uid"):
                         val = payload.get(key)
                         if val:
@@ -360,24 +372,24 @@ class AuditMiddleware(BaseHTTPMiddleware):
     ) -> Response:
         start = time.perf_counter()
         method = request.method
-        path = request.url.path
         ip = _client_ip(request)
 
         try:
             response = await call_next(request)
         except Exception as exc:  # noqa: BLE001
             elapsed_ms = int((time.perf_counter() - start) * 1000)
+            route_path = _route_path(request)
             _record_5xx(500)
             try:
                 from app.observability import metrics as _metrics
 
-                _metrics.observe_http_request(method, request.url.path, 500, elapsed_ms / 1000.0)
+                _metrics.observe_http_request(method, route_path, 500, elapsed_ms / 1000.0)
             except Exception:  # noqa: BLE001
                 pass
             logger.error(
                 "request %s %s ip=%s user_id=%s elapsed=%sms status=500 error=%r",
                 method,
-                path,
+                route_path,
                 ip,
                 _user_id_from_request(request),
                 elapsed_ms,
@@ -388,19 +400,20 @@ class AuditMiddleware(BaseHTTPMiddleware):
 
         elapsed_ms = int((time.perf_counter() - start) * 1000)
         user_id = _user_id_from_request(request)
+        route_path = _route_path(request)
         _record_5xx(response.status_code)
         try:
             from app.observability import metrics as _metrics
 
             _metrics.observe_http_request(
-                method, request.url.path, response.status_code, elapsed_ms / 1000.0
+                method, route_path, response.status_code, elapsed_ms / 1000.0
             )
         except Exception:  # noqa: BLE001
             pass
         logger.info(
             "request %s %s ip=%s user_id=%s elapsed=%sms status=%s",
             method,
-            path,
+            route_path,
             ip,
             user_id,
             elapsed_ms,
