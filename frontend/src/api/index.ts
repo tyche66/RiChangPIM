@@ -111,7 +111,7 @@ api.interceptors.response.use(
       }
 
       if (!refreshPromise) {
-        refreshPromise = api.post('/auth/refresh', null, { skipAuth: true, params: { refresh_token: rt } })
+        refreshPromise = api.post('/auth/refresh', { refresh_token: rt }, { skipAuth: true })
           .then((res: any) => {
             const data = res.data
             localStorage.setItem('token', data.access_token)
@@ -208,12 +208,20 @@ export default api
 export const authApi = {
   login: (data: { username: string; password: string }) =>
     api.post('/auth/login', data),
-  logout: () => api.post('/auth/logout'),
+  logout: (refreshToken?: string | null) => {
+    // 调用方可显式传入（登出前 store 还持有它）；否则回落到 localStorage。
+    // 后端只有收到 refresh_token 才会撤销它，否则退出后仍可换取新会话。
+    const token = refreshToken ?? localStorage.getItem('refresh_token')
+    return api.post('/auth/logout', token ? { refresh_token: token } : {})
+  },
   getCurrentUser: () => api.get('/auth/me'),
   refresh: (refreshToken: string) =>
-    api.post('/auth/refresh', null, { skipAuth: true, params: { refresh_token: refreshToken } }),
+    api.post('/auth/refresh', { refresh_token: refreshToken }, { skipAuth: true }),
   changePassword: (oldPassword: string, newPassword: string) =>
-    api.post('/auth/change-password', null, { params: { old_password: oldPassword, new_password: newPassword } }),
+    api.post('/auth/change-password', {
+      old_password: oldPassword,
+      new_password: newPassword,
+    }),
 }
 
 export interface ProductListParams {
@@ -565,7 +573,10 @@ export const shareApi = {
   list: () => api.get('/shares') as Promise<{ data: { list: { id: string; share_type: 'proposal' | 'quotation'; target_id: string; creator_id: string; status: 'active' | 'disabled' | 'expired'; create_time: string | null }[] } }>,
   // 分享页自己渲染密码门 / 失效提示，拦截器再弹 toast 只会和页面上的 alert 说同一句话
   get: (token: string, password?: string) =>
-    api.get(`/share/${token}`, { skipAuth: true, suppressErrorMessage: true, params: password ? { password } : {} }),
+    api.post(`/share/${token}`, password ? { password } : {}, {
+      skipAuth: true,
+      suppressErrorMessage: true,
+    }),
   revoke: (id: string) => api.delete(`/shares/${id}`),
 }
 

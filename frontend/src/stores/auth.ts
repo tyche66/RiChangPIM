@@ -80,8 +80,11 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function logout() {
+    // 抛出 refresh_token：后端只有收到它才会撤销 refresh 侧会话，否则
+    // 退出后已签发的 refresh token 仍能换回新的 access token。
+    const rt = refreshToken.value ?? localStorage.getItem('refresh_token')
     try {
-      await authApi.logout()
+      await authApi.logout(rt)
     } catch {
       // ignore logout errors
     }
