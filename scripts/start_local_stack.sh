@@ -10,7 +10,9 @@
 # 用法: scripts/start_local_stack.sh {start|stop|restart|status}
 set -euo pipefail
 
-BASE_DIR="/home/AI-PIM/RiChangPIM"
+# 默认按脚本自身位置推导仓库根（兼容 E:\RiChangPIM 与旧 /home/AI-PIM 布局）；
+# 也可显式 export BASE_DIR=... 覆盖。
+BASE_DIR="${BASE_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 RUNTIME_DIR="${RUNTIME_DIR:-/var/lib/richangpim-local}"
 LOG_DIR="$RUNTIME_DIR/logs"
 NGINX_CONF="$RUNTIME_DIR/nginx.conf"

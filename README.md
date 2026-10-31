@@ -108,7 +108,39 @@ RiChangPIM 是当前这套 AI-PIM 项目的工作快照，面向产品信息管�
 
 ### 1. 开发环境
 
-本地开发建议使用 `docker-compose.dev.yml` 启动基础依赖，再分别启动后端、Portal 和 Admin。
+本机开发端（`E:\RiChangPIM` 所在的这台机器）用仓库根 compose 起**整套栈**，入口是 `:888`：
+
+```bash
+# 统一入口（已内置 nvm 的 PATH 与 Docker Desktop 的 socket 设置）
+bash scripts/local_dev_stack.sh start      # 构建前端 → 重建 backend/nginx → 启动
+bash scripts/local_dev_stack.sh status     # 看各服务状态
+bash scripts/local_dev_stack.sh stop       # 停本地开发栈（docker compose stop）
+bash scripts/local_dev_stack.sh restart    # 停再起
+bash scripts/local_dev_stack.sh logs       # 跟 backend / nginx 日志
+
+# 验收
+curl -s --noproxy '*' http://127.0.0.1:888/api/v1/health
+```
+
+也可以直接用 compose 原语（`down` 同样只作用于本地开发端）：
+
+```bash
+export PATH="$HOME/.nvm/versions/node/v24.18.0/bin:$PATH"
+export DOCKER_HOST=unix:///mnt/wsl/docker-desktop/shared-sockets/host-services/docker.proxy.sock
+bash scripts/build_frontends.sh
+docker compose build backend nginx && docker compose up -d backend nginx
+docker compose down      # 或 stop / restart：本机开发端可放心启停
+```
+
+
+> ⚠️ **本机的 `:888` 栈与生产是两套，只是同构部署。** 这台机器上 `:888` 跑的是本地开发端，
+> 数据是开发样例（如「用户 n / 商品 m」），**不是生产数据**；
+> 停、起、重建、甚至 `docker compose down` 都只影响本地开发端，随时可放心操作，
+> 不存在「动了就是生产事故」的限制。生产入口与真实数据在别的部署环境里，
+> 本地任何操作都不会触及。运维交接文档 `README-OPS.md` 里几处「以实机为准 / 不要连带重启」
+> 是写这套同构部署时的注意事项，不适用于本地开发端的启停。
+
+只想跑前后端热更新、不碰 `:888` 时，另用 `docker-compose.dev.yml` 起依赖，再分别启动后端、Portal 和 Admin：
 
 ```bash
 # 1) 启动依赖服务

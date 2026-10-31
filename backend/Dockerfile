@@ -5,6 +5,11 @@ ARG BUILD_ID=dev-local
 ARG GIT_COMMIT=unknown
 ARG BUILD_TIME=unknown
 ARG APP_ENV=production
+# 本镜像默认不装编译工具链：requirements 里的 psycopg2-binary / psycopg[binary] /
+# asyncpg / pgvector 在 python:3.11-slim 上都有预编译 wheel，apt 只在自建
+# 依赖时才需要。默认关闭让构建不依赖发行版软件源（离线、镜像源不可达、代理
+# 未透传时不至于整个构建失败）；确实要编译时 --build-arg INSTALL_BUILD_DEPS=1。
+ARG INSTALL_BUILD_DEPS=0
 
 WORKDIR /app
 
@@ -17,10 +22,12 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     BUILD_TIME=${BUILD_TIME} \
     APP_ENV=${APP_ENV}
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc \
-    libpq-dev \
-    && rm -rf /var/lib/apt/lists/*
+RUN if [ "$INSTALL_BUILD_DEPS" = "1" ]; then \
+        apt-get update && apt-get install -y --no-install-recommends \
+            gcc \
+            libpq-dev \
+        && rm -rf /var/lib/apt/lists/*; \
+    fi
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt

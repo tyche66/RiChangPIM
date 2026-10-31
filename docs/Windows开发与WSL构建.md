@@ -84,7 +84,16 @@ npm -v    # 必须是 12.x（不是 Windows 的 11.x）
 - 编辑器请按 LF 保存（VS Code 默认服从 `.gitattributes`）；不要手工把文件改成 CRLF 后提交。
 - 换行符或权限导致异常时，先看 `git status` 与 `git diff --stat`，不要直接 `git checkout .` 覆盖未提交改动。
 
-## 六、已知限制
+## 六、本机 `:888` 是本地开发端，可放心启停
+
+- 这台机器上 `:888` 的 compose 栈（`richangpim-*`）就是**本地开发端**，数据是开发样例，不是生产数据。
+- 启停随意：`bash scripts/start_local_stack.sh {start|stop|restart|status}`，或直接
+  `docker compose build nginx && docker compose up -d --no-deps nginx` / `docker compose down` 重建。
+- 改完前端必须重建 nginx（`dist` 是 `COPY` 进镜像的，只 build 宿主机不生效）。
+- 生产在别的部署环境，本地停启不会影响它；`README-OPS.md` 里「以实机为准 / 不要顺带重启依赖」
+  是本机同构部署时的注意事项，不构成对本地开发端的启停限制。
+
+## 七、已知限制
 
 1. **`/mnt/e` 的 I/O 比 WSL 原生 ext4 慢**，`npm ci`、`pip install`、`vite build` 首次会明显变慢，属正常现象。
 2. **`docker/volumes` 不随仓库迁移**（650 MB 运行数据）。旧位置仍保留一份，需要时再决定是否搬。

@@ -23,6 +23,7 @@ services:
         GIT_COMMIT: ${GIT_COMMIT:-unknown}
         BUILD_TIME: ${BUILD_TIME:-unknown}
         APP_ENV: ${APP_ENV:-production}
+        INSTALL_BUILD_DEPS: ${INSTALL_BUILD_DEPS:-0}
     expose:
       - "8000"
     networks:
