@@ -130,6 +130,9 @@ PERMISSIONS = [
     ("content:manage", "内容Skill管理", "content", "manage", "write"),
     ("ai:config", "AI 配置管理", "ai", "config", "write"),
     ("reminder:edit", "提醒管理", "reminder", "edit", "write"),
+    # 全局设置（FR-3）：仅 admin 通过 "*" 获得这两个权限点，不改其它角色
+    ("setting:view", "全局设置查看", "setting", "view", "read"),
+    ("setting:edit", "全局设置编辑", "setting", "edit", "write"),
 ]
 
 # 角色 -> 权限映射；"*" 表示全部权限点

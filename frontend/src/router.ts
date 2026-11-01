@@ -206,6 +206,16 @@ const routes = [
         },
       },
       {
+        path: 'settings',
+        name: 'SystemSettings',
+        component: () => import('@/views/SystemSettings.vue'),
+        meta: {
+          permissions: ['setting:view'],
+          permission: 'setting:view',
+          adminOnly: true,
+        },
+      },
+      {
         path: 'version',
         name: 'Version',
         component: () => import('@/views/Version.vue'),

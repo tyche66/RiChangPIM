@@ -68,7 +68,7 @@
           </el-tag>
         </el-descriptions-item>
         <el-descriptions-item label="总面价">
-          <span class="price-text">¥{{ proposal.total_face_value?.toFixed(2) ?? '-' }}</span>
+          <span class="price-text">{{ formatMoney(proposal.total_face_value) }}</span>
         </el-descriptions-item>
         <el-descriptions-item label="AI 润色">
           <el-tag
@@ -167,7 +167,7 @@
             class-name="cell-num"
           >
             <template #default="{ row }">
-              <span class="price-text">¥{{ row.face_price?.toFixed(2) ?? '-' }}</span>
+              <span class="price-text">{{ formatMoney(row.face_price) }}</span>
             </template>
           </el-table-column>
           <el-table-column
@@ -392,6 +392,7 @@ import { DocumentChecked, List, ChatDotRound } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { proposalApi, aiApi } from '@/api'
 import { useAuthStore } from '@/stores/auth'
+import { formatMoney } from '@/utils/money'
 import { hasPermission } from '@/types/permissions'
 import type { PolishContent } from '@/types/ai'
 import { tryParseJson, isPolishFailed } from '@/types/ai'

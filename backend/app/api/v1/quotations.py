@@ -21,6 +21,7 @@ from app.schemas.quotation import (
     QuotationUpdate,
 )
 from app.services.product_snapshot import build_product_snapshot
+from app.services.system_setting import get_business_defaults
 
 router = APIRouter()
 
@@ -544,11 +545,17 @@ async def create_quotation(
     )
     await _validate_quotation_items([i.product_id for i in quotation_data.items], db)
 
+    # FR-3：未显式传 tax_rate 时读全局设置的默认税率。
+    if quotation_data.tax_rate is not None:
+        tax_rate = quotation_data.tax_rate
+    else:
+        tax_rate = (await get_business_defaults(db)).quotation_default_tax_rate
+
     quotation = Quotation(
         quotation_no=_gen_quotation_no(),
         proposal_id=quotation_data.proposal_id,
         creator_id=UUID(current_user["sub"]),
-        tax_rate=quotation_data.tax_rate,
+        tax_rate=tax_rate,
         discount=quotation_data.discount,
         valid_until=quotation_data.valid_until,
         status="draft",

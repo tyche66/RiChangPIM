@@ -74,6 +74,10 @@ export const PERMISSIONS = [
   'content:metric',
   'content:manage',
   'reminder:edit',
+  'setting:view',
+  'setting:edit',
+  'announcement:view',
+  'announcement:manage',
 ] as const
 
 export type PermissionCode = (typeof PERMISSIONS)[number]
@@ -118,6 +122,8 @@ export const RESOURCE_PERMISSIONS: Record<string, PermissionCode[]> = {
     'content:manage',
   ],
   reminder: ['reminder:edit'],
+  setting: ['setting:view', 'setting:edit'],
+  announcement: ['announcement:view', 'announcement:manage'],
 }
 
 export const PERMISSION_NAMES: Record<PermissionCode, string> = {
@@ -196,4 +202,8 @@ export const PERMISSION_NAMES: Record<PermissionCode, string> = {
   'content:metric': '内容指标',
   'content:manage': '内容Skill管理',
   'reminder:edit': '提醒编辑',
+  'setting:view': '全局设置查看',
+  'setting:edit': '全局设置编辑',
+  'announcement:view': '公告查看',
+  'announcement:manage': '公告管理',
 }

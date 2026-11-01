@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 import shutil
 import time
@@ -43,12 +44,15 @@ from app.api.v1.projects import router as projects_router
 from app.api.v1.quotations import router as quotations_router
 from app.api.v1.reminders import router as reminders_router
 from app.api.v1.scene_images import router as scene_images_router
+from app.api.v1.settings import router as settings_router
 from app.api.v1.stats import router as stats_router
 from app.api.v1.suppliers import router as suppliers_router
 from app.api.v1.tags import router as tags_router
 from app.core.config import settings
 from app.core.security_limits import close_security_limits, is_internal_request
 from app.middleware.audit import AuditMiddleware
+
+logger = logging.getLogger(__name__)
 
 
 async def _check_db() -> bool:
@@ -196,6 +200,17 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
 
     refresher = asyncio.create_task(_refresh_ai_config_loop())
 
+    # 全局设置单行兜底（FR-3）：无行则按默认值创建（幂等）。DB 未就绪时
+    # 只告警不阻塞启动——读取路径会再兜一次。
+    from app.core.database import AsyncSessionLocal
+    from app.services.system_setting import ensure_default_row
+
+    try:
+        async with AsyncSessionLocal() as session:
+            await ensure_default_row(session)
+    except Exception:
+        logger.warning("system_setting 默认行创建失败，读取路径会再兜底", exc_info=True)
+
     # 夜间向量索引调度（默认 Asia/Shanghai 01:00-02:30；见
     # app/services/knowledge_index_scheduler.py）。多 worker 下每个进程都有
     # 一个实例，谁拿到 advisory lock 谁干活，其余进程只做心跳。
@@ -244,7 +259,13 @@ if cors_origins:
         allow_origins=cors_origins,
         allow_credentials=False,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        allow_headers=["Authorization", "Content-Type", "Accept", "X-Device-Fingerprint", "X-Openid"],
+        allow_headers=[
+            "Authorization",
+            "Content-Type",
+            "Accept",
+            "X-Device-Fingerprint",
+            "X-Openid",
+        ],
     )
 
 app.add_middleware(AuditMiddleware)
@@ -286,6 +307,7 @@ app.include_router(content_router)
 app.include_router(content_skills_router)
 app.include_router(reminders_router)
 app.include_router(scene_images_router, prefix="/api/v1/scene-images", tags=["scene_images"])
+app.include_router(settings_router, tags=["settings"])
 app.include_router(version.router, prefix="/api/v1", tags=["version"])
 
 

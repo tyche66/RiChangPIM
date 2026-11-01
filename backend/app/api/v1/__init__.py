@@ -18,6 +18,7 @@ from app.api.v1.quotations import router as quotations_router
 from app.api.v1.reminders import router as reminders_router
 from app.api.v1.roles import router as roles_router
 from app.api.v1.scene_images import router as scene_images_router
+from app.api.v1.settings import router as settings_router
 from app.api.v1.share_token import router as share_token_router
 from app.api.v1.shares import router as shares_router
 from app.api.v1.stats import router as stats_router
@@ -54,5 +55,6 @@ __all__ = [
     "files_router",
     "stats_router",
     "scene_images_router",
+    "settings_router",
     "version_router",
 ]

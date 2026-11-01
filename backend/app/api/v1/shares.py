@@ -14,12 +14,15 @@ from app.core.security import ensure_bcrypt_compatible, get_password_hash
 from app.middleware.audit import audit_action
 from app.models.audit import Share, ShareToken
 from app.models.sales import Proposal, Quotation
+from app.services.system_setting import get_share_defaults
 
 router = APIRouter()
 
 MAX_EXPIRE_HOURS = 720  # 30 days
 MAX_ACCESS_COUNT = 10000
-DEFAULT_EXPIRE_HOURS = 168  # 7 days
+# FR-3：缺省统一为 24 小时；未显式传参时读全局设置（system_setting.share），
+# 这两个常量只作为设置项同名默认值的镜像说明，不再直接参与业务分支。
+DEFAULT_EXPIRE_HOURS = 24
 DEFAULT_MAX_ACCESS_COUNT = 100
 
 SHARE_TYPES = {"proposal", "quotation"}
@@ -28,10 +31,9 @@ SHARE_TYPES = {"proposal", "quotation"}
 class ShareCreate(BaseModel):
     share_type: str = Field("proposal", pattern="^(proposal|quotation)$")
     target_id: UUID
-    expire_hours: int | None = Field(DEFAULT_EXPIRE_HOURS, ge=1, le=MAX_EXPIRE_HOURS)
-    max_access_count: int | None = Field(
-        DEFAULT_MAX_ACCESS_COUNT, ge=1, le=MAX_ACCESS_COUNT
-    )
+    # 未传时读全局设置缺省值（见 create_share），因此 Schema 默认 None。
+    expire_hours: int | None = Field(None, ge=1, le=MAX_EXPIRE_HOURS)
+    max_access_count: int | None = Field(None, ge=1, le=MAX_ACCESS_COUNT)
     password: str | None = Field(None, min_length=8, max_length=72)
 
     @field_validator("password", mode="before")
@@ -68,6 +70,12 @@ async def create_share(
         raise HTTPException(
             status_code=401, detail={"code": 40103, "msg": "当前用户身份无效"}
         ) from None
+
+    # 未显式传参时读全局设置的缺省值（FR-3：默认从 168h 收敛为 24h，
+    # 直接调接口且不传 expire_hours 的调用方需知悉该行为变化）。
+    # 必须放在所有写操作之前：设置行缺失时服务层会 commit 默认行，
+    # 若此时事务里已有未提交的 share INSERT 会被一起带出去。
+    share_defaults = await get_share_defaults(db)
 
     # 验证 target 真实未删除
     if share_data.share_type == "proposal":
@@ -118,8 +126,16 @@ async def create_share(
     await db.flush()
 
     token_str = f"tk_{secrets.token_urlsafe(32)}"
-    expire_hours = share_data.expire_hours or DEFAULT_EXPIRE_HOURS
-    max_access_count = share_data.max_access_count or DEFAULT_MAX_ACCESS_COUNT
+    expire_hours = (
+        share_data.expire_hours
+        if share_data.expire_hours is not None
+        else share_defaults.share_default_expire_hours
+    )
+    max_access_count = (
+        share_data.max_access_count
+        if share_data.max_access_count is not None
+        else share_defaults.share_default_max_access_count
+    )
     expire_time = datetime.now(UTC) + timedelta(hours=expire_hours)
     password_hash = (
         get_password_hash(share_data.password) if share_data.password else None

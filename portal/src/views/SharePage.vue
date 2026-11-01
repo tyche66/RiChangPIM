@@ -30,6 +30,9 @@ import {
   type ShareSceneImage,
 } from '@/api'
 import { MISSING_TEXT, formatPrice } from '@/utils/format'
+import { useSettingsStore } from '@/stores/settings'
+
+const settings = useSettingsStore()
 
 const route = useRoute()
 const token = String(route.params.token || '')
@@ -453,7 +456,7 @@ onMounted(load)
 
       <footer class="share-foot">
         <span>访问次数 {{ share?.access_count ?? 0 }}</span>
-        <span>由 RiChangPIM 提供</span>
+        <span>{{ settings.footerText }}</span>
       </footer>
     </template>
 
