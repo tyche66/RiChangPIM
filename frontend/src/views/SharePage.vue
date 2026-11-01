@@ -97,7 +97,7 @@
                 </el-tag>
               </el-descriptions-item>
               <el-descriptions-item label="总面价">
-                <span class="price-text">¥{{ formatCNY(proposalContent?.total_face_value) }}</span>
+                <span class="price-text">{{ formatMoney(proposalContent?.total_face_value) }}</span>
               </el-descriptions-item>
             </el-descriptions>
           </div>
@@ -145,7 +145,7 @@
                   align="right"
                 >
                   <template #default="{ row }">
-                    <span class="price-text">¥{{ formatCNY(row.face_price) }}</span>
+                    <span class="price-text">{{ formatMoney(row.face_price) }}</span>
                   </template>
                 </el-table-column>
                 <el-table-column
@@ -159,7 +159,7 @@
                   align="right"
                 >
                   <template #default="{ row }">
-                    <span class="row-subtotal">¥{{ formatCNY(row.face_price ? row.face_price * row.quantity : 0) }}</span>
+                    <span class="row-subtotal">{{ formatMoney(row.face_price ? row.face_price * row.quantity : 0) }}</span>
                   </template>
                 </el-table-column>
                 <el-table-column
@@ -205,7 +205,7 @@
                 </el-tag>
               </el-descriptions-item>
               <el-descriptions-item label="总金额">
-                <span class="total-amount">¥{{ formatCNY(quotationContent?.total_amount) }}</span>
+                <span class="total-amount">{{ formatMoney(quotationContent?.total_amount) }}</span>
               </el-descriptions-item>
             </el-descriptions>
           </div>
@@ -253,7 +253,7 @@
                   align="right"
                 >
                   <template #default="{ row }">
-                    <span class="price-text">¥{{ formatCNY(row.face_price) }}</span>
+                    <span class="price-text">{{ formatMoney(row.face_price) }}</span>
                   </template>
                 </el-table-column>
                 <el-table-column
@@ -261,7 +261,7 @@
                   align="right"
                 >
                   <template #default="{ row }">
-                    <span class="price-text">¥{{ formatCNY(row.unit_price) }}</span>
+                    <span class="price-text">{{ formatMoney(row.unit_price) }}</span>
                   </template>
                 </el-table-column>
                 <el-table-column
@@ -283,7 +283,7 @@
                   align="right"
                 >
                   <template #default="{ row }">
-                    <span class="subtotal-text">¥{{ formatCNY(row.subtotal) }}</span>
+                    <span class="subtotal-text">{{ formatMoney(row.subtotal) }}</span>
                   </template>
                 </el-table-column>
                 <el-table-column
@@ -291,7 +291,7 @@
                   align="right"
                 >
                   <template #default="{ row }">
-                    <span class="subtotal-text">¥{{ formatCNY(row.unit_price ? row.unit_price * row.quantity * (1 + (row.tax_rate ?? 0)) : 0) }}</span>
+                    <span class="subtotal-text">{{ formatMoney(row.unit_price ? row.unit_price * row.quantity * (1 + (row.tax_rate ?? 0)) : 0) }}</span>
                   </template>
                 </el-table-column>
                 <el-table-column
@@ -391,7 +391,7 @@
               {{ detailItem.material_desc || '未提供' }}
             </el-descriptions-item>
             <el-descriptions-item label="面价">
-              <span class="price-text">¥{{ formatCNY(detailItem.face_price) }}</span>
+              <span class="price-text">{{ formatMoney(detailItem.face_price) }}</span>
             </el-descriptions-item>
             <el-descriptions-item label="数量">
               {{ detailItem.quantity }}
@@ -400,7 +400,7 @@
               v-if="shareData.share_type === 'quotation'"
               label="单价"
             >
-              <span class="price-text">¥{{ formatCNY(detailItem.unit_price) }}</span>
+              <span class="price-text">{{ formatMoney(detailItem.unit_price) }}</span>
             </el-descriptions-item>
             <el-descriptions-item
               v-if="shareData.share_type === 'quotation'"
@@ -465,6 +465,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { shareApi } from '@/api'
+import { formatMoney } from '@/utils/money'
 import ProductSceneCarousel from '@/components/ProductSceneCarousel.vue'
 import type { ShareContent, ShareProductItem, ShareProposalContent, ShareQuotationContent } from '@/types/sales'
 import type { AxiosError } from 'axios'
@@ -538,14 +539,6 @@ const getPlaceholderText = (name: string | undefined): string => {
 
 const onImgError = (row: ShareProductItem) => {
   row._imgError = true
-}
-
-// Format CNY with null/undefined fallback to '-'
-const formatCNY = (value: number | null | undefined | string): string => {
-  if (value === null || value === undefined || value === '') return '-'
-  const num = typeof value === 'string' ? parseFloat(value) : value
-  if (isNaN(num) || num === null) return '-'
-  return num.toFixed(2)
 }
 
 const fetchContent = async () => {

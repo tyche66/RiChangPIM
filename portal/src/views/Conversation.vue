@@ -32,6 +32,7 @@ import {
   type StreamEvent,
 } from '@/api'
 import AnswerBody from '@/components/AnswerBody.vue'
+import AnnouncementDialog from '@/components/AnnouncementDialog.vue'
 import AppHeader from '@/components/AppHeader.vue'
 import CapabilityBar from '@/components/CapabilityBar.vue'
 import ChatInput from '@/components/ChatInput.vue'
@@ -116,6 +117,8 @@ const composer = ref<InstanceType<typeof ChatInput> | null>(null)
 const queryHistory = ref<QueryHistoryItem[]>([])
 const historyOpen = ref(false)
 const lastQueryAt = ref('')
+/** 引用来源默认折叠，每次新查询 / 重置结果时回到折叠态 */
+const sourcesOpen = ref(false)
 
 const rendered = computed(() => buildAnswer(answer.value, sources.value, busy.value))
 const segments = computed(() => rendered.value.segments)
@@ -227,6 +230,7 @@ function clearResults() {
   insufficient.value = false
   elapsedMs.value = 0
   activeSource.value = null
+  sourcesOpen.value = false
 }
 
 function reset() {
@@ -693,10 +697,33 @@ onMounted(() => {
 
       <template v-if="sources.length">
         <div class="section-head">
-          <h2>引用来源</h2>
-          <span class="section-head__count">{{ sources.length }} 条</span>
+          <button
+            type="button"
+            class="sources-toggle"
+            :aria-expanded="sourcesOpen"
+            aria-controls="source-list"
+            @click="sourcesOpen = !sourcesOpen"
+          >
+            <h2>引用来源</h2>
+            <span class="section-head__count">{{ sources.length }} 条</span>
+            <svg
+              class="sources-toggle__caret"
+              :class="{ 'sources-toggle__caret--open': sourcesOpen }"
+              viewBox="0 0 24 24"
+              fill="none"
+              aria-hidden="true"
+            >
+              <path
+                d="M6 9l6 6l6-6"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </button>
         </div>
-        <section v-reveal class="card-list source-list" aria-label="引用来源">
+        <section v-show="sourcesOpen" id="source-list" v-reveal class="card-list source-list" aria-label="引用来源">
           <SourceCard
             v-for="source in sources"
             :key="source.source_id"
@@ -718,6 +745,7 @@ onMounted(() => {
       </CollapseSection>
     </section>
     <SourceDialog :source="activeSource" @close="activeSource = null" />
+    <AnnouncementDialog />
 
   </main>
 </template>
@@ -758,7 +786,7 @@ onMounted(() => {
 }
 .query-history__toggle:hover { color: var(--ink); }
 .query-history__toggle:focus-visible {
-  outline: 2px solid var(--pine);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
   border-radius: var(--radius-sm);
 }
@@ -799,7 +827,7 @@ onMounted(() => {
 .query-history__item + .query-history__item { margin-top: 2px; }
 .query-history__item:hover { background: var(--surface-strong); }
 .query-history__item:focus-visible {
-  outline: 2px solid var(--pine);
+  outline: 2px solid var(--accent);
   outline-offset: -2px;
 }
 .query-history__text {
@@ -817,6 +845,31 @@ onMounted(() => {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+
+/* ===== 引用来源折叠标题行 =====
+ * 默认折叠：整行是一个可点击按钮，「引用来源 + 数量 + 箭头」，
+ * 箭头随展开旋转；内容区用 v-show 控制，默认不渲染在视觉流里。
+ */
+.sources-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+.sources-toggle h2 { font-size: 15px; }
+.sources-toggle:hover h2 { color: var(--accent); }
+.sources-toggle__caret {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  color: var(--ink-subtle);
+  transition: transform .18s ease;
+}
+.sources-toggle__caret--open { transform: rotate(180deg); }
 
 /* 「本次查询」回显：加一个右对齐的时间戳，滚动后翻回来也知道是这一轮的 */
 .query-echo__time {

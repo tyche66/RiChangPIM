@@ -85,7 +85,7 @@
             align="right"
           >
             <template #default="{ row }">
-              <span class="price-text">¥{{ row.total_amount?.toFixed(2) ?? '-' }}</span>
+              <span class="price-text">{{ formatMoney(row.total_amount) }}</span>
             </template>
           </el-table-column>
           <el-table-column
@@ -278,7 +278,7 @@
             <div>
               <span class="quote-product-name">{{ item.product_name || '-' }}</span>
               <span class="quote-product-no">{{ item.product_no || '-' }}</span>
-              <span class="quote-face-price">面价 ¥{{ item.face_price?.toFixed(2) ?? '-' }}</span>
+              <span class="quote-face-price">面价 {{ formatMoney(item.face_price) }}</span>
               <span
                 v-if="item.floor_label || item.space_label"
                 class="quote-space-label"
@@ -327,25 +327,25 @@
             />
           </div>
           <div class="quote-col-subtotal">
-            <span class="subtotal-text">¥{{ (item.quantity * item.unit_price).toFixed(2) }}</span>
+            <span class="subtotal-text">{{ formatMoney(item.quantity * item.unit_price) }}</span>
           </div>
           <div class="quote-col-total">
-            <span class="subtotal-text">¥{{ (item.quantity * item.unit_price * (1 + item.tax_rate)).toFixed(2) }}</span>
+            <span class="subtotal-text">{{ formatMoney(item.quantity * item.unit_price * (1 + item.tax_rate)) }}</span>
           </div>
         </div>
 
         <div class="quote-totals">
           <div class="totals-row">
             <span class="totals-label">未税合计</span>
-            <span class="totals-value">¥{{ subtotalTotal.toFixed(2) }}</span>
+            <span class="totals-value">{{ formatMoney(subtotalTotal) }}</span>
           </div>
           <div class="totals-row">
             <span class="totals-label">折扣后</span>
-            <span class="totals-value">¥{{ (subtotalTotal * quotationForm.discount).toFixed(2) }}</span>
+            <span class="totals-value">{{ formatMoney(subtotalTotal * quotationForm.discount) }}</span>
           </div>
           <div class="totals-row totals-final">
             <span class="totals-label">含税总额</span>
-            <span class="totals-value">¥{{ totalAmount.toFixed(2) }}</span>
+            <span class="totals-value">{{ formatMoney(totalAmount) }}</span>
           </div>
         </div>
       </el-form>
@@ -409,7 +409,7 @@
           {{ viewQuotation?.valid_until ? formatDate(viewQuotation.valid_until) : '-' }}
         </el-descriptions-item>
         <el-descriptions-item label="含税总额">
-          <span class="price-text">¥{{ viewQuotation?.total_amount?.toFixed(2) ?? '-' }}</span>
+          <span class="price-text">{{ formatMoney(viewQuotation?.total_amount) }}</span>
         </el-descriptions-item>
       </el-descriptions>
 
@@ -469,7 +469,7 @@
             align="right"
           >
             <template #default="{ row }">
-              <span class="price-text">¥{{ row.unit_price?.toFixed(2) ?? '-' }}</span>
+              <span class="price-text">{{ formatMoney(row.unit_price) }}</span>
             </template>
           </el-table-column>
           <el-table-column
@@ -489,7 +489,7 @@
             align="right"
           >
             <template #default="{ row }">
-              <span class="subtotal-text">¥{{ row.subtotal?.toFixed(2) ?? '-' }}</span>
+              <span class="subtotal-text">{{ formatMoney(row.subtotal) }}</span>
             </template>
           </el-table-column>
         </el-table>
@@ -518,10 +518,18 @@
             />
           </el-select>
         </el-form-item>
-        <el-form-item label="访问密码">
+        <el-form-item label="要求访问密码">
+          <el-switch v-model="shareRequirePassword" />
+        </el-form-item>
+        <el-form-item
+          v-if="shareRequirePassword"
+          label="访问密码"
+        >
           <el-input
             v-model="shareForm.password"
-            placeholder="留空则无需密码"
+            type="password"
+            show-password
+            placeholder="至少 8 位"
             class="capsule-input"
           />
         </el-form-item>
@@ -575,7 +583,9 @@ import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { quotationApi, proposalApi, shareApi } from '@/api'
 import { useAuthStore } from '@/stores/auth'
+import { useSettingsStore } from '@/stores/settings'
 import { hasPermission } from '@/types/permissions'
+import { formatMoney } from '@/utils/money'
 import type {
   Quotation,
   QuotationCreateRequest,
@@ -588,6 +598,7 @@ import ShareResultDialog from '@/components/ShareResultDialog.vue'
 
 const route = useRoute()
 const authStore = useAuthStore()
+const settingsStore = useSettingsStore()
 
 function hasPerm(perm: string): boolean {
   return hasPermission(authStore.permissions, perm)
@@ -626,7 +637,7 @@ const queryParams = reactive({
 
 const quotationForm = reactive({
   proposal_id: '',
-  tax_rate: 0.13,
+  tax_rate: 0.13, // 默认税率取全局设置（FR-3），onMounted 时用设置值覆盖
   discount: 1.0,
   valid_until: null as Date | null,
   items: [] as QuotationItem[],
@@ -644,6 +655,16 @@ const shareForm = reactive<ShareForm>({
   expire_hours: 24,
   max_access_count: 100,
 })
+// 是否要求访问密码：默认取全局设置（FR-3），勾选时展开密码输入
+const shareRequirePassword = ref(false)
+
+function prefillShareFormFromSettings() {
+  const share = settingsStore.share
+  shareForm.expire_hours = share.share_default_expire_hours
+  shareForm.max_access_count = share.share_default_max_access_count
+  shareRequirePassword.value = share.share_default_require_password
+  if (!shareRequirePassword.value) shareForm.password = ''
+}
 
 // Computed totals
 const subtotalTotal = computed(() =>
@@ -748,6 +769,8 @@ const handleConfirm = async (row: Quotation) => {
 const handleShare = (row: Quotation) => {
   shareForm.target_id = row.id
   shareForm.creator_id = authStore.user?.id || ''
+  // 打开弹窗时按全局设置预填（FR-3）；非管理员读取失败回落默认值
+  void settingsStore.load().then(prefillShareFormFromSettings)
   showShareDialog.value = true
 }
 
@@ -855,6 +878,10 @@ const handleExportPdf = async (row: Quotation) => {
 const prefillProposalId = computed(() => route.query.proposal_id as string | undefined)
 
 onMounted(() => {
+  // 新建报价单的默认税率取全局设置（FR-3）；非管理员/失败时回落 0.13
+  void settingsStore.load().then(() => {
+    quotationForm.tax_rate = settingsStore.business.quotation_default_tax_rate
+  })
   const pid = prefillProposalId.value
   if (pid) {
     quotationForm.proposal_id = pid

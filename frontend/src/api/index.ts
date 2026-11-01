@@ -16,6 +16,7 @@ import type {
   QuotationCreateRequest,
   QuotationUpdateRequest,
   ShareCreateRequest,
+  ShareLinkInfo,
   ShareResult,
 } from '@/types/sales'
 
@@ -577,6 +578,10 @@ export const shareApi = {
       skipAuth: true,
       suppressErrorMessage: true,
     }),
+  getByTarget: (shareType: 'proposal' | 'quotation', targetId: string) =>
+    api.get(`/shares/target/${shareType}/${targetId}`) as Promise<
+      ApiEnvelope<ShareLinkInfo | null>
+    >,
   revoke: (id: string) => api.delete(`/shares/${id}`),
 }
 

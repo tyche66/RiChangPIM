@@ -288,9 +288,11 @@ def test_password_policy_only_applies_to_new_passwords():
 def test_share_create_defaults_and_empty_password():
     from app.api.v1.shares import ShareCreate
 
+    # FR-3：Schema 缺省改为 None，未传参时由 create_share 读全局设置
+    # （默认 24h / 100 次）；接口层行为由集成测试覆盖。
     data = ShareCreate(target_id=uuid4())
-    assert data.expire_hours == 168
-    assert data.max_access_count == 100
+    assert data.expire_hours is None
+    assert data.max_access_count is None
     assert data.password is None
     assert ShareCreate(target_id=uuid4(), password="").password is None
     with pytest.raises(ValidationError):

@@ -26,6 +26,57 @@
 
 **不要去改的历史记录**（改了就是篡改发布史）：`BUILD_LOG.md` 的构建记录、`PROJECT_MANAGEMENT.md` 的发布台账、`TODO.md` 的「已发布」条目、`docs/08-开发路线图.md` 的里程碑行。`RELEASE_GATE.md` 已改成版本无关，不需要跟着版本走。
 
+## v2.0.0 — 2026-11-01
+
+PIM 2.0 把门户图片浏览、方案编辑、全局配置与公告能力一次性补齐：分享页主图与场景图统一为全屏画廊；方案创建/编辑从弹窗改为独立页面；新增管理员可维护的全局设置与公告中心；门户浅色主题切换到新的强调色与页眉装饰线。**分享有效期缺省值由 7 天改为 24 小时**，直接调用分享接口的集成方需同步确认。
+
+### FR-1 分享页图片画廊
+
+- 从 `FloorPlanViewer` 抽出通用 `portal/src/components/ImageViewer.vue`：原生 `<dialog>` 焦点陷阱、全屏、滚轮/双指/双击缩放、放大拖拽、方向键与两侧按钮切换、Esc/关闭/遮罩关闭、打开期间锁页面滚动。
+- 分享页每个商品的画廊 = 主图（存在时第一张）+ 场景图（按 `sort` 升序）；56px 缩略图拆成独立按钮，只开画廊不误触详情；详情封面与「查看 N 张场景图」共用同一画廊。
+- 图片地址过期时显示「图片已过期，请刷新页面查看」，不自动重试、不重新请求分享内容，避免增加访问次数。
+- `ShareSceneDialog` 按仓库规则移入 `portal/src/components/回收站/`；平面图查看器保留为 ImageViewer 薄封装。
+
+### FR-2 方案创建/编辑统一页面
+
+- 新增 `/proposals/create` 与 `/proposals/:id/edit`，声明在 `/proposals/:id` 之前；原 920px 创建弹窗与 640px 编辑弹窗移除。
+- 创建：名称/客户/关联客户/关联项目可编辑，保留平面图草案上传与创建成功后批量绑定；编辑：名称/客户可编辑，关联客户/项目只读，平面图卡只读并可跳转详情页 `#floor-plans`。
+- 商品明细去掉 `46vh` 内部滚动，改页面自然滚动；字段栅格 ≥1200px 四列、768–1199px 两列、<768px 单列，材质说明跨整行。
+- 商品搜索固定在明细区顶部；`selection_token` 只消费一次；路由离开与 `beforeunload` 未保存拦截；保存成功统一回详情页。
+- `Products.vue` 选品回跳改为 `/proposals/create`；`ProposalDetail.vue` 编辑改跳独立页。
+
+### FR-3 全局设置
+
+- 新增单行表 `system_setting`（迁移 `0039_system_setting`），`data JSONB` 分 brand/share/business 三组；Pydantic 嵌套校验、未知 key 拒绝。
+- 新增 `GET/PUT /api/v1/settings`（仅管理员，`setting:view` / `setting:edit`，写操作审计）、匿名 `GET /api/v1/settings/public`（只回品牌字段）与 `GET /api/v1/settings/logo?v=`（当前配置单图、JPG/PNG/WebP、≤2MB、ETag/Last-Modified/immutable 缓存）。
+- 后台「系统管理 → 全局设置」维护品牌文案、Logo、分享缺省值、默认税率、金额小数位与货币符号；设置 60 秒进程内缓存，保存后立即失效。
+- 接入：分享接口未传 `expire_hours` / `max_access_count` 时读设置；报价创建未传 `tax_rate` 时读设置；后台分享弹窗按设置预填并支持默认要求密码；金额展示统一走 `utils/money.ts`。
+- 门户启动匿名拉取公共设置，应用系统名称、首页标题/副标题、页脚与 Logo；接口失败回落原硬编码文案，不白屏。
+
+### FR-4 后台可编辑公告
+
+- 新增 `announcement` 表（迁移 `0040_announcement`）：标题、受限 Markdown 正文、受众（admin/portal/all）、级别、启停、发布时间与过期时间；软删除可追溯。
+- 管理接口 `GET/POST/PUT/DELETE /api/v1/announcements`（`announcement:view` / `announcement:manage`，写操作审计，显式管理员校验）；匿名 `GET /api/v1/announcements/active?audience=` 只下发启用、已到发布时间、未过期且受众匹配的公告，60 秒缓存。
+- 后台「系统管理 → 公告管理」支持新建、编辑、预览、启停、删除、受众与时间窗口；登录后/应用启动按新到旧逐条弹窗，「我知道了」写 `localStorage: announcement_seen:<id>`。
+- 门户首页/对话页检查 portal 受众公告并同样按浏览器记录已读；**分享页不请求、不弹公告**。
+- Markdown 复用门户自研安全渲染器（先转义、白名单标签、链接仅 http/https/mailto/tel），后台复制裁剪版，不新增 npm 依赖。
+
+### VR-1 门户视觉规范
+
+- 浅色 token：`--bg #EDEBE6`、`--surface-soft #F4F2ED`，新增 `--accent #1F3FB0`、`--accent-strong #17308A`、`--on-accent #FFFFFF`；`--pine` 仅保留成功/正向语义。
+- 浅色页眉改为非吸顶、无背景/模糊/底边框，底部居中 70vw、中间粗两头细的深色装饰线（`--ink`，2px）；焦点环、主/发送按钮、胶囊选中态、输入框聚焦、引用 hover、加载指示改用强调色。
+- 深色主题保持原有配色与吸顶页眉，不继承 `#1F3FB0`（对比不足），装饰线隐藏。
+- 双端登录页统一为视频分栏 + 右侧登录卡：真实 Logo、中文欢迎语、深蓝主题、移动端堆叠；后台登录进后台、门户登录进门户，注册入口不跳转。
+- 查询结果区桌面端铺至 ≥80vw；逐项比较改为双轴滚动 + 粘性表头/首列 + 常驻横向滚动条；引用来源默认折叠并在桌面端铺成卡片网格；产品卡主图强制铺满、库存枚举中文化；回答与比较面板去掉外边框；公告弹窗居中。
+- 分享页全屏查看器改为固定视口 + 舞台内绝对定位图片，修复图片底部被页面裁切；方案详情页新增最近一次分享的链接、二维码、有效期与访问次数，支持复制/预览/下载，创建后不再丢失。
+- 后台「分享管理」从系统管理移入销售板块，板块更名为「销售工作台」。
+
+### 数据、权限与升级
+
+- 迁移：`0039_system_setting` → `0040_announcement`，`down_revision` 链式；升级后初始化 `system_setting` 默认值。
+- 新增权限：`setting:view`、`setting:edit`、`announcement:view`、`announcement:manage`；`admin` 通过 `*` 获得。**存量部署升级后需重跑 `python -m app.scripts.seed_data`**（容器入口会自动执行）。
+- 发版高亮：分享默认有效期 **168h → 24h**（读全局设置）；报价默认税率改读设置；方案创建/编辑改独立页面；门户视觉更新；分享页新增全屏画廊。
+
 ## v1.9.9 — 2026-10-31
 
 本版把产品知识卡的向量索引从「每分钟常驻轮询」改为「夜间窗口调度」，修复了导致同一批内容被反复 embedding 的重复计费根因；后台新增「向量索引」管理页（启停、窗口、报告、积压、手动灰度）。同时合并一组安全加固：登出撤销 refresh token、Redis 故障时撤销检查 fail closed、分享口令改存哈希、口令长度边界统一、日志路径脱敏、健康检查与 CORS 收敛。

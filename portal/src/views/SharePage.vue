@@ -16,8 +16,9 @@ import { useRoute } from 'vue-router'
 import AppHeader from '@/components/AppHeader.vue'
 import FloorPlanGallery from '@/components/FloorPlanGallery.vue'
 import FloorPlanViewer from '@/components/FloorPlanViewer.vue'
+import ImageViewer from '@/components/ImageViewer.vue'
+import type { ImageViewerImage } from '@/components/ImageViewer.vue'
 import ShareDetailDialog from '@/components/ShareDetailDialog.vue'
-import ShareSceneDialog from '@/components/ShareSceneDialog.vue'
 import {
   ShareAccessError,
   getShareContent,
@@ -29,6 +30,9 @@ import {
   type ShareSceneImage,
 } from '@/api'
 import { MISSING_TEXT, formatPrice } from '@/utils/format'
+import { useSettingsStore } from '@/stores/settings'
+
+const settings = useSettingsStore()
 
 const route = useRoute()
 const token = String(route.params.token || '')
@@ -39,8 +43,6 @@ const phase = ref<Phase>('loading')
 const message = ref('')
 const passwordInput = ref('')
 const share = ref<ShareEnvelopeData | null>(null)
-const scenes = ref<ShareSceneImage[]>([])
-const sceneOpen = ref(false)
 const detailOpen = ref(false)
 const detailItem = ref<ShareProductItem | null>(null)
 const failedImages = ref<Set<string>>(new Set())
@@ -110,11 +112,53 @@ function taxRateText(rate?: number | null): string {
   return `${(rate * 100).toFixed(0)}%`
 }
 
+// ---------------------------------------------------------------------------
+// FR-1：商品图片画廊（ImageViewer）
+// 画廊内容 = 主图 cover_image_url（存在时第一张）+ 场景图（按 sort 升序），
+// 过滤空地址；缩略图、详情封面、「查看 N 张场景图」三个入口打开同一个画廊。
+// ---------------------------------------------------------------------------
+
+/** 场景图按 sort 升序；缺 sort 的排在有值的后面，同为空保持接口顺序。 */
+function bySort(a: ShareSceneImage, b: ShareSceneImage): number {
+  const va = a.sort ?? Number.POSITIVE_INFINITY
+  const vb = b.sort ?? Number.POSITIVE_INFINITY
+  return va - vb
+}
+
+function galleryImagesOf(item: ShareProductItem): ImageViewerImage[] {
+  const images: ImageViewerImage[] = []
+  if (item.cover_image_url) {
+    images.push({
+      url: item.cover_image_url,
+      title: item.product_name || MISSING_TEXT,
+      subtitle: '商品主图',
+    })
+  }
+  for (const scene of (item.scene_images || []).filter((image) => Boolean(image.image_url)).sort(bySort)) {
+    images.push({
+      url: scene.image_url as string,
+      title: item.product_name || MISSING_TEXT,
+      subtitle: (scene.name || '').trim(),
+    })
+  }
+  return images
+}
+
+const galleryOpen = ref(false)
+const galleryImages = ref<ImageViewerImage[]>([])
+const galleryIndex = ref(0)
+
+function openGallery(item: ShareProductItem, startIndex = 0) {
+  const images = galleryImagesOf(item)
+  if (!images.length) return
+  galleryImages.value = images
+  galleryIndex.value = Math.max(0, Math.min(startIndex, images.length - 1))
+  galleryOpen.value = true
+}
+
+/** 详情弹窗「查看 N 张场景图」：有主图时画廊从第一张场景图开始。 */
 function openScenes(item: ShareProductItem) {
-  const available = sceneImagesOf(item)
-  if (!available.length) return
-  scenes.value = available
-  sceneOpen.value = true
+  openGallery(item, item.cover_image_url ? 1 : 0)
 }
 
 /** 含税小计由未税单价、数量、税率现算，后端只给未税 subtotal。 */
@@ -151,10 +195,6 @@ function onImageError(item: ShareProductItem, index: number) {
   const next = new Set(failedImages.value)
   next.add(imageKey(item, index))
   failedImages.value = next
-}
-
-function sceneImagesOf(item: ShareProductItem): ShareSceneImage[] {
-  return (item.scene_images || []).filter((image) => Boolean(image.image_url))
 }
 
 // ---------------------------------------------------------------------------
@@ -356,13 +396,15 @@ onMounted(load)
                 <tbody>
                   <tr v-for="(item, index) in group.items" :key="item.product_id || index">
                     <td>
-                      <button
-                        type="button"
-                        class="share-product"
-                        title="查看商品详情"
-                        @click="openDetail(item)"
-                      >
-                        <span class="share-product__thumb">
+                      <!-- FR-1：缩略图是独立按钮，只开画廊；商品名/「查看详情」才开详情，互不误触 -->
+                      <div class="share-product">
+                        <button
+                          v-if="galleryImagesOf(item).length"
+                          type="button"
+                          class="share-product__thumb share-product__thumb--button"
+                          :aria-label="`查看「${item.product_name || MISSING_TEXT}」的图片`"
+                          @click="openGallery(item)"
+                        >
                           <img
                             v-if="coverUrl(item, index)"
                             :src="coverUrl(item, index) as string"
@@ -374,13 +416,24 @@ onMounted(load)
                             @error="onImageError(item, index)"
                           />
                           <span v-else class="share-product__fallback">{{ placeholderText(item.product_name) }}</span>
+                        </button>
+                        <span
+                          v-else
+                          class="share-product__thumb"
+                        >
+                          <span class="share-product__fallback">{{ placeholderText(item.product_name) }}</span>
                         </span>
-                        <span class="share-product__text">
+                        <button
+                          type="button"
+                          class="share-product__text"
+                          title="查看商品详情"
+                          @click="openDetail(item)"
+                        >
                           <span class="share-product__name">{{ item.product_name || MISSING_TEXT }}</span>
                           <span class="product-code">{{ item.product_no || MISSING_TEXT }}</span>
                           <span class="share-product__hint">{{ categoryText(item) }}</span>
-                        </span>
-                      </button>
+                        </button>
+                      </div>
                     </td>
                     <td class="is-numeric">{{ formatPrice(item.face_price) }}</td>
                     <td v-if="!isProposal" class="is-numeric">{{ formatPrice(item.unit_price) }}</td>
@@ -403,11 +456,16 @@ onMounted(load)
 
       <footer class="share-foot">
         <span>访问次数 {{ share?.access_count ?? 0 }}</span>
-        <span>由 RiChangPIM 提供</span>
+        <span>{{ settings.footerText }}</span>
       </footer>
     </template>
 
-    <ShareSceneDialog :images="sceneOpen ? scenes : null" @close="sceneOpen = false" />
+    <!-- 商品图片画廊（FR-1）：缩略图 / 详情封面 / 「查看 N 张场景图」共用一个查看器 -->
+    <ImageViewer
+      :images="galleryOpen ? galleryImages : null"
+      :start-index="galleryIndex"
+      @close="galleryOpen = false"
+    />
 
     <!-- 平面图全屏：缩略图只是入口，缩放与多张切换都在这里 -->
     <FloorPlanViewer
@@ -417,7 +475,12 @@ onMounted(load)
     />
 
     <!-- 商品详情：明细表只放摘要，规格/材质/颜色/材质说明与场景图在点击后展开 -->
-    <ShareDetailDialog :item="detailOpen ? detailItem : null" @close="closeDetail" @open-scenes="openScenes" />
+    <ShareDetailDialog
+      :item="detailOpen ? detailItem : null"
+      @close="closeDetail"
+      @open-scenes="openScenes"
+      @open-gallery="openGallery($event)"
+    />
   </main>
 </template>
 

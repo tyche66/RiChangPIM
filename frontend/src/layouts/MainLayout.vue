@@ -59,13 +59,19 @@
         <el-sub-menu index="m-sales">
           <template #title>
             <el-icon><DocumentCopy /></el-icon>
-            <span>销售管理</span>
+            <span>销售工作台</span>
           </template>
           <el-menu-item index="/proposals">
             方案管理
           </el-menu-item>
           <el-menu-item index="/quotations">
             报价管理
+          </el-menu-item>
+          <el-menu-item
+            v-if="hasPerm('share:view')"
+            index="/shares"
+          >
+            分享管理
           </el-menu-item>
         </el-sub-menu>
         <el-sub-menu
@@ -130,11 +136,20 @@
           <el-menu-item index="/roles">
             角色权限
           </el-menu-item>
-          <el-menu-item index="/shares">
-            分享管理
-          </el-menu-item>
           <el-menu-item index="/logs">
             操作日志
+          </el-menu-item>
+          <el-menu-item
+            v-if="isAdmin && hasPerm('setting:view')"
+            index="/settings"
+          >
+            全局设置
+          </el-menu-item>
+          <el-menu-item
+            v-if="isAdmin && hasPerm('announcement:view')"
+            index="/announcements"
+          >
+            公告管理
           </el-menu-item>
         </el-sub-menu>
         <el-sub-menu index="m-ai">
@@ -268,6 +283,7 @@
     </el-dialog>
 
     <TodoDrawer v-model="todoDrawerOpen" />
+    <AnnouncementPopup />
   </el-container>
 </template>
 
@@ -276,10 +292,12 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Briefcase, Cpu, Document, DocumentCopy, InfoFilled, List, Menu, Setting } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
+import { useSettingsStore } from '@/stores/settings'
 import { hasPermission } from '@/types/permissions'
 import ThemeToggle from '@/components/ThemeToggle.vue'
 import NotificationBell from '@/components/NotificationBell.vue'
 import TodoDrawer from '@/components/TodoDrawer.vue'
+import AnnouncementPopup from '@/components/AnnouncementPopup.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -324,6 +342,7 @@ const subMenuMap: Record<string, string> = {
   roles: 'm-admin',
   shares: 'm-admin',
   logs: 'm-admin',
+  announcements: 'm-admin',
   'ai-select': 'm-ai',
   manuals: 'm-ai',
   import: 'm-ai',
@@ -363,12 +382,14 @@ const routeLabels: Record<string, [string, string]> = {
   media: ['产品管理', '媒体库'],
   'scene-images': ['产品管理', '场景图管理'],
   quality: ['产品管理', '数据质量'],
-  proposals: ['销售管理', '方案管理'],
-  quotations: ['销售管理', '报价管理'],
+  proposals: ['销售工作台', '方案管理'],
+  quotations: ['销售工作台', '报价管理'],
   users: ['系统管理', '用户管理'],
   roles: ['系统管理', '角色权限'],
-  shares: ['系统管理', '分享管理'],
+  shares: ['销售工作台', '分享管理'],
   logs: ['系统管理', '操作日志'],
+  settings: ['系统管理', '全局设置'],
+  announcements: ['系统管理', '公告管理'],
   'ai-select': ['AI 功能', 'AI 选品'],
   'ai/config': ['AI 功能', 'AI 配置中心'],
   'knowledge-index': ['AI 功能', '向量索引'],
@@ -388,7 +409,11 @@ const currentLabels = computed(
   () => routeLabels[route.path] || routeLabels[route.path.split('/')[1]] || ['工作台', 'AI-PIM'],
 )
 const pageSection = computed(() => currentLabels.value[0])
-const pageTitle = computed(() => route.params.id ? `${currentLabels.value[1]}详情` : currentLabels.value[1])
+const pageTitle = computed(() => {
+  if (route.name === 'ProposalCreate') return '新增方案'
+  if (route.name === 'ProposalEdit') return '编辑方案'
+  return route.params.id ? `${currentLabels.value[1]}详情` : currentLabels.value[1]
+})
 // 顶栏只显示真实用户名。「当前用户」是标签，不参与占位——不用它冒名顶替真实用户名。
 // profileResolved 标记「/auth/me 这一轮已经跑完」：ensureUser() 失败是静默的
 // （stores/auth.ts:114-119），跑完还拿不到 profile 就必须把文案从「加载中…」切走，
@@ -414,6 +439,9 @@ onMounted(async () => {
   } finally {
     profileResolved.value = true
   }
+  // 全局设置（FR-3）：后台启动时拉一次（分享弹窗预填/税率默认/金额格式化共用）。
+  // 非管理员 403 时 store 内部回落默认值，不影响使用。
+  void useSettingsStore().load()
 })
 
 const handleLogout = async () => {

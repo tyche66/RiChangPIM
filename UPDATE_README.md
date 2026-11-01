@@ -1,46 +1,70 @@
-# RiChangPIM v1.9.8 更新包
+# RiChangPIM v2.0.0 更新包
 
-本包用于已有生产环境从 v1.9.7 升级到 v1.9.8，只包含源码、配置模板、迁移与构建脚本，不含业务数据、对象存储、`.env` 或任何凭据。
+本包用于已有生产环境升级到 `v2.0.0`，只包含源码、配置模板、迁移与构建脚本，不含业务数据、对象存储、`.env` 或任何凭据。
 
 ## 本版改动
 
-- **产品列表三级筛选导航**：新增 `GET /api/v1/products/filter-options`，六个维度（系列 / 品牌 / 供应商 / 状态 / 库存 / 品类）的二级、三级选项与计数全部由产品数据实时聚合；「系列」三级取系列标签，「品类」三级取规格长度，两个维度数据源独立。产品列表与导出新增 `tag_type`、`spec_length_mm` 参数，分类筛选包含全部后代分类。
-- **产品交货期**：新增 `product.delivery_period`，导入模板 / 导出列 / 列表 / 详情 / 编辑表单同步，打通「导出 → 改 → 导回」。
-- **知识索引自动重建**：产品增改删、图片变更、批量导入、说明书上传 / 解析 / OCR / 删除均自动登记索引任务；产品卡片新增类目路径、交货期与外观标签。
-- **产品图视觉标注（可选）**：新增多模态标注器与 `ai_provider_config.vision_model` 配置；不配置视觉模型时整条链路自动跳过，不影响索引。
-- **详情页与门户**：产品详情页新增大图 hero + 灯箱；门户比较表新增主图列、MD 导出与 PDF 导出接口。
+- **门户视觉与登录**：门户浅色主题切换到 `#EDEBE6` 背景、`#F4F2ED` 弱填充与 `#1F3FB0` 强调色；页眉改为非吸顶 + 2px 深色装饰线；后台与门户登录页统一为视频分栏设计，登录后分别进入后台/门户。
+- **分享页图片画廊**：新增通用 `ImageViewer`，商品主图与场景图统一全屏浏览、缩放、拖拽、键盘切换；修复全屏图片底部被文档流裁切的问题；过期图片有明确兜底。
+- **方案创建/编辑统一页面**：新增 `/proposals/create`、`/proposals/:id/edit`，原弹窗入口改为跳转；商品明细支持 4/2/1 列响应式布局；编辑页提供只读平面图卡与 `#floor-plans` 跳转。
+- **分享链接复用**：方案详情页新增「分享链接」卡片，展示最近一次分享的链接、二维码、有效期、访问次数与密码状态，支持复制、预览和下载二维码。新增 `GET /api/v1/shares/target/{share_type}/{target_id}`（`share:view`）。
+- **全局设置**：新增单行表 `system_setting` 与管理员设置页，覆盖品牌文案、Logo、分享缺省值、报价默认税率、金额小数位与货币符号；门户公共品牌接口与 Logo 强缓存端点。
+- **公告**：新增 `announcement` 表、管理页、匿名 `/active` 接口与后台/门户弹窗；支持受众、级别、启停、定时发布与过期，已读状态存浏览器；分享页不弹公告。
+- **后台菜单**：「分享管理」从系统管理移入销售板块，销售板块更名为「销售工作台」。
+- **结果页**：桌面查询结果 ≥80vw；逐项比较使用双轴滚动、粘性表头/首列与常驻横向滚动条；引用来源默认折叠并在桌面端使用卡片网格；回答与比较面板去掉外边框。
 
 ## 本版索引与数据字段变更
 
 | 变更 | 承载文件 | 生效方式 | 验收方式 |
 | --- | --- | --- | --- |
-| `product.delivery_period`（新列） | `backend/alembic/versions/0036_product_delivery_period_vision_tags.py` | 随 backend 容器启动自动迁移 | `docker exec richangpim-backend-1 alembic current` 显示 `0036_... (head)` |
-| `product_image.vision_tags`（新列，JSONB） | 同上 | 自动 | 同上；`information_schema.columns` 可查到 |
-| `ai_provider_config.vision_model`（新列） | 同上 | 自动 | 同上 |
-| `knowledge_chunk` 唯一索引改为仅约束未删除行 | `backend/alembic/versions/0035_knowledge_chunk_partial_unique.py` | 自动 | `pg_indexes` 中 `idx_knowledge_chunk_document_index` 含 `is_deleted = false` |
-| `user.token_version`（0034，前次遗留） | `backend/alembic/versions/0034_user_token_version.py` | 自动 | 迁移 head 为 0036 即包含 |
-| 既有产品的索引卡片刷新（含新字段与视觉标签） | `backend/app/scripts/knowledge_indexer.py` | **手动、可选** | 见下方第 6 步 |
+| `system_setting` 单行表 + 默认值 | `backend/alembic/versions/0039_system_setting.py` | backend 容器启动自动迁移 | `docker exec richangpim-backend-1 alembic current` 显示 `0040_announcement (head)` |
+| `announcement` 表 | `backend/alembic/versions/0040_announcement.py` | 自动 | 后台「系统管理 → 公告管理」可新建并下发 |
+| `setting:view` / `setting:edit` / `announcement:view` / `announcement:manage` | `backend/app/scripts/seed_data.py` | backend entrypoint 自动执行 `seed_data` | 管理员登录后令牌含四个权限；非管理员不可访问 |
+| 方案详情分享查询接口 | `backend/app/api/v1/shares.py` | 代码随包发布 | 方案详情页显示已有链接/二维码 |
 
-本版**没有必须执行的数据回填**：视觉标签在卡片重建时按需生成，未配置 `vision_model` 时自动跳过。
-若希望存量产品也带上新字段与外观标签，可在升级后手动跑一次卡片重建（会消耗 embedding / 视觉调用额度）：
+本版**没有必须手动执行的数据回填**。存量部署升级后由容器入口自动执行 `alembic upgrade head`、`init_admin`、`seed_data`、`seed_default_skills --apply`、`seed_attribute_dictionary --apply`。
 
-```bash
-docker exec richangpim-backend-1 python -m app.scripts.knowledge_indexer --once
-```
+## 行为变化（需告知使用方）
+
+- **分享默认有效期统一为 24 小时**：直接调用 `POST /api/v1/shares` 且不传 `expire_hours` 时，默认值由 7 天变为 24 小时。
+- 新建报价单未显式传 `tax_rate` 时读取全局设置 `quotation_default_tax_rate`。
+- 门户与后台登录页改为同一视觉，登录后的落点分别保持门户 `/chat` 与后台 `/products`。
 
 ## 升级步骤
 
-1. 运行 `scripts/where-am-i.sh`，确认目标是生产 Compose 栈。
-2. 升级前备份 PostgreSQL 和 MinIO，并确认两份备份成功。生产 PostgreSQL 使用容器内 `pg_dump`，不要使用连接宿主机 `localhost:5432` 的备份脚本默认配置。
-3. 发布源码包含迁移 `0034_user_token_version`、`0035_knowledge_chunk_partial_unique`、`0036_product_delivery_period_vision_tags`。backend entrypoint 会在容器启动时自动升级数据库。
-4. 使用 `PATH="$HOME/.nvm/versions/node/v24.18.0/bin:$PATH" bash scripts/build_frontends.sh` 构建两个前端，并记录其输出的 `APP_VERSION`、`BUILD_ID`、`GIT_COMMIT`、`BUILD_TIME`。
-5. 将同一组构建元数据导出给 Compose，设置 `APP_VERSION=1.9.8`、`APP_ENV=production`，然后执行 `docker compose build backend nginx` 和 `docker compose up -d --no-deps backend nginx`。不要重启 worker、knowledge-indexer、数据库或对象存储。
-6. （可选）如需刷新存量产品的知识卡片：`docker exec richangpim-backend-1 python -m app.scripts.knowledge_indexer --once`；它只处理「卡片缺失或已过期」的产品，不会逐条重刷全部 4000+ 产品。
-7. 执行 `docker exec richangpim-backend-1 alembic current`，确认 `0036_product_delivery_period_vision_tags (head)`；执行 `docker exec richangpim-backend-1 python -m app.scripts.seed_data --check`。
-8. 运行健康检查，登录后台验证「系统管理 → 版本」中的前后端版本、构建 ID、Git commit、北京时间构建时间均有值且一致；再验证产品列表三级筛选（系列 / 品类三级数据不同源）、交货期展示与导入模板、门户比较表的 MD / PDF 导出。
+1. 运行 `bash scripts/where-am-i.sh`，确认目标是生产 Compose 栈。
+2. 升级前备份 PostgreSQL 与 MinIO，并确认备份成功；不要用连接宿主机 `localhost:5432` 的默认脚本替代生产容器备份。
+3. 本包包含迁移 `0039_system_setting`、`0040_announcement`，backend entrypoint 会在启动时自动执行。
+4. 构建前端：
+   ```bash
+   export PATH="$HOME/.nvm/versions/node/v24.18.0/bin:$PATH"
+   bash scripts/build_frontends.sh
+   ```
+   记录输出的 `APP_VERSION`、`BUILD_ID`、`GIT_COMMIT`、`BUILD_TIME`。
+5. 导出同一组构建元数据，设置 `APP_VERSION=2.0.0`、`APP_ENV=production`，执行：
+   ```bash
+   docker compose build backend nginx
+   docker compose up -d --no-deps backend nginx
+   ```
+6. 校验迁移与权限：
+   ```bash
+   docker exec richangpim-backend-1 alembic current
+   docker exec richangpim-backend-1 python -m app.scripts.seed_data --check
+   ```
+7. 健康检查与验收：
+   ```bash
+   curl -s --noproxy '*' http://127.0.0.1:888/api/v1/health
+   ```
+   登录后台检查「版本」页前后端版本/构建 ID/Git commit/北京时间一致；再验收设置读写、Logo 更新、公告受众与弹窗、分享链接复用、分享页画廊、方案新建/编辑。
 
-## 配置与回滚说明
+## 配置与回滚
 
-- 若启用产品图视觉标注：在「AI 配置中心 → 知识库域」填「视觉标注模型 ID」，或设置环境变量 `AI_VISION_MODEL`；必须是支持图片输入的多模态模型，纯文本模型会让索引任务失败。留空即关闭。
-- 保留旧 backend 和 nginx 镜像，直到生产验收完成。迁移回滚会删除本版新增的三列与部分唯一索引；`knowledge_chunk` 索引回滚在存在同位软删除历史行时会失败并整体回滚，属预期保护。
-- 已知问题（本版未修）：`backend/app/knowledge/tools/product.py` 的规格数值表达式使用 `func.instr`，PostgreSQL 无此函数，AI 选品按「长度 / 宽 / 高」排序或过滤时会报错。后台产品筛选已绕开该表达式，如需修复请单独安排。
+- 新增设置项保存在数据库 `system_setting`，无需新增环境变量。
+- 回滚代码前保留旧 backend/nginx 镜像；迁移回滚会删除 `announcement` 与 `system_setting`，请先确认不再需要公告/设置数据。
+- 深色主题本期保持原有配色与吸顶页眉，不应用 `#1F3FB0`。
+- 公共设置接口只返回品牌字段；门户分享页金额展示在未下发业务字段时回落 `¥`/2 位。
+
+## 已知问题
+
+- AI 查询依赖外部模型服务；若上游超时，门户会停留在处理中，与本版代码无关。
+- 门户登录页视频来自外部 CDN；网络不可达时左侧回落深蓝渐变背景，登录功能不受影响。

@@ -5,6 +5,7 @@
  * 统一在这里翻译成业务语言；缺失值统一表达为“资料未提供”，
  * 不用 0 / null / - 之类的占位值冒充真实数据。
  */
+import { useSettingsStore } from '@/stores/settings'
 
 export const MISSING_TEXT = '资料未提供'
 
@@ -59,6 +60,9 @@ export function cellText(value: unknown): string {
 /**
  * 价格展示。后端可能返回 99999 或“待核价”占位，
  * 前端禁止把占位值渲染成真实价格（见 AI-Docs/04 §3.1）。
+ *
+ * 小数位与货币符号取自全局设置 store（FR-3）；public 端点当前不含业务
+ * 展示字段时，store 内回落 ¥ / 2 位，行为与旧硬编码一致。
  */
 export function formatPrice(value: unknown): string {
   if (value === 99999 || value === '99999' || value === '待核价' || value === null || value === undefined) {
@@ -66,12 +70,25 @@ export function formatPrice(value: unknown): string {
   }
   const price = Number(value)
   if (!Number.isFinite(price)) return String(value)
-  return `¥${price.toLocaleString('zh-CN', { maximumFractionDigits: 2 })}`
+  const { currencySymbol, amountDecimalPlaces } = useSettingsStore()
+  return `${currencySymbol}${price.toLocaleString('zh-CN', {
+    minimumFractionDigits: amountDecimalPlaces,
+    maximumFractionDigits: amountDecimalPlaces,
+  })}`
+}
+
+/** 后端库存枚举 → 中文展示；已经是中文（或其他未知值）时原样返回。 */
+const STOCK_LABELS: Record<string, string> = {
+  in_stock: '有货',
+  out_of_stock: '缺货',
+  preorder: '预售',
+  unknown: '库存待确认',
 }
 
 export function formatStock(value: unknown): string {
-  if (value === 'unknown' || value === null || value === undefined || value === '') return '库存待确认'
-  return String(value)
+  if (value === null || value === undefined || value === '') return '库存待确认'
+  const text = String(value)
+  return STOCK_LABELS[text] || text
 }
 
 /** 长 ID 只在技术信息里展示；界面上默认收敛成短码，避免占用注意力。 */

@@ -4,8 +4,9 @@
  * 分类、规格、材质、颜色、材质说明、场景图在这里展开，避免一上来就把
  * 十几列塞进手机屏。
  *
- * 与 ShareSceneDialog 一样用原生 <dialog>，自带焦点陷阱、Escape 关闭和遮罩；
- * 场景图不在这里自己渲染，交给调用方打开已有的灯箱。
+ * 用原生 <dialog>，自带焦点陷阱、Escape 关闭和遮罩（与 SourceDialog 同口径）；
+ * 场景图不在这里自己渲染：封面与「查看 N 张场景图」只发事件（openGallery /
+ * openScenes），由调用方打开统一的图片画廊（FR-1）。
  */
 import { computed, ref, watch } from 'vue'
 
@@ -20,6 +21,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   close: []
   openScenes: [item: ShareProductItem]
+  /** 点击封面：交给调用方打开画廊，从主图开始（startIndex=0）。 */
+  openGallery: [item: ShareProductItem]
 }>()
 
 const dialog = ref<HTMLDialogElement | null>(null)
@@ -109,13 +112,21 @@ watch(
 
     <div v-if="item" class="share-detail-dialog__body">
       <div class="share-detail-dialog__cover">
-        <img
+        <!-- 封面是画廊入口之一：加载成功才可点，失败/无图保持占位不打开 -->
+        <button
           v-if="item.cover_image_url && !failed"
-          :src="item.cover_image_url"
-          alt=""
-          decoding="async"
-          @error="failed = true"
-        />
+          type="button"
+          class="share-detail-dialog__cover-btn"
+          aria-label="查看商品大图"
+          @click="emit('openGallery', item)"
+        >
+          <img
+            :src="item.cover_image_url"
+            alt=""
+            decoding="async"
+            @error="failed = true"
+          />
+        </button>
         <span v-else class="share-product__fallback">无图</span>
       </div>
 

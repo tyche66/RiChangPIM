@@ -33,7 +33,8 @@ class QuotationItemResponse(QuotationItemBase):
 
 class QuotationCreate(BaseModel):
     proposal_id: UUID
-    tax_rate: float = Field(0.13, ge=0, le=1)
+    # FR-3：未显式传入时由服务端读全局设置 quotation_default_tax_rate。
+    tax_rate: float | None = Field(None, ge=0, le=1)
     discount: float = Field(1.0, ge=0, le=1)
     valid_until: datetime | None = None
     items: list[QuotationItemCreate] = Field(default_factory=list)

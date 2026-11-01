@@ -176,6 +176,20 @@ export interface ShareForm {
   max_access_count: number
 }
 
+/** 方案/报价详情页复用的分享链接信息。 */
+export interface ShareLinkInfo {
+  share_id: string
+  share_type: 'proposal' | 'quotation'
+  target_id: string
+  status: 'active' | 'disabled' | 'expired'
+  share_url: string | null
+  token: string | null
+  expire_time: string | null
+  max_access_count: number | null
+  current_access_count: number
+  password_protected: boolean
+}
+
 // ============ Share content (from backend share endpoint) ============
 
 export interface ShareProductItem {
