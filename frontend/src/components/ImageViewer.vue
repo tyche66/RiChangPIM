@@ -383,6 +383,12 @@ body.image-viewer-open {
 
 .image-viewer[open] {
   display: grid;
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  margin: 0;
+  overflow: hidden;
 }
 
 .image-viewer::backdrop {
@@ -465,6 +471,7 @@ body.image-viewer-open {
   position: relative;
   display: grid;
   place-items: center;
+  min-height: 0;
   overflow: hidden;
   background: var(--pim-media-bg);
   touch-action: none;
@@ -480,10 +487,15 @@ body.image-viewer-open {
 }
 
 .image-viewer__stage img {
-  max-width: 100%;
-  max-height: 100%;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
   display: block;
   object-fit: contain;
+  object-position: center;
   user-select: none;
   -webkit-user-drag: none;
   will-change: transform;

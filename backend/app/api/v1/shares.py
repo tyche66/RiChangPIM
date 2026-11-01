@@ -186,6 +186,86 @@ async def list_shares(db: AsyncSession = Depends(get_db)):
     }
 
 
+@router.get(
+    "/target/{share_type}/{target_id}",
+    response_model=dict,
+    dependencies=[Depends(PermissionChecker("share:view"))],
+)
+async def get_share_by_target(
+    share_type: str,
+    target_id: UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    """按业务对象读取最近一次分享，供方案/报价详情页复用链接与二维码。
+
+    只返回当前登录用户有 ``share:view`` 权限的数据；没有分享时返回 data=null，
+    前端据此展示空态，不把它当成接口错误。
+    """
+    if share_type not in SHARE_TYPES:
+        raise HTTPException(
+            status_code=422, detail={"code": 42201, "msg": "share_type 非法"}
+        )
+
+    share = (
+        await db.execute(
+            select(Share)
+            .where(
+                Share.share_type == share_type,
+                Share.target_id == target_id,
+                Share.is_deleted.is_(False),
+            )
+            .order_by(Share.create_time.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    if share is None:
+        return {"code": 200, "data": None}
+
+    token = (
+        await db.execute(
+            select(ShareToken)
+            .where(
+                ShareToken.share_id == share.id,
+                ShareToken.is_deleted.is_(False),
+            )
+            .order_by(ShareToken.create_time.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    if token is None:
+        return {
+            "code": 200,
+            "data": {
+                "share_id": str(share.id),
+                "share_type": share.share_type,
+                "target_id": str(share.target_id),
+                "status": share.status,
+                "share_url": None,
+                "token": None,
+                "expire_time": None,
+                "max_access_count": None,
+                "current_access_count": 0,
+                "password_protected": False,
+            },
+        }
+
+    return {
+        "code": 200,
+        "data": {
+            "share_id": str(share.id),
+            "share_type": share.share_type,
+            "target_id": str(share.target_id),
+            "status": share.status,
+            "share_url": f"/share/{token.token}",
+            "token": token.token,
+            "expire_time": token.expire_time.isoformat() if token.expire_time else None,
+            "max_access_count": token.max_access_count,
+            "current_access_count": token.current_access_count or 0,
+            "password_protected": bool(token.password_hash),
+        },
+    }
+
+
 @router.delete("/{share_id}", dependencies=[Depends(PermissionChecker("share:delete"))])
 @audit_action("share_revoke", module="shares")
 async def revoke_share(request: Request, share_id: UUID, db: AsyncSession = Depends(get_db)):

@@ -93,6 +93,13 @@
         </el-descriptions-item>
       </el-descriptions>
 
+      <!-- 分享复用：把最近一次分享的链接/二维码留在详情页，避免创建后错过复制 -->
+      <ShareLinkCard
+        v-if="hasPerm('share:view')"
+        :share="shareLink"
+        :loading="shareLoading"
+      />
+
       <!-- FR-2：编辑走独立页面 /proposals/:id/edit（ProposalEditor.vue）；平面图区带锚点供编辑页跳回 -->
       <el-divider
         id="floor-plans"
@@ -333,14 +340,15 @@ import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { DocumentChecked, List, ChatDotRound } from '@element-plus/icons-vue'
-import { proposalApi, aiApi } from '@/api'
+import { proposalApi, aiApi, shareApi } from '@/api'
 import { useAuthStore } from '@/stores/auth'
 import { formatMoney } from '@/utils/money'
 import { hasPermission } from '@/types/permissions'
 import type { PolishContent } from '@/types/ai'
 import { tryParseJson, isPolishFailed } from '@/types/ai'
-import type { Proposal, ProposalItem } from '@/types/sales'
+import type { Proposal, ProposalItem, ShareLinkInfo } from '@/types/sales'
 import ProposalFloorPlanManager from '@/components/ProposalFloorPlanManager.vue'
+import ShareLinkCard from '@/components/ShareLinkCard.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -381,6 +389,8 @@ const showPolishSection = computed<boolean>(() => {
 })
 
 const enrichedItems = ref<ProposalItem[]>([])
+const shareLink = ref<ShareLinkInfo | null>(null)
+const shareLoading = ref(false)
 
 const fetchProposal = async () => {
   loading.value = true
@@ -395,6 +405,20 @@ const fetchProposal = async () => {
   } finally {
     loading.value = false
     itemsLoading.value = false
+  }
+}
+
+/** 详情页复用最近一次分享：没有分享时 data=null，显示空态而不是报错。 */
+const fetchShareLink = async () => {
+  if (!hasPerm('share:view')) return
+  shareLoading.value = true
+  try {
+    const res = await shareApi.getByTarget('proposal', proposalId.value)
+    shareLink.value = res.data ?? null
+  } catch {
+    shareLink.value = null
+  } finally {
+    shareLoading.value = false
   }
 }
 
@@ -448,10 +472,13 @@ const onImgError = (row: ProposalItem) => {
 // Reset showRaw when proposal changes
 watch(proposalId, () => {
   showRaw.value = false
+  shareLink.value = null
+  void fetchShareLink()
 })
 
 onMounted(async () => {
   await fetchProposal()
+  void fetchShareLink()
   // 编辑页「在详情页管理平面图」带 #floor-plans 锚点跳入，加载完滚到平面图区
   if (route.hash) {
     await nextTick()

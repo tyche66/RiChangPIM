@@ -59,13 +59,19 @@
         <el-sub-menu index="m-sales">
           <template #title>
             <el-icon><DocumentCopy /></el-icon>
-            <span>销售管理</span>
+            <span>销售工作台</span>
           </template>
           <el-menu-item index="/proposals">
             方案管理
           </el-menu-item>
           <el-menu-item index="/quotations">
             报价管理
+          </el-menu-item>
+          <el-menu-item
+            v-if="hasPerm('share:view')"
+            index="/shares"
+          >
+            分享管理
           </el-menu-item>
         </el-sub-menu>
         <el-sub-menu
@@ -129,9 +135,6 @@
           </el-menu-item>
           <el-menu-item index="/roles">
             角色权限
-          </el-menu-item>
-          <el-menu-item index="/shares">
-            分享管理
           </el-menu-item>
           <el-menu-item index="/logs">
             操作日志
@@ -379,11 +382,11 @@ const routeLabels: Record<string, [string, string]> = {
   media: ['产品管理', '媒体库'],
   'scene-images': ['产品管理', '场景图管理'],
   quality: ['产品管理', '数据质量'],
-  proposals: ['销售管理', '方案管理'],
-  quotations: ['销售管理', '报价管理'],
+  proposals: ['销售工作台', '方案管理'],
+  quotations: ['销售工作台', '报价管理'],
   users: ['系统管理', '用户管理'],
   roles: ['系统管理', '角色权限'],
-  shares: ['系统管理', '分享管理'],
+  shares: ['销售工作台', '分享管理'],
   logs: ['系统管理', '操作日志'],
   settings: ['系统管理', '全局设置'],
   announcements: ['系统管理', '公告管理'],
