@@ -385,6 +385,7 @@ const routeLabels: Record<string, [string, string]> = {
   roles: ['系统管理', '角色权限'],
   shares: ['系统管理', '分享管理'],
   logs: ['系统管理', '操作日志'],
+  settings: ['系统管理', '全局设置'],
   announcements: ['系统管理', '公告管理'],
   'ai-select': ['AI 功能', 'AI 选品'],
   'ai/config': ['AI 功能', 'AI 配置中心'],
@@ -405,7 +406,11 @@ const currentLabels = computed(
   () => routeLabels[route.path] || routeLabels[route.path.split('/')[1]] || ['工作台', 'AI-PIM'],
 )
 const pageSection = computed(() => currentLabels.value[0])
-const pageTitle = computed(() => route.params.id ? `${currentLabels.value[1]}详情` : currentLabels.value[1])
+const pageTitle = computed(() => {
+  if (route.name === 'ProposalCreate') return '新增方案'
+  if (route.name === 'ProposalEdit') return '编辑方案'
+  return route.params.id ? `${currentLabels.value[1]}详情` : currentLabels.value[1]
+})
 // 顶栏只显示真实用户名。「当前用户」是标签，不参与占位——不用它冒名顶替真实用户名。
 // profileResolved 标记「/auth/me 这一轮已经跑完」：ensureUser() 失败是静默的
 // （stores/auth.ts:114-119），跑完还拿不到 profile 就必须把文案从「加载中…」切走，
