@@ -9,7 +9,7 @@
  * 页面只有一个输入组件；类型胶囊和能力入口都只把关键词**预填**进输入框，
  * 不直接触发搜索，用户仍需自己按发送或 Enter。
  */
-import { computed, nextTick, ref } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 
 const props = defineProps<{ busy: boolean }>()
 const emit = defineEmits<{ submit: [message: string]; stop: [] }>()
@@ -23,6 +23,17 @@ const activeType = ref('')
 const field = ref<HTMLTextAreaElement | null>(null)
 
 const canSubmit = computed(() => Boolean(value.value.trim()) && !props.busy)
+
+/**
+ * 手动输入同步：输入框以某个产品类型开头（后面是空白或结尾）时，
+ * 对应胶囊自动进入选中态；删掉该词后自动取消选中。
+ * 不影响 pickType 的既有行为（pickType 改 value 后同样落到这里，结果一致）。
+ */
+watch(value, (text) => {
+  const trimmed = text.trimStart()
+  const matched = PRODUCT_TYPES.find((type) => new RegExp(`^${type}(?=\\s|$)`).test(trimmed))
+  activeType.value = matched || ''
+})
 
 function autoGrow() {
   const el = field.value

@@ -77,9 +77,18 @@ export function formatPrice(value: unknown): string {
   })}`
 }
 
+/** 后端库存枚举 → 中文展示；已经是中文（或其他未知值）时原样返回。 */
+const STOCK_LABELS: Record<string, string> = {
+  in_stock: '有货',
+  out_of_stock: '缺货',
+  preorder: '预售',
+  unknown: '库存待确认',
+}
+
 export function formatStock(value: unknown): string {
-  if (value === 'unknown' || value === null || value === undefined || value === '') return '库存待确认'
-  return String(value)
+  if (value === null || value === undefined || value === '') return '库存待确认'
+  const text = String(value)
+  return STOCK_LABELS[text] || text
 }
 
 /** 长 ID 只在技术信息里展示；界面上默认收敛成短码，避免占用注意力。 */

@@ -117,6 +117,16 @@ onMounted(async () => {
   display: none;
 }
 
+/* 打开态显式居中（fixed + inset:0 + margin:auto），避免落到左下角；
+   宽度与 flex 布局仍由上面的基础规则承担 */
+.announcement-dialog[open] {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  height: fit-content;
+  max-height: min(70vh, 640px);
+}
+
 .announcement-dialog::backdrop {
   background: var(--scrim-dialog);
 }

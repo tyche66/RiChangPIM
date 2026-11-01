@@ -121,7 +121,7 @@ async function handleExportPdf() {
         </button>
       </div>
     </div>
-    <div class="table-scroll">
+    <div class="table-scroll compare-scroll" tabindex="0" aria-label="产品比较表，可横向和纵向滚动">
       <table class="compare-table">
         <thead>
           <tr class="compare-media">
