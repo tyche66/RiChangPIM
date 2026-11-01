@@ -112,6 +112,11 @@ onMounted(async () => {
   box-shadow: var(--shadow-pop);
 }
 
+/* 作者样式 display:flex 的优先级高于 UA 的 dialog:not([open])，必须显式关掉 */
+.announcement-dialog:not([open]) {
+  display: none;
+}
+
 .announcement-dialog::backdrop {
   background: var(--scrim-dialog);
 }

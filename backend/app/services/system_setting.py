@@ -177,12 +177,12 @@ async def get_settings(db: AsyncSession) -> SystemSettingRead:
 
 async def get_share_defaults(db: AsyncSession) -> ShareSettings:
     """分享缺省值（expire_hours / max_access_count / require_password）。"""
-    return (await get_snapshot(db)).share
+    return (await get_snapshot(db)).settings.share
 
 
 async def get_business_defaults(db: AsyncSession) -> BusinessSettings:
     """业务缺省值（默认税率 / 金额小数位 / 货币符号）。"""
-    return (await get_snapshot(db)).business
+    return (await get_snapshot(db)).settings.business
 
 
 async def get_public_settings(db: AsyncSession) -> PublicSettings:
@@ -256,7 +256,7 @@ async def save_settings(db: AsyncSession, payload: SystemSettingUpdate) -> Syste
     row.data = _clean_stored(raw)
     await db.commit()
     invalidate_cache()
-    return merged.settings
+    return merged
 
 
 _KNOWN_FIELDS: dict[str, set[str]] = {

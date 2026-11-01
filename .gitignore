@@ -50,3 +50,6 @@ opencode.json.backup.*
 
 # 回收站：弃用内容一律移入同级 回收站/，不纳入版本控制（匹配任意层级）
 回收站/
+
+# OpenChamber browser captures
+.openchamber/
