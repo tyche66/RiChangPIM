@@ -67,6 +67,20 @@ const routes = [
         component: () => import('@/views/Proposals.vue'),
         meta: { permissions: ['proposal:view'], permission: 'proposal:view' },
       },
+      // FR-2：创建/编辑统一页面。两条静态路由必须声明在 `proposals/:id` 之前，
+      // 否则 `/proposals/create` 会被详情路由的 `:id` 参数抢先匹配。
+      {
+        path: 'proposals/create',
+        name: 'ProposalCreate',
+        component: () => import('@/views/ProposalEditor.vue'),
+        meta: { permissions: ['proposal:create'], permission: 'proposal:create' },
+      },
+      {
+        path: 'proposals/:id/edit',
+        name: 'ProposalEdit',
+        component: () => import('@/views/ProposalEditor.vue'),
+        meta: { permissions: ['proposal:edit'], permission: 'proposal:edit' },
+      },
       {
         path: 'proposals/:id',
         name: 'ProposalDetail',

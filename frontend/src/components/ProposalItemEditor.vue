@@ -1,7 +1,7 @@
 <template>
   <div
     class="proposal-item-editor"
-    :class="{ 'proposal-item-editor--compact': compact }"
+    :class="{ 'proposal-item-editor--compact': compact, 'proposal-item-editor--page': page }"
   >
     <div class="product-picker">
       <el-select
@@ -164,6 +164,11 @@ interface Props {
   modelValue?: ProposalItem[]
   /** 紧凑模式：字段排成两列网格，适合放在较窄的弹窗里 */
   compact?: boolean
+  /**
+   * 页面级模式（FR-2）：用在全宽编辑页。去掉内部滚动（页面自然滚动）、
+   * 商品搜索固定在明细区顶部、字段栅格按视口宽度走 4/2/1 列三档。
+   */
+  page?: boolean
 }
 
 interface Emits {
@@ -174,6 +179,7 @@ interface Emits {
 const props = withDefaults(defineProps<Props>(), {
   modelValue: () => [],
   compact: false,
+  page: false,
 })
 
 const emit = defineEmits<Emits>()
@@ -501,6 +507,48 @@ const onCoverError = (e: Event) => {
 .proposal-item-editor--compact .item-cover {
   width: 40px;
   height: 40px;
+}
+
+/*
+ * 页面级模式（FR-2）：全宽编辑页。去掉内部 max-height/overflow（页面自然滚动），
+ * 商品搜索固定在明细区顶部（sticky，滚过基础信息后始终可搜），
+ * 字段栅格 ≥1200px 四列（数量/备注/楼层/空间，材质说明跨整行）。
+ */
+.proposal-item-editor--page .items-list {
+  max-height: none;
+  overflow-y: visible;
+  gap: 12px;
+  padding-right: 0;
+}
+
+.proposal-item-editor--page .product-picker {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  padding: 10px 0;
+  margin: -10px 0 2px;
+  background: var(--pim-overlay);
+  border-radius: var(--radius-sm);
+}
+
+.proposal-item-editor--page .item-fields {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.proposal-item-editor--page .item-space-id {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 1199px) {
+  .proposal-item-editor--page .item-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 767px) {
+  .proposal-item-editor--page .item-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 /* Capsule styling */

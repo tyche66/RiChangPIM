@@ -14,8 +14,7 @@
               @click="handleEdit"
             >
               编辑
-            </el-button>
-            <el-button
+            </el-button>            <el-button
               v-if="hasPerm('quotation:create')"
               type="success"
               class="capsule-btn capsule-btn-primary"
@@ -93,9 +92,11 @@
         </el-descriptions-item>
       </el-descriptions>
 
+      <!-- FR-2：编辑走独立页面 /proposals/:id/edit（ProposalEditor.vue）；平面图区带锚点供编辑页跳回 -->
       <el-divider
+        id="floor-plans"
         content-position="left"
-        class="glass-divider"
+        class="glass-divider floor-plans-anchor"
       >
         方案平面图
       </el-divider>
@@ -323,80 +324,20 @@
         />
       </div>
     </el-card>
-
-    <!-- Edit Dialog -->
-    <el-dialog
-      v-model="showEditDialog"
-      title="编辑方案"
-      class="glass-dialog"
-      append-to-body
-      lock-scroll
-      :close-on-click-modal="false"
-      width="640px"
-    >
-      <el-form
-        ref="editFormRef"
-        :model="editForm"
-        :rules="editFormRules"
-        label-width="100px"
-      >
-        <el-form-item
-          label="方案名称"
-          prop="proposal_name"
-        >
-          <el-input
-            v-model="editForm.proposal_name"
-            class="capsule-input"
-          />
-        </el-form-item>
-        <el-form-item
-          label="客户名称"
-          prop="customer_name"
-        >
-          <el-input
-            v-model="editForm.customer_name"
-            class="capsule-input"
-          />
-        </el-form-item>
-        <el-form-item
-          label="商品明细"
-        >
-          <ProposalItemEditor v-model="editForm.items" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button
-          class="capsule-btn"
-          @click="showEditDialog = false"
-        >
-          取消
-        </el-button>
-        <el-button
-          type="primary"
-          :loading="editLoading"
-          class="capsule-btn capsule-btn-primary"
-          @click="handleEditSubmit"
-        >
-          确定
-        </el-button>
-      </template>
-    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed, watch } from 'vue'
+import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { DocumentChecked, List, ChatDotRound } from '@element-plus/icons-vue'
-import type { FormInstance, FormRules } from 'element-plus'
 import { proposalApi, aiApi } from '@/api'
 import { useAuthStore } from '@/stores/auth'
 import { hasPermission } from '@/types/permissions'
 import type { PolishContent } from '@/types/ai'
 import { tryParseJson, isPolishFailed } from '@/types/ai'
 import type { Proposal, ProposalItem } from '@/types/sales'
-import ProposalItemEditor from '@/components/ProposalItemEditor.vue'
 import ProposalFloorPlanManager from '@/components/ProposalFloorPlanManager.vue'
 
 const route = useRoute()
@@ -419,21 +360,8 @@ const loading = ref(false)
 const itemsLoading = ref(false)
 const proposal = ref<Proposal | null>(null)
 const items = ref<ProposalItem[]>([])
-const showEditDialog = ref(false)
-const editLoading = ref(false)
 const polishLoading = ref(false)
 const showRaw = ref(false)
-const editFormRef = ref<FormInstance>()
-
-const editForm = reactive({
-  proposal_name: '',
-  customer_name: '',
-  items: [] as ProposalItem[],
-})
-
-const editFormRules: FormRules = {
-  proposal_name: [{ required: true, message: '请输入方案名称', trigger: 'blur' }],
-}
 
 const polishParsed = computed<PolishContent | null>(() => {
   const content = proposal.value?.ai_polish_content
@@ -468,53 +396,9 @@ const fetchProposal = async () => {
   }
 }
 
+// FR-2：编辑改走独立页面 /proposals/:id/edit，由 ProposalEditor 承接
 const handleEdit = () => {
-  editForm.proposal_name = proposal.value?.proposal_name || ''
-  editForm.customer_name = proposal.value?.customer_name || ''
-  editForm.items = [...(enrichedItems.value || items.value)]
-  showEditDialog.value = true
-}
-
-const handleEditSubmit = async () => {
-  if (!editFormRef.value) return
-  await editFormRef.value.validate(async (valid) => {
-    if (!valid) return
-    // Validate at least one item
-    if (editForm.items.length === 0) {
-      ElMessage.warning('请至少添加一项商品')
-      return
-    }
-    // Validate quantities
-    for (const item of editForm.items) {
-      if (!Number.isInteger(item.quantity) || item.quantity < 1) {
-        ElMessage.warning(`商品 "${item.product_name || item.product_id}" 的数量必须为正整数`)
-        return
-      }
-    }
-    editLoading.value = true
-    try {
-      await proposalApi.update(proposalId.value, {
-        proposal_name: editForm.proposal_name,
-        customer_name: editForm.customer_name,
-        items: editForm.items.map((item) => ({
-          product_id: item.product_id.trim(),
-          quantity: item.quantity,
-          remark: item.remark?.trim() || undefined,
-          project_space_id: item.project_space_id || undefined,
-          floor_label: item.floor_label?.trim() || undefined,
-          space_label: item.space_label?.trim() || undefined,
-          material_desc: item.material_desc?.trim() || undefined,
-        })),
-      })
-      ElMessage.success('更新成功')
-      showEditDialog.value = false
-      fetchProposal()
-    } catch {
-      // error handled by interceptor
-    } finally {
-      editLoading.value = false
-    }
-  })
+  router.push(`/proposals/${proposalId.value}/edit`)
 }
 
 const handleCreateQuotation = () => {
@@ -564,7 +448,14 @@ watch(proposalId, () => {
   showRaw.value = false
 })
 
-onMounted(fetchProposal)
+onMounted(async () => {
+  await fetchProposal()
+  // 编辑页「在详情页管理平面图」带 #floor-plans 锚点跳入，加载完滚到平面图区
+  if (route.hash) {
+    await nextTick()
+    document.getElementById(route.hash.slice(1))?.scrollIntoView({ behavior: 'smooth' })
+  }
+})
 </script>
 
 <style scoped>
@@ -711,6 +602,11 @@ onMounted(fetchProposal)
 .glass-divider {
   border-color: rgba(var(--pim-brand), 0.1);
   margin: 24px 0 16px;
+}
+
+/* 编辑页跳回管理平面图时的锚点落点，留一点顶部呼吸空间 */
+.floor-plans-anchor {
+  scroll-margin-top: 16px;
 }
 
 .glass-divider :deep(.el-divider__text) {
@@ -883,40 +779,6 @@ onMounted(fetchProposal)
   margin-top: 8px;
 }
 
-/* ===== Glass Dialog ===== */
-.glass-dialog :deep(.el-dialog) {
-  border-radius: var(--radius-lg) !important;
-  overflow: hidden;
-  box-shadow: 0 20px 60px rgba(var(--pim-brand), 0.15);
-}
-
-.glass-dialog :deep(.el-dialog__header) {
-  background: linear-gradient(135deg, rgba(var(--pim-brand), 0.06), rgba(var(--pim-brand), 0.02));
-  padding: 20px 24px 16px;
-  margin-right: 0;
-  border-bottom: 1px solid rgba(var(--pim-brand), 0.06);
-}
-
-.glass-dialog :deep(.el-dialog__title) {
-  color: var(--text-primary);
-  font-weight: 700;
-  font-size: 18px;
-}
-
-.glass-dialog :deep(.el-dialog__body) {
-  padding: 24px;
-}
-
-.glass-dialog :deep(.el-dialog__footer) {
-  padding: 16px 24px;
-}
-
-.capsule-input :deep(.el-input__wrapper) {
-  border-radius: 20px;
-  box-shadow: 0 0 0 1px rgba(var(--pim-brand), 0.1) inset;
-  padding: 4px 16px;
-}
-
 /* ===== Responsive ===== */
 @media (max-width: 768px) {
   .proposal-detail {
@@ -950,16 +812,6 @@ onMounted(fetchProposal)
   .glass-descriptions :deep(.el-descriptions__label),
   .glass-descriptions :deep(.el-descriptions__content) {
     font-size: 12px;
-  }
-
-  .glass-dialog :deep(.el-dialog) {
-    width: 95vw !important;
-    max-width: 95vw;
-    margin: 8px auto;
-  }
-
-  .glass-dialog :deep(.el-dialog__body) {
-    padding: 16px;
   }
 }
 </style>

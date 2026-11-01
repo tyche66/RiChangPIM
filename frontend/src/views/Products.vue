@@ -1479,11 +1479,12 @@ const finishProposal = async () => {
   const storageKey = `proposal_token_${tokenId}`
   try {
     sessionStorage.setItem(storageKey, JSON.stringify(token))
+    // FR-2：选品直接进入独立创建页，由 ProposalEditor 消费 selection_token（只能用一次）
     const navigationFailure = await router.push({
-      path: '/proposals',
+      path: '/proposals/create',
       query: { mode: 'create', selection_token: tokenId },
     })
-    if (navigationFailure || router.currentRoute.value.path !== '/proposals') {
+    if (navigationFailure || router.currentRoute.value.path !== '/proposals/create') {
       throw navigationFailure || new Error('proposal route was not reached')
     }
     exitProposalMode()
