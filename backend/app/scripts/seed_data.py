@@ -130,6 +130,9 @@ PERMISSIONS = [
     ("content:manage", "内容Skill管理", "content", "manage", "write"),
     ("ai:config", "AI 配置管理", "ai", "config", "write"),
     ("reminder:edit", "提醒管理", "reminder", "edit", "write"),
+    # 公告（FR-4）
+    ("announcement:view", "公告查看", "announcement", "view", "read"),
+    ("announcement:manage", "公告管理", "announcement", "manage", "write"),
 ]
 
 # 角色 -> 权限映射；"*" 表示全部权限点

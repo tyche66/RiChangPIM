@@ -5,6 +5,7 @@
  */
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import AnnouncementDialog from '@/components/AnnouncementDialog.vue'
 import AppHeader from '@/components/AppHeader.vue'
 import ScopePanel from '@/components/ScopePanel.vue'
 import { useAuthStore } from '@/stores/auth'
@@ -71,4 +72,6 @@ async function quickStart(prompt: string) {
       </section>
     </div>
   </main>
+
+  <AnnouncementDialog />
 </template>
