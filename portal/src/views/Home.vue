@@ -268,8 +268,8 @@ function handleRegister() {
 
 .login-logo {
   display: block;
-  width: 56px;
-  height: 56px;
+  width: 132px;
+  height: auto;
   margin: 0 auto 22px;
   object-fit: contain;
 }
@@ -529,8 +529,8 @@ function handleRegister() {
   }
 
   .login-logo {
-    width: 52px;
-    height: 52px;
+    width: 112px;
+    height: auto;
     margin-bottom: 18px;
   }
 
