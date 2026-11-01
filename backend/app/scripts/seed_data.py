@@ -133,6 +133,9 @@ PERMISSIONS = [
     # 全局设置（FR-3）：仅 admin 通过 "*" 获得这两个权限点，不改其它角色
     ("setting:view", "全局设置查看", "setting", "view", "read"),
     ("setting:edit", "全局设置编辑", "setting", "edit", "write"),
+    # 公告（FR-4）
+    ("announcement:view", "公告查看", "announcement", "view", "read"),
+    ("announcement:manage", "公告管理", "announcement", "manage", "write"),
 ]
 
 # 角色 -> 权限映射；"*" 表示全部权限点

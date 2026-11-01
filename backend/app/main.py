@@ -14,6 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1 import (
     ai,
     ai_config,
+    announcements,
     audit,
     auth,
     categories,
@@ -309,6 +310,7 @@ app.include_router(reminders_router)
 app.include_router(scene_images_router, prefix="/api/v1/scene-images", tags=["scene_images"])
 app.include_router(settings_router, tags=["settings"])
 app.include_router(version.router, prefix="/api/v1", tags=["version"])
+app.include_router(announcements.router, tags=["announcements"])
 
 
 _READY_CACHE: tuple[float, dict[str, object]] | None = None

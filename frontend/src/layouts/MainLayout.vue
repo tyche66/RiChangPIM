@@ -142,6 +142,12 @@
           >
             全局设置
           </el-menu-item>
+          <el-menu-item
+            v-if="isAdmin && hasPerm('announcement:view')"
+            index="/announcements"
+          >
+            公告管理
+          </el-menu-item>
         </el-sub-menu>
         <el-sub-menu index="m-ai">
           <template #title>
@@ -274,6 +280,7 @@
     </el-dialog>
 
     <TodoDrawer v-model="todoDrawerOpen" />
+    <AnnouncementPopup />
   </el-container>
 </template>
 
@@ -287,6 +294,7 @@ import { hasPermission } from '@/types/permissions'
 import ThemeToggle from '@/components/ThemeToggle.vue'
 import NotificationBell from '@/components/NotificationBell.vue'
 import TodoDrawer from '@/components/TodoDrawer.vue'
+import AnnouncementPopup from '@/components/AnnouncementPopup.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -331,6 +339,7 @@ const subMenuMap: Record<string, string> = {
   roles: 'm-admin',
   shares: 'm-admin',
   logs: 'm-admin',
+  announcements: 'm-admin',
   'ai-select': 'm-ai',
   manuals: 'm-ai',
   import: 'm-ai',
@@ -376,6 +385,7 @@ const routeLabels: Record<string, [string, string]> = {
   roles: ['系统管理', '角色权限'],
   shares: ['系统管理', '分享管理'],
   logs: ['系统管理', '操作日志'],
+  announcements: ['系统管理', '公告管理'],
   'ai-select': ['AI 功能', 'AI 选品'],
   'ai/config': ['AI 功能', 'AI 配置中心'],
   'knowledge-index': ['AI 功能', '向量索引'],

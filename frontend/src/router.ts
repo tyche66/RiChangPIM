@@ -216,6 +216,16 @@ const routes = [
         },
       },
       {
+        path: 'announcements',
+        name: 'Announcements',
+        component: () => import('@/views/Announcements.vue'),
+        meta: {
+          permissions: ['announcement:view'],
+          permission: 'announcement:view',
+          adminOnly: true,
+        },
+      },
+      {
         path: 'version',
         name: 'Version',
         component: () => import('@/views/Version.vue'),

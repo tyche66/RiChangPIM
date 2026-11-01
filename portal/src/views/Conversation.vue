@@ -32,6 +32,7 @@ import {
   type StreamEvent,
 } from '@/api'
 import AnswerBody from '@/components/AnswerBody.vue'
+import AnnouncementDialog from '@/components/AnnouncementDialog.vue'
 import AppHeader from '@/components/AppHeader.vue'
 import CapabilityBar from '@/components/CapabilityBar.vue'
 import ChatInput from '@/components/ChatInput.vue'
@@ -718,6 +719,7 @@ onMounted(() => {
       </CollapseSection>
     </section>
     <SourceDialog :source="activeSource" @close="activeSource = null" />
+    <AnnouncementDialog />
 
   </main>
 </template>

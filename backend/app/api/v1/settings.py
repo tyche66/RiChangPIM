@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Iterator
+from datetime import UTC
 from email.utils import format_datetime
 from typing import Any
 from urllib.parse import quote
@@ -167,7 +168,7 @@ def _cache_headers(etag: str, attachment: Attachment) -> dict[str, str]:
     }
     if attachment.update_time is not None:
         headers["Last-Modified"] = format_datetime(
-            attachment.update_time.astimezone(attachment.update_time.tzinfo), usegmt=True
+            attachment.update_time.astimezone(UTC), usegmt=True
         )
     return headers
 
