@@ -340,10 +340,18 @@
             />
           </el-select>
         </el-form-item>
-        <el-form-item label="访问密码">
+        <el-form-item label="要求访问密码">
+          <el-switch v-model="shareRequirePassword" />
+        </el-form-item>
+        <el-form-item
+          v-if="shareRequirePassword"
+          label="访问密码"
+        >
           <el-input
             v-model="shareForm.password"
-            placeholder="留空则无需密码"
+            type="password"
+            show-password
+            placeholder="至少 8 位"
             class="capsule-input"
           />
         </el-form-item>
@@ -398,6 +406,7 @@ import type { FormInstance, FormRules } from 'element-plus'
 import { ArrowDown } from '@element-plus/icons-vue'
 import { proposalApi, shareApi } from '@/api'
 import { proposalFloorPlanApi } from '@/api/proposalFloorPlans'
+import { useSettingsStore } from '@/stores/settings'
 import { customerApi } from '@/api/customer'
 import { projectApi } from '@/api/project'
 import { useAuthStore } from '@/stores/auth'
@@ -410,6 +419,7 @@ import ShareResultDialog from '@/components/ShareResultDialog.vue'
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
+const settingsStore = useSettingsStore()
 
 function hasPerm(perm: string): boolean {
   return hasPermission(authStore.permissions, perm)
@@ -498,6 +508,16 @@ const shareForm = reactive<ShareForm>({
   max_access_count: 100,
 })
 const shareResultUrl = ref('')
+// 是否要求访问密码：默认取全局设置（FR-3），勾选时展开密码输入
+const shareRequirePassword = ref(false)
+
+function prefillShareFormFromSettings() {
+  const share = settingsStore.share
+  shareForm.expire_hours = share.share_default_expire_hours
+  shareForm.max_access_count = share.share_default_max_access_count
+  shareRequirePassword.value = share.share_default_require_password
+  if (!shareRequirePassword.value) shareForm.password = ''
+}
 
 const fetchProposals = async () => {
   loading.value = true
@@ -540,6 +560,8 @@ const handleCreateQuotation = (row: Proposal) => {
 const handleShare = (row: Proposal) => {
   shareForm.target_id = row.id
   shareForm.creator_id = authStore.user?.id || ''
+  // 打开弹窗时按全局设置预填（FR-3）；非管理员读取失败回落默认值
+  void settingsStore.load().then(prefillShareFormFromSettings)
   showShareDialog.value = true
 }
 

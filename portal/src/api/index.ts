@@ -304,3 +304,20 @@ export async function getShareContent(
   return data
 }
 
+/** GET /api/v1/settings/public 的 data：只含品牌字段（FR-3 验收约束）。 */
+export type PublicSettings = {
+  site_name: string
+  portal_title: string
+  portal_subtitle: string
+  footer_text: string
+  logo_url: string | null
+}
+
+/** 匿名拉取公共品牌设置；失败直接抛错，由调用方回落默认文案（FR-3）。 */
+export async function getPublicSettings(): Promise<PublicSettings> {
+  const payload = await apiFetch<{ code: number; data?: PublicSettings }>(
+    '/api/v1/settings/public',
+  )
+  if (!payload.data) throw new Error('settings/public 返回缺少 data')
+  return payload.data
+}

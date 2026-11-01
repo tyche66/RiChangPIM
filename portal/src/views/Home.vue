@@ -8,8 +8,10 @@ import { useRouter } from 'vue-router'
 import AppHeader from '@/components/AppHeader.vue'
 import ScopePanel from '@/components/ScopePanel.vue'
 import { useAuthStore } from '@/stores/auth'
+import { useSettingsStore } from '@/stores/settings'
 
 const auth = useAuthStore()
+const settings = useSettingsStore()
 const router = useRouter()
 
 const username = ref('admin')
@@ -46,8 +48,8 @@ async function quickStart(prompt: string) {
   <main class="auth-shell">
     <div class="auth-inner">
       <section class="auth-hero">
-        <h1>RiChangPIM Portal</h1>
-        <p>内部只读 AI 工作台。产品、资料和质量记录统一走 Knowledge Gateway，答案都带引用来源。</p>
+        <h1>{{ settings.portalTitle }}</h1>
+        <p>{{ settings.portalSubtitle }}</p>
       </section>
 
       <form class="auth-card" @submit.prevent="login">

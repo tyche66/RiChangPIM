@@ -47,6 +47,7 @@ from app.models.sales import (
     Quotation,
     QuotationItem,
 )
+from app.models.system_setting import SystemSetting
 from app.models.user import Permission, Role, RolePermission, User
 
 __all__ = [
@@ -100,6 +101,7 @@ __all__ = [
     "Share",
     "ShareLog",
     "ShareToken",
+    "SystemSetting",
     "Supplier",
     "Tag",
     "User",

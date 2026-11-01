@@ -3,6 +3,7 @@ import { createPinia } from 'pinia'
 
 import App from './App.vue'
 import router from './router'
+import { useSettingsStore } from './stores/settings'
 import { adoptParentSession, applyEmbedChrome } from './utils/embed'
 import { initTheme } from './utils/theme'
 import './styles/main.css'
@@ -14,7 +15,11 @@ initTheme()
 adoptParentSession().then(() => {
   applyEmbedChrome()
   const app = createApp(App)
-  app.use(createPinia())
+  const pinia = createPinia()
+  app.use(pinia)
   app.use(router)
   app.mount('#app')
+  // 公共品牌设置（FR-3）：只加载一次、不 await——失败回落硬编码文案，
+  // 绝不阻塞挂载或白屏。store 成功后会顺带更新浏览器标题。
+  useSettingsStore().load()
 })

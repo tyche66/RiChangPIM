@@ -24,7 +24,7 @@
           <div class="option-info">
             <span class="option-name">{{ p.product_name }}</span>
             <span class="option-no">{{ p.product_no }}</span>
-            <span class="option-price">¥{{ p.face_price?.toFixed(2) ?? '-' }}</span>
+            <span class="option-price">{{ formatMoney(p.face_price) }}</span>
             <span class="option-stock">库存状态 {{ p.stock_status || '-' }}</span>
           </div>
         </el-option>
@@ -62,7 +62,7 @@
               <span class="item-no">{{ item.product_no || '-' }}</span>
             </div>
             <div class="item-meta">
-              <span class="item-face-price">面价 ¥{{ item.face_price?.toFixed(2) ?? '-' }}</span>
+              <span class="item-face-price">面价 {{ formatMoney(item.face_price) }}</span>
               <span class="item-stock">库存状态 {{ item.stock_status || '-' }}</span>
             </div>
           </div>
@@ -157,6 +157,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { productApi } from '@/api'
+import { formatMoney } from '@/utils/money'
 import type { ProposalItem, ProductOption } from '@/types/sales'
 import { Close } from '@element-plus/icons-vue'
 

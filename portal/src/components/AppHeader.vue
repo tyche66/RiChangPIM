@@ -13,22 +13,34 @@
 import { computed } from 'vue'
 import logoColor from '../../../logo/RiChangPIM.png'
 import logoWhite from '../../../logo/RiChangPIM-white.png'
+import { useSettingsStore } from '@/stores/settings'
 import { isDark, toggleTheme } from '@/utils/theme'
 
-withDefaults(defineProps<{ showSubLabel?: boolean }>(), { showSubLabel: true })
+const props = withDefaults(defineProps<{ showSubLabel?: boolean }>(), {
+  showSubLabel: true,
+})
 
-const logoUrl = computed(() => (isDark.value ? logoWhite : logoColor))
+const settingsStore = useSettingsStore()
+
+// 配置了 Logo（公共设置下发）则优先用；为空回落打包资源（深浅两版）。
+const logoUrl = computed(
+  () => settingsStore.logoUrl ?? (isDark.value ? logoWhite : logoColor),
+)
+const brandName = computed(() => settingsStore.siteName)
+const brandAriaLabel = computed(() =>
+  props.showSubLabel ? `${brandName.value} 门户首页` : `${brandName.value} 首页`,
+)
 const themeLabel = computed(() => (isDark.value ? '切换到浅色模式' : '切换到深色模式'))
 </script>
 
 <template>
   <header class="site-header">
     <div class="site-header__inner">
-      <a class="brand-mark" href="/" :aria-label="showSubLabel ? 'RiChangPIM 门户首页' : 'RiChangPIM 首页'">
+      <a class="brand-mark" href="/" :aria-label="brandAriaLabel">
         <span class="brand-mark__badge">
           <img :src="logoUrl" alt="" />
         </span>
-        <span>RiChangPIM</span>
+        <span>{{ brandName }}</span>
         <span v-if="showSubLabel" class="brand-mark__sub">门户</span>
       </a>
       <div class="site-header__actions">

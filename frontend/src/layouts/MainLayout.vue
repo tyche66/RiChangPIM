@@ -136,6 +136,12 @@
           <el-menu-item index="/logs">
             操作日志
           </el-menu-item>
+          <el-menu-item
+            v-if="isAdmin && hasPerm('setting:view')"
+            index="/settings"
+          >
+            全局设置
+          </el-menu-item>
         </el-sub-menu>
         <el-sub-menu index="m-ai">
           <template #title>
@@ -276,6 +282,7 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Briefcase, Cpu, Document, DocumentCopy, InfoFilled, List, Menu, Setting } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
+import { useSettingsStore } from '@/stores/settings'
 import { hasPermission } from '@/types/permissions'
 import ThemeToggle from '@/components/ThemeToggle.vue'
 import NotificationBell from '@/components/NotificationBell.vue'
@@ -414,6 +421,9 @@ onMounted(async () => {
   } finally {
     profileResolved.value = true
   }
+  // 全局设置（FR-3）：后台启动时拉一次（分享弹窗预填/税率默认/金额格式化共用）。
+  // 非管理员 403 时 store 内部回落默认值，不影响使用。
+  void useSettingsStore().load()
 })
 
 const handleLogout = async () => {
