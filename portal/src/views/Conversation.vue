@@ -758,7 +758,7 @@ onMounted(() => {
 }
 .query-history__toggle:hover { color: var(--ink); }
 .query-history__toggle:focus-visible {
-  outline: 2px solid var(--pine);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
   border-radius: var(--radius-sm);
 }
@@ -799,7 +799,7 @@ onMounted(() => {
 .query-history__item + .query-history__item { margin-top: 2px; }
 .query-history__item:hover { background: var(--surface-strong); }
 .query-history__item:focus-visible {
-  outline: 2px solid var(--pine);
+  outline: 2px solid var(--accent);
   outline-offset: -2px;
 }
 .query-history__text {

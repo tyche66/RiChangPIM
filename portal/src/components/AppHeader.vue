@@ -51,5 +51,7 @@ const themeLabel = computed(() => (isDark.value ? '切换到浅色模式' : '切
         <slot />
       </div>
     </div>
+    <!-- VR-1 页眉装饰线：浅色下居中 70vw，中间粗两头细；深色隐藏（样式在 main.css） -->
+    <div class="site-header__rule" aria-hidden="true" />
   </header>
 </template>

@@ -6,16 +6,21 @@
  * 暖色只来自产品摄影；默认不使用阴影与渐变，用留白和间距建立层级。
  *
  * 配色统一走下面的 CSS 变量（唯一入口，组件里不写死颜色）：
- * 北欧极简（Scandinavian Minimalism）色板——
- *   主背景桦木白 #f5f0eb、内容背景白、正文炭灰 #3d3d3d；
+ * 北欧极简（Scandinavian Minimalism）色板（VR-1 调整后）——
+ *   主背景暖灰 #EDEBE6、内容背景白、弱填充 #F4F2ED、正文炭灰 #3d3d3d；
  *   分隔与边框羊毛灰 #d4cdc5，木质色 #a89279 只做品牌字样与警示底色；
- *   松绿 #5a7a6b 负责聚焦/选中/正向状态，峡湾蓝 #7ba0b8 只做极轻的点缀。
+ *   强调色克莱因蓝 #1F3FB0 承担选中/焦点/主行动（hover 加深 #17308A，
+ *   实底文字一律 --on-accent 白色），页眉底部用它做一条 70vw 装饰线；
+ *   松绿 #5a7a6b 只保留成功/正向语义，峡湾蓝 #7ba0b8 只做极轻的点缀。
+ * 页眉在浅色下不再吸顶、无背景/模糊/底边框，分隔交给装饰线。
  * 三档文字色都按 WCAG AA（≥4.5:1）取值，投影一律炭灰调制，
- * 不用纯黑、不用高饱和色、不用渐变。
+ * 不用纯黑、不用渐变。
  *
  * 深色主题由同文件末尾的 .dark-mode 块按「语义角色」重新赋值（不是反相）：
  * 页面 #171e22 / 卡片 #283439 / 一级容器 #202a2e，文字 #edf1ee / #b9c8c2，
- * 松绿 #a4c8b4、峡湾蓝 #a9c8dc、木质 #d5bca4。类名挂在 <html> 上，由
+ * 松绿 #a4c8b4、峡湾蓝 #a9c8dc、木质 #d5bca4。本期视觉规范只覆盖浅色，
+ * 深色保留原配色与吸顶页眉：--accent 映射回松绿（#1F3FB0 在深色底上
+ * 对比不足，不得用作文字或细线），装饰线隐藏。类名挂在 <html> 上，由
  * utils/theme.ts 依据 localStorage('theme') 与系统偏好维护，后台切换主题时
  * 经 storage 事件同步（iframe 嵌入的聊天工作台同样生效）。
  */
@@ -29,19 +34,21 @@
   color-scheme: light;
 
   /* 色彩：北欧极简 Token（对外界面的唯一定义处）*/
-  --bg: #f5f0eb; /* 主背景：桦木白 */
-  --surface: #ffffff; /* 内容背景：白 */
-  --surface-soft: #f7f2ec; /* 弱填充：桦木白的浅一档 */
+  --bg: #EDEBE6; /* 主背景：暖灰 */
+  --surface: #FFFFFF; /* 内容背景：白 */
+  --surface-soft: #F4F2ED; /* 弱填充：推荐词胶囊、产品图衬底等浅暖色 */
   --surface-strong: #ece4da; /* 悬浮填充：暖灰 */
   --ink: #3d3d3d; /* 主文字：炭灰 */
   --ink-muted: #6b6459; /* 辅助文字：暖灰（AA）*/
   --ink-subtle: #6f685a; /* 弱化文字：暖灰（AA）*/
   --wood: #a89279; /* 木质色：品牌装饰与警示底色 */
   --wood-deep: #7f6a4d; /* 木质色深阶：需要过 AA 的小字 */
-  --pine: #5a7a6b; /* 松绿：聚焦 / 选中 / 正向状态 */
+  --accent: #1F3FB0; /* 强调色：选中 / 焦点 / 主行动（VR-1 新增）*/
+  --accent-strong: #17308A; /* 强调色 hover/active：同色系加深 */
+  --pine: #5a7a6b; /* 松绿：仅成功 / 正向状态，不再承担选中/焦点 */
   --fjord: #7ba0b8; /* 峡湾蓝：极轻的点缀（文本选区）*/
   --fjord-soft: rgb(123 160 184 / 24%); /* 峡湾蓝的淡化档：文本选区底色 */
-  --accent-deep: #2f2f2f; /* 主按钮 hover：更深的炭灰 */
+  --accent-deep: #2f2f2f; /* 深色主题实底按钮 hover 用（浅色主按钮改走 accent）*/
   --warn-ink: #7c5a2a;
   --warn-bg: rgb(168 146 121 / 12%);
   --warn-border: rgb(168 146 121 / 34%);
@@ -54,12 +61,12 @@
   --border: #d4cdc5; /* 分隔线 / 卡片描边：羊毛灰 */
   --border-strong: #b0a493; /* 可交互控件描边：略深的羊毛灰（比令牌深一档，保证控件边界可辨）*/
 
-  /* 反白文字：实底（ink / pine）之上的文字色 */
+  /* 反白文字：实底（accent / ink / pine）之上的文字色 */
+  --on-accent: #FFFFFF;
   --on-ink: #ffffff;
   --on-pine: #ffffff;
 
-  /* 半透明容器：顶栏、卡堆指示、弹层遮罩 */
-  --header-bg: rgb(245 240 235 / 88%);
+  /* 半透明容器：卡堆指示、弹层遮罩（页眉不再用背景色，--header-bg 只留在深色）*/
   --nav-bg: rgb(255 255 255 / 88%);
   --scrim-dialog: rgb(61 61 61 / 38%);
   --scrim-scene: rgb(61 61 61 / 46%);
@@ -93,6 +100,8 @@
  *   松绿 #a4c8b4（聚焦/选中）、峡湾蓝 #a9c8dc、木质 #d5bca4（暖点缀）
  * 正文对比度均 ≥4.5:1；禁用态同时降透明度，不只靠颜色。
  * 实底按钮（--ink 底 / --pine 底）上的文字切换到深墨色，保证 ≥4.5:1。
+ * 本期视觉规范只覆盖浅色：--accent 映射回松绿（#1F3FB0 在深色底上
+ * 对比不足，不得用作文字或细线），深色选中/焦点外观与改版前一致。
  */
 .dark-mode {
   color-scheme: dark;
@@ -106,6 +115,8 @@
   --ink-subtle: #9db0a9;
   --wood: #d5bca4;
   --wood-deep: #c8a985;
+  --accent: #a4c8b4; /* 同 --pine：深色沿用松绿承担选中/焦点，不用低对比蓝 */
+  --accent-strong: #a4c8b4;
   --pine: #a4c8b4;
   --fjord: #a9c8dc;
   --fjord-soft: rgb(169 200 220 / 16%);
@@ -122,6 +133,7 @@
   --border: #3e5052;
   --border-strong: #55686a;
 
+  --on-accent: #171e22;
   --on-ink: #171e22;
   --on-pine: #171e22;
 
@@ -150,8 +162,8 @@ body {
   -moz-osx-font-smoothing: grayscale;
   /**
    * 首屏卡堆会有卡片被推到 1200px 内容列之外，通栏白底也用了 100vw。
-   * 用 clip 而不是 hidden：clip 不会生成滚动容器，顶栏的 position: sticky
-   * 才能继续贴在视口上。
+   * 用 clip 而不是 hidden：clip 不会生成滚动容器，深色主题的吸顶页眉
+   * 也不受影响。
    */
   overflow-x: clip;
 }
@@ -162,7 +174,7 @@ a { color: inherit; }
 table { border-collapse: collapse; }
 
 :where(a, button, input, textarea, summary, [tabindex]):focus-visible {
-  outline: 2px solid var(--pine);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
   border-radius: var(--radius-sm);
 }
@@ -193,8 +205,22 @@ table { border-collapse: collapse; }
   color: var(--ink-subtle);
 }
 
-/* ===== 顶部品牌栏（整宽，不随内容列收窄） ===== */
+/* ===== 顶部品牌栏（整宽，不随内容列收窄） =====
+ * VR-1：浅色下页眉不再吸顶，去掉背景色 / 背景模糊 / 底部边框，
+ * 页眉与内容区的分隔交给底部居中的强调色装饰线（.site-header__rule）；
+ * 深色保留原吸顶 + 背景模糊 + 边框，并隐藏装饰线。
+ */
 .site-header {
+  position: static;
+}
+.site-header__rule {
+  width: 70vw;
+  height: 3px;
+  margin: 0 auto;
+  background: var(--accent);
+  clip-path: polygon(0 50%, 6% 0, 94% 0, 100% 50%, 94% 100%, 6% 100%);
+}
+.dark-mode .site-header {
   position: sticky;
   top: 0;
   z-index: 40;
@@ -203,6 +229,7 @@ table { border-collapse: collapse; }
   -webkit-backdrop-filter: blur(14px);
   border-bottom: 1px solid var(--border);
 }
+.dark-mode .site-header__rule { display: none; }
 .site-header__inner {
   width: min(100% - calc(var(--page-gutter) * 2), var(--page-max));
   margin-inline: auto;
@@ -296,7 +323,7 @@ table { border-collapse: collapse; }
 .site-header__theme:hover { background: var(--surface-strong); color: var(--ink); }
 .site-header__theme:active { color: var(--ink-subtle); }
 .site-header__theme:focus-visible {
-  outline: 2px solid var(--pine);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 .site-header__theme svg { width: 17px; height: 17px; display: block; }
@@ -397,7 +424,7 @@ table { border-collapse: collapse; }
   transition: border-color .18s ease, box-shadow .18s ease;
 }
 .composer:focus-within {
-  border-color: var(--pine);
+  border-color: var(--accent);
   box-shadow: var(--shadow-hover);
 }
 .composer__icon {
@@ -406,7 +433,7 @@ table { border-collapse: collapse; }
   transition: color .18s ease;
 }
 .composer__icon svg { width: 20px; height: 20px; display: block; }
-.composer:focus-within .composer__icon { color: var(--pine); }
+.composer:focus-within .composer__icon { color: var(--accent); }
 .composer__field {
   width: 100%;
   min-height: 26px;
@@ -460,12 +487,19 @@ table { border-collapse: collapse; }
 .button:hover:not(:disabled) { border-color: var(--ink); }
 .button:disabled { opacity: .45; cursor: not-allowed; }
 
+/* 主行动入口用强调色实底（VR-1）；深色保留炭灰实底的原有观感 */
 .button--primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
+.button--primary:hover:not(:disabled) { background: var(--accent-strong); border-color: var(--accent-strong); }
+.dark-mode .button--primary {
   background: var(--ink);
   border-color: var(--ink);
   color: var(--on-ink);
 }
-.button--primary:hover:not(:disabled) { background: var(--accent-deep); border-color: var(--accent-deep); }
+.dark-mode .button--primary:hover:not(:disabled) { background: var(--accent-deep); border-color: var(--accent-deep); }
 .button--secondary { color: var(--ink-muted); border-color: var(--border); }
 .button--secondary:hover:not(:disabled) { color: var(--ink); }
 .button--ghost { border-color: transparent; background: transparent; color: var(--ink-muted); }
@@ -489,9 +523,9 @@ table { border-collapse: collapse; }
 }
 .chip:hover { background: var(--surface-strong); color: var(--ink); }
 .chip[aria-pressed="true"] {
-  background: var(--pine);
-  border-color: var(--pine);
-  color: var(--on-pine);
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
 }
 
 .icon-button {
@@ -509,11 +543,17 @@ table { border-collapse: collapse; }
 .icon-button:hover:not(:disabled) { background: var(--surface-soft); }
 .icon-button:disabled { opacity: .35; cursor: not-allowed; }
 .icon-button--send {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
+.icon-button--send:hover:not(:disabled) { background: var(--accent-strong); border-color: var(--accent-strong); }
+.dark-mode .icon-button--send {
   background: var(--ink);
   border-color: var(--ink);
   color: var(--on-ink);
 }
-.icon-button--send:hover:not(:disabled) { background: var(--accent-deep); }
+.dark-mode .icon-button--send:hover:not(:disabled) { background: var(--accent-deep); border-color: var(--accent-deep); }
 .icon-button--quiet {
   width: 32px;
   height: 32px;
@@ -605,7 +645,7 @@ table { border-collapse: collapse; }
   vertical-align: 2px;
   transition: background-color .18s ease, color .18s ease;
 }
-button.citation:hover { background: var(--pine); border-color: var(--pine); color: #fff; }
+button.citation:hover { background: var(--accent-strong); border-color: var(--accent-strong); color: var(--on-accent); }
 .citation--unresolved { border-style: dashed; cursor: default; }
 
 /* ===== 答案正文的 Markdown 排版 =====
@@ -730,7 +770,7 @@ button.citation:hover { background: var(--pine); border-color: var(--pine); colo
   height: 14px;
   flex: none;
   border: 2px solid var(--border-strong);
-  border-top-color: var(--pine);
+  border-top-color: var(--accent);
   border-radius: 50%;
   animation: spin .8s linear infinite;
 }
@@ -1498,6 +1538,7 @@ button.citation:hover { background: var(--pine); border-color: var(--pine); colo
 .share-table th.is-numeric,
 .share-table td.is-numeric { text-align: right; white-space: nowrap; }
 .share-table td { vertical-align: middle; }
+/* FR-1：缩略图与商品名拆成两个独立按钮——缩略图只开画廊，商品名只开详情 */
 .share-product {
   display: flex;
   align-items: center;
@@ -1507,7 +1548,6 @@ button.citation:hover { background: var(--pine); border-color: var(--pine); colo
   text-align: left;
   min-width: 220px;
 }
-.share-product--static { cursor: default; }
 .share-product__thumb {
   flex: none;
   display: grid;
@@ -1519,12 +1559,28 @@ button.citation:hover { background: var(--pine); border-color: var(--pine); colo
   border: 1px solid var(--border);
   background: var(--surface-soft);
 }
+.share-product__thumb--button {
+  padding: 0;
+  cursor: zoom-in;
+  transition: border-color .18s ease, box-shadow .18s ease;
+}
+.share-product__thumb--button:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-hover);
+}
 .share-product__thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .share-product__fallback { font-size: 11px; font-weight: 600; color: var(--ink-subtle); }
-.share-product__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.share-product__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 0;
+  text-align: left;
+}
 .share-product__name { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
 .share-product__hint { font-size: 11.5px; color: var(--ink-subtle); }
-.share-product:not(.share-product--static):hover .share-product__name { text-decoration: underline; }
+.share-product__text:hover .share-product__name { text-decoration: underline; }
 .share-foot {
   display: flex;
   align-items: center;
@@ -1577,6 +1633,14 @@ button.citation:hover { background: var(--pine); border-color: var(--pine); colo
   background: var(--surface-soft);
 }
 .share-detail-dialog__cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* 封面同时是画廊入口（FR-1）：按钮撑满 96px 容器，点击交给父级打开画廊 */
+.share-detail-dialog__cover-btn {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  cursor: zoom-in;
+}
 .share-detail-dialog__facts {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
@@ -1692,12 +1756,12 @@ button.citation:hover { background: var(--pine); border-color: var(--pine); colo
 }
 .plan-tile:hover .plan-tile__name { color: var(--ink); }
 
-/* ===== 平面图全屏查看器 =====
+/* ===== 通用全屏图片查看器（FR-1：平面图与分享页商品画廊共用） =====
  * 原生 dialog 铺满视口；缩放与平移只作用于 <img> 的 transform，
  * 不改变布局，所以不会触发重排。
  */
-.plan-viewer-open { overflow: hidden; }
-.plan-viewer {
+.image-viewer-open { overflow: hidden; }
+.image-viewer {
   position: relative;
   width: 100vw;
   height: 100vh;
@@ -1711,9 +1775,9 @@ button.citation:hover { background: var(--pine); border-color: var(--pine); colo
   display: none;
   grid-template-rows: auto minmax(0, 1fr) auto;
 }
-.plan-viewer[open] { display: grid; }
-.plan-viewer::backdrop { background: var(--scrim-dialog); }
-.plan-viewer__header {
+.image-viewer[open] { display: grid; }
+.image-viewer::backdrop { background: var(--scrim-dialog); }
+.image-viewer__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1722,30 +1786,30 @@ button.citation:hover { background: var(--pine); border-color: var(--pine); colo
   border-bottom: 1px solid var(--border);
   background: var(--surface);
 }
-.plan-viewer__heading { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.plan-viewer__heading h2 {
+.image-viewer__heading { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.image-viewer__heading h2 {
   font-size: 16px;
   overflow-wrap: anywhere;
 }
-.plan-viewer__subtitle {
+.image-viewer__subtitle {
   font-size: 12.5px;
   color: var(--ink-subtle);
 }
-.plan-viewer__tools {
+.image-viewer__tools {
   display: flex;
   align-items: center;
   gap: 6px;
   flex: none;
 }
-.plan-viewer__counter,
-.plan-viewer__zoom {
+.image-viewer__counter,
+.image-viewer__zoom {
   font-size: 12px;
   color: var(--ink-muted);
   font-variant-numeric: tabular-nums;
   min-width: 44px;
   text-align: center;
 }
-.plan-viewer__tool {
+.image-viewer__tool {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1760,13 +1824,13 @@ button.citation:hover { background: var(--pine); border-color: var(--pine); colo
   line-height: 1;
   transition: background-color .18s ease, color .18s ease, border-color .18s ease;
 }
-.plan-viewer__tool:hover {
+.image-viewer__tool:hover {
   background: var(--surface-soft);
   color: var(--ink);
   border-color: var(--border-strong);
 }
-.plan-viewer__tool--text { font-size: 12px; }
-.plan-viewer__stage {
+.image-viewer__tool--text { font-size: 12px; }
+.image-viewer__stage {
   position: relative;
   display: grid;
   place-items: center;
@@ -1775,9 +1839,9 @@ button.citation:hover { background: var(--pine); border-color: var(--pine); colo
   touch-action: none;
   cursor: default;
 }
-.plan-viewer__stage.is-zoomed { cursor: grab; }
-.plan-viewer__stage.is-dragging { cursor: grabbing; }
-.plan-viewer__stage img {
+.image-viewer__stage.is-zoomed { cursor: grab; }
+.image-viewer__stage.is-dragging { cursor: grabbing; }
+.image-viewer__stage img {
   max-width: 100%;
   max-height: 100%;
   display: block;
@@ -1786,7 +1850,14 @@ button.citation:hover { background: var(--pine); border-color: var(--pine); colo
   -webkit-user-drag: none;
   will-change: transform;
 }
-.plan-viewer__nav {
+/* 图片地址带时效，加载失败给出固定兜底文案（不自动重试） */
+.image-viewer__fallback {
+  padding: 24px;
+  color: var(--ink-muted);
+  font-size: 14px;
+  text-align: center;
+}
+.image-viewer__nav {
   position: absolute;
   top: 50%;
   z-index: 2;
@@ -1806,11 +1877,11 @@ button.citation:hover { background: var(--pine); border-color: var(--pine); colo
   -webkit-backdrop-filter: blur(6px);
   transition: background-color .18s ease, color .18s ease;
 }
-.plan-viewer__nav:hover:not(:disabled) { background: var(--surface); color: var(--ink); }
-.plan-viewer__nav:disabled { opacity: .3; cursor: not-allowed; }
-.plan-viewer__nav--prev { left: 16px; }
-.plan-viewer__nav--next { right: 16px; }
-.plan-viewer__hint {
+.image-viewer__nav:hover:not(:disabled) { background: var(--surface); color: var(--ink); }
+.image-viewer__nav:disabled { opacity: .3; cursor: not-allowed; }
+.image-viewer__nav--prev { left: 16px; }
+.image-viewer__nav--next { right: 16px; }
+.image-viewer__hint {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1830,52 +1901,8 @@ button.citation:hover { background: var(--pine); border-color: var(--pine); colo
     border-left: none;
     border-top: 1px solid var(--border);
   }
-  .plan-viewer__hint { display: none; }
-  .plan-viewer__nav { width: 40px; height: 40px; margin-top: -20px; }
-}
-
-/* 场景图灯箱 */
-.scene-dialog {
-  width: min(860px, calc(100vw - 32px));
-  /* 同 share-detail-dialog：设了 width 后必须显式写回居中 */
-  margin: auto;
-  padding: 0;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--surface);
-  color: var(--ink);
-  box-shadow: var(--shadow-pop);
-}
-.scene-dialog::backdrop { background: var(--scrim-scene); }
-.scene-dialog__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 14px 18px;
-  border-bottom: 1px solid var(--border);
-}
-.scene-dialog__header h2 { font-size: 15px; overflow-wrap: anywhere; }
-.scene-dialog__stage {
-  display: grid;
-  place-items: center;
-  background: var(--surface-soft);
-  max-height: min(70vh, 620px);
-  overflow: hidden;
-}
-.scene-dialog__stage img {
-  max-width: 100%;
-  max-height: min(70vh, 620px);
-  display: block;
-  object-fit: contain;
-}
-.scene-dialog__footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 12px 18px;
-  border-top: 1px solid var(--border);
+  .image-viewer__hint { display: none; }
+  .image-viewer__nav { width: 40px; height: 40px; margin-top: -20px; }
 }
 
 /* ===== 响应式：平板 ===== */
