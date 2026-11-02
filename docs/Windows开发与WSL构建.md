@@ -9,7 +9,7 @@
 | 仓库根（开发位置） | `E:\RiChangPIM` | `/mnt/e/RiChangPIM` |
 | 构建 / 运行 / 测试 | — | `cd /mnt/e/RiChangPIM` 后执行 |
 | 旧位置（仅回退参考） | `\\wsl$\RiChangPIM\home\AI-PIM\RiChangPIM` | `/home/AI-PIM/RiChangPIM` |
-| 全量迁移包存放 | — | `/home/AI-PIM/*.tar.gz`（不进仓库，见 [MIGRATION_BUNDLE.md](../MIGRATION_BUNDLE.md)） |
+| 全量迁移包存放 | — | `/home/AI-PIM/*.tar.gz`（不进仓库，见 [MIGRATION_BUNDLE.md](MIGRATION_BUNDLE.md)） |
 
 `E:\RiChangPIM` 与 `/mnt/e/RiChangPIM` 是**同一份文件**的两个视图，不存在同步问题。
 
@@ -48,7 +48,7 @@ cd /mnt/e/RiChangPIM
 docker compose build && docker compose up -d
 ```
 
-`dist` 是 `COPY` 进 nginx 镜像的，改完前端必须 `docker compose build nginx`；只在本机 build 不会改变 `:888` 上的内容。完整发版顺序见 [版本控制规范和Git.md](../版本控制规范和Git.md) 的「正确顺序」。
+`dist` 是 `COPY` 进 nginx 镜像的，改完前端必须 `docker compose build nginx`；只在本机 build 不会改变 `:888` 上的内容。完整发版顺序见 [版本控制规范和Git.md](版本控制规范和Git.md) 的「正确顺序」。
 
 ## 四、首次在新位置准备环境
 

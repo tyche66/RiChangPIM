@@ -71,8 +71,8 @@ See:
 
 - [Storage volumes](docs/数据卷与持久化存储.md)
 - [MinIO operations](docs/MinIO对象存储.md)
-- [Operations runbook](README-OPS.md)
-- [Full migration bundle](MIGRATION_BUNDLE.md)
+- [Operations runbook](docs/README-OPS.md)
+- [Full migration bundle](docs/MIGRATION_BUNDLE.md)
 - [Cloud update package](docs/云端更新包.md)
 
 ## API Documentation
@@ -96,11 +96,11 @@ For the complete release gate, use `bash scripts/release_gate.sh`. Database inte
 
 - `README.md`: Chinese project overview
 - `README_EN.md`: English project overview
-- `README-OPS.md`: current machine operations and recovery runbook
+- `docs/README-OPS.md`: current machine operations and recovery runbook
 - `docs/`: current product, architecture, API, deployment, storage, and test documentation
 - `docs/过时/`: archived design, planning, review, delivery, and superseded deployment documents
 - `AI-Docs/`: independent pluggable AI architecture, planning, governance, and extension documentation
-- `RELEASE_GATE.md`: release checks
+- `docs/RELEASE_GATE.md`: release checks
 - `CHANGELOG.md`: release history
 
 ## Security

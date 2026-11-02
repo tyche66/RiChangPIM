@@ -1,7 +1,7 @@
 # RiChangPIM 交接文档
 
 > 交接时间：2026-07-31
-> 版本基线：`v1.9.1`（产品媒体导入、AI / Knowledge 增强、媒体分页与文档同步；发布详情见 `CHANGELOG.md`）
+> 版本基线：`v1.9.1`（产品媒体导入、AI / Knowledge 增强、媒体分页与文档同步；发布详情见 `../CHANGELOG.md`）
 > 下一棒方向：**管理后台（`frontend/`）界面美化 + 小部分功能调整**
 > 本文只服务「快速上手」——项目怎么跑、代码在哪、规矩是什么、当前基线是什么。具体任务由用户直接指派，见 §8。
 
@@ -37,7 +37,7 @@ export PATH="$HOME/.nvm/versions/node/v24.18.0/bin:$PATH"
 MSYS2_ARG_CONV_EXCL='*' MSYS_NO_PATHCONV=1 wsl.exe -d RiChangPIM -- sh -c 'cd /home/AI-PIM/RiChangPIM/frontend && npm run dev' | tr -d '\0'
 ```
 
-本地开发四步（详见 `README.md` 的「快速开始」）：
+本地开发四步（详见 `../README.md` 的「快速开始」）：
 
 ```bash
 docker compose -f docker-compose.dev.yml up -d
@@ -133,7 +133,7 @@ docker compose -f docker-compose.dev.yml up -d
 
 涉及文件（**这次不需要再动**）：`portal/src/views/Conversation.vue`、`portal/src/components/{HeroDeck,CapabilityBar,ChatInput}.vue`、`portal/src/utils/reveal.ts`、`portal/src/styles/main.css`、`portal/src/api/index.ts`。
 
-`README.md` 概览表里的「当前版本」和「当前迁移 head」曾停在 `v1.8.0` / `0014_knowledge_tables`，已随本轮 T12 更新为 `v1.8.5` / `0017_operation_log_username`；版本号到底要改哪几处，现在写在 `CHANGELOG.md` 顶部和 `版本控制规范和Git.md` §1.1。
+`../README.md` 概览表里的「当前版本」和「当前迁移 head」曾停在 `v1.8.0` / `0014_knowledge_tables`，已随本轮 T12 更新为 `v1.8.5` / `0017_operation_log_username`；版本号到底要改哪几处，现在写在 `../CHANGELOG.md` 顶部和 `版本控制规范和Git.md` §1.1。
 
 ## 8. 你的任务指派
 

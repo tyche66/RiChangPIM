@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     )
     APP_NAME: str = "AI-PIM"
     DEBUG: bool = False
-    # 产品版本基线。`版本控制规范和Git.md` §1 规定版本号锚点是
+    # 产品版本基线。`docs/版本控制规范和Git.md` §1 规定版本号锚点是
     # `frontend/package.json` 的 version，这里必须跟着一起改（发版清单见
     # `CHANGELOG.md` 顶部的「改版本号要动哪几处」）。
     #

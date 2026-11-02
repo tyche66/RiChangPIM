@@ -17,7 +17,7 @@
 
 - 最近一次完整 RC 构建: 2026-07-29（V1.8.0 — AI 能力生产就绪 + 演示链路统一）
 - 该次构建版本: v1.8.0（Knowledge Gateway 正式上线，AI 门户可演示）
-- 其后的 v1.8.1 / v1.8.2 / v1.8.5 都是门户界面迭代，v1.9.0 是后台界面迭代，按「BUILD_LOG 只在大版本更新」的约定都没有新增完整构建记录；**当前版本以 `CHANGELOG.md` 为准，不要拿这一节的 v1.8.0 当现值。**
+- 其后的 v1.8.1 / v1.8.2 / v1.8.5 都是门户界面迭代，v1.9.0 是后台界面迭代，按「BUILD_LOG 只在大版本更新」的约定都没有新增完整构建记录；**当前版本以 `../CHANGELOG.md` 为准，不要拿这一节的 v1.8.0 当现值。**
 - 构建环境: /home/AI-PIM/RiChangPIM
 - 后端根目录: /home/AI-PIM/RiChangPIM/backend
 - 前端根目录: /home/AI-PIM/RiChangPIM/frontend

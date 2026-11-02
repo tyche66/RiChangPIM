@@ -12,17 +12,17 @@
 
 ## 1.1 版本号的单一事实来源
 
-规范只说了「锚点是 `frontend/package.json`」，没说版本号一共散落在几处，结果 `v1.8.0` → `v1.8.5` 之间有 7 个文件停在旧值（`README.md` 报 v1.8.0、后端兜底报 0.1.0、门户 `package.json` 报 0.1.0）。补一条硬规则：
+规范只说了「锚点是 `frontend/package.json`」，没说版本号一共散落在几处，结果 `v1.8.0` → `v1.8.5` 之间有 7 个文件停在旧值（`../README.md` 报 v1.8.0、后端兜底报 0.1.0、门户 `package.json` 报 0.1.0）。补一条硬规则：
 
-- **当前版本号的现值只认 `CHANGELOG.md` 顶部。** 任何文档要写「当前版本」，要么引用 `CHANGELOG.md`，要么就不写。
-- **手改的位置只有 `CHANGELOG.md`「改版本号要动哪几处」列出的那几处**（前端 `package.json`、门户 `package.json`、`backend/app/core/config.py` 的 `VERSION`、`CHANGELOG.md`、`README.md`、`AI-Docs/README.md`、annotated tag）。发版时按那张表逐项打勾。
+- **当前版本号的现值只认 `../CHANGELOG.md` 顶部。** 任何文档要写「当前版本」，要么引用 `../CHANGELOG.md`，要么就不写。
+- **手改的位置只有 `../CHANGELOG.md`「改版本号要动哪几处」列出的那几处**（前端 `package.json`、门户 `package.json`、`backend/app/core/config.py` 的 `VERSION`、`../CHANGELOG.md`、`../README.md`、`../AI-Docs/README.md`、annotated tag）。发版时按那张表逐项打勾。
 - **派生值不许手写**：`frontend/src/config/version.ts`、`/api/v1/version`、`/health`、OpenAPI 的 `version` 都从上面几处推出来；CI 的 `APP_VERSION` 从 tag 或 `frontend/package.json` 读，不许在脚本里写死版本号。
 - **兜底值也必须是真话**：`settings.VERSION` 这类「没注入时用什么」的默认值要跟着发版一起改，否则忘传构建参数的部署会对外报一个不存在的版本。
 - **版本信息校对页面必须显示真话**：后台「系统管理 → 版本」页（`frontend/src/views/Version.vue`，接口 `GET /api/v1/version`）是唯一让使用者肉眼确认「浏览器里的前端构建」和「正在跑的后台实例」是否同版的地方。发完一个版本，那一页的「前端构建」和「后台运行实例」两块的**版本 / 构建 ID / Git commit / 构建时间四项都不能是 `—`**，且顶部「一致性检查」必须是「一致」。出现 `—` 或「缺少构建信息，无法确认」即视为未发布完成，不等同于版本号改完。
 - **构建时间一律用北京时间（UTC+8），不用 UTC**：`BUILD_TIME` / `VITE_BUILD_TIME` 生成时必须写 `TZ=Asia/Shanghai date +%Y-%m-%dT%H:%M:%S%z`，显式指定时区，不依赖机器设置（GitHub runner 默认 UTC）。版本页的构建时间是给人对照 `git log`、`docker` 事件和报障描述看的，那些都按本地时间记；输出 UTC 会让页面比真实操作慢 8 小时，对不上任何一边。`%z` 必须带上真实偏移，不许写死 `+08:00` 或省略。`BUILD_ID` 里嵌的时间戳同理（`scripts/build_frontends.sh`）。备份类脚本（`backup.sh` / `db_backup.sh` / `minio_backup.sh` 的 `TS_UTC` / `created_utc`）是跨时区审计记录，**继续用 UTC，不要跟着改**。
 - **`docker-compose.yml` 的 `${APP_VERSION:-dev}` 会压掉第 3 处的兜底值**：`config.py` 的 `VERSION` 只在 `APP_VERSION` 完全没设时兜底，而 compose 给 `build args` 和运行时 `environment` 都写了 `APP_VERSION: ${APP_VERSION:-dev}`。于是「忘了传参」时后端对外报的是 `dev`、`BUILD_ID=dev-local`、`GIT_COMMIT=unknown`、`BUILD_TIME=unknown`，`Version.vue` 把这四个值一律渲染成 `—`，`compareBuilds()` 也判 `unknown`。**改 `config.py` 的兜底值不够，必须连 compose 的构建参数一起传**，否则版本页永远说不清。（这条 2026-09-29 在 v1.9.2 上实测复现：`docker inspect` 显示容器内 `APP_VERSION=dev`。）
 - **后端不替前端报版本**：前后端各自独立构建，一致性由 `compareBuilds()` 比对得出，不能由某一端凭空补全另一端的版本号。
-- **历史记录不跟版本走**：`BUILD_LOG.md`、`PROJECT_MANAGEMENT.md`、`TODO.md` 的已发布条目、`docs/08-开发路线图.md` 的里程碑行记的是当时的事实，发新版时不要改写；`RELEASE_GATE.md` 定义的是每次发布都要过的门禁，保持版本无关。
+- **历史记录不跟版本走**：`BUILD_LOG.md`、`PROJECT_MANAGEMENT.md`、`TODO.md` 的已发布条目、`08-开发路线图.md` 的里程碑行记的是当时的事实，发新版时不要改写；`RELEASE_GATE.md` 定义的是每次发布都要过的门禁，保持版本无关。
 
 ## 2. 分支策略
 
@@ -84,7 +84,7 @@ git push -u origin feature/example
 ## 6. 发布流程
 
 1. 确认工作区干净并同步 `origin/main`。
-2. 按 `CHANGELOG.md`「改版本号要动哪几处」逐项更新版本号、发布说明和必要文档（§1.1）。
+2. 按 `../CHANGELOG.md`「改版本号要动哪几处」逐项更新版本号、发布说明和必要文档（§1.1）。
 3. 完成后端专项及完整测试、前端测试、类型检查、构建和关键 E2E。**这一步的构建只用来验证「能构建」，不是上生产的产物**——它跑在版本号改完但尚未提交的工作区上，产物带的 Git commit 会打 `-dirty`。
 4. **合并发布提交到 `main`**（放在构建之前，见 §6.1 第三点）。
 5. **按 §6.1 构建并上生产**：先跑 `scripts/build_frontends.sh` 拿到四项元数据，再用**同样的** `APP_VERSION` / `BUILD_ID` / `GIT_COMMIT` / `BUILD_TIME` 重建后端，最后 `docker compose build nginx` 上门户与后台。三项都不能省：

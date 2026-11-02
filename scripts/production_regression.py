@@ -4,7 +4,7 @@
 Extends the V1.1 baseline of 25 checks with the V1.2 work-package specific
 checks (backup status, audit page, data quality, migration head, capacity
 alert, ops-status, /metrics, idempotent quotation confirm), bringing the
-total close to 35-40 per docs/v1.2-plan.md §7 / RELEASE_GATE.md §7.
+total close to 35-40 per docs/v1.2-plan.md §7 / docs/RELEASE_GATE.md §7.
 """
 
 import argparse

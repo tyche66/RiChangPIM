@@ -63,7 +63,7 @@ v1.9.0 包的 sha256：`cb4f9fc12b43040a219b0b50b6d09b8b11251558adddf3097bdbe9fe
 `frontend/dist`、`portal/dist`、`coverage`、`playwright-report`、`test-results`、`backups/`、`*.log`。
 ## 怎么打一份新的
 
-前提：**工作区干净、版本号已按 [CHANGELOG.md](CHANGELOG.md) 的表改完、tag 已打**——
+前提：**工作区干净、版本号已按 [CHANGELOG.md](../CHANGELOG.md) 的表改完、tag 已打**——
 包里的 `git-status.txt` 就是这件事的证据，脏工作区打出来的包没法说清"包内源码是哪个版本"。
 
 全程**不停、不重启、不修改任何服务**。数据库走 `docker exec pg_dump`，卷是热归档。
@@ -148,7 +148,7 @@ sha256sum "${STAGE##*/}.tar.gz" | tee "${STAGE##*/}.tar.gz.sha256"
 ```
 
 打完在**另一个目录**解一次、`sha256sum -c` 过一遍、抽查源码包里的版本锚点
-（`frontend/package.json`、`portal/package.json`、`backend/app/core/config.py`、`CHANGELOG.md` 顶部）
+（`frontend/package.json`、`portal/package.json`、`backend/app/core/config.py`、`../CHANGELOG.md` 顶部）
 和 `git bundle list-heads` 里有没有这一版的 tag。v1.9.0 包是这么验过的。
 
 从 Windows 侧 `wsl.exe -- sh -c '...'` 套进来跑时注意：`$(date +%Y%m%d…)` 里的 `%` 会被 interop 吃掉，
@@ -228,7 +228,7 @@ sha256sum -c RiChangPIM_v1.9.0_20260731_215300.tar.gz.sha256
 
 按顺序勾：
 
-- [ ] 版本号 7 处锚点已按 [CHANGELOG.md](CHANGELOG.md) 改完，`git status --porcelain` 为空
+- [ ] 版本号 7 处锚点已按 [CHANGELOG.md](../CHANGELOG.md) 改完，`git status --porcelain` 为空
 - [ ] annotated tag 已打并推送，`git ls-remote --tags origin` 能看到
 - [ ] 生产栈是这一版（`:888/api/v1/health` 的 `version` / `build_id` 与 dist 一致）
 - [ ] 磁盘余量 ≥ 5 GB（包 240 MB，中间产物峰值约 2 倍）

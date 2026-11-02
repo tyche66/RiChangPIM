@@ -41,8 +41,8 @@ RiChangPIM 是当前这套 AI-PIM 项目的工作快照，面向产品信息管�
 | 生产入口 | `http://127.0.0.1:888/`（Docker nginx `888:80`；门户 / 分享页 `/share/{token}` / `/admin/` / `/api/v1/*`） |
 | 管理后台入口 | `http://127.0.0.1:888/admin/`（生产 nginx；`:888/admin` 会 301 到带尾斜杠的） |
 | 环境体检 | `bash scripts/where-am-i.sh`（**每次开工第一条命令**） |
-| 实机运维口径 | [README-OPS.md](README-OPS.md)、`/home/AI-PIM/从启动到穿透.md` |
-| 整机迁移 / 灾难恢复 | [MIGRATION_BUNDLE.md](MIGRATION_BUNDLE.md)（全量备份迁移包怎么打、怎么恢复） |
+| 实机运维口径 | [README-OPS.md](docs/README-OPS.md)、`/home/AI-PIM/从启动到穿透.md` |
+| 整机迁移 / 灾难恢复 | [MIGRATION_BUNDLE.md](docs/MIGRATION_BUNDLE.md)（全量备份迁移包怎么打、怎么恢复） |
 | 云端生产升级 | [docs/云端更新包.md](docs/云端更新包.md) |
 | 数据卷 | [docs/数据卷与持久化存储.md](docs/数据卷与持久化存储.md) |
 | MinIO | [docs/MinIO对象存储.md](docs/MinIO对象存储.md) |
@@ -137,7 +137,7 @@ docker compose down      # 或 stop / restart：本机开发端可放心启停
 > 数据是开发样例（如「用户 n / 商品 m」），**不是生产数据**；
 > 停、起、重建、甚至 `docker compose down` 都只影响本地开发端，随时可放心操作，
 > 不存在「动了就是生产事故」的限制。生产入口与真实数据在别的部署环境里，
-> 本地任何操作都不会触及。运维交接文档 `README-OPS.md` 里几处「以实机为准 / 不要连带重启」
+> 本地任何操作都不会触及。运维交接文档 `docs/README-OPS.md` 里几处「以实机为准 / 不要连带重启」
 > 是写这套同构部署时的注意事项，不适用于本地开发端的启停。
 
 只想跑前后端热更新、不碰 `:888` 时，另用 `docker-compose.dev.yml` 起依赖，再分别启动后端、Portal 和 Admin：
@@ -231,7 +231,7 @@ tailscale funnel 888
 ### 2. 生产 / 容器化环境
 
 > 本机（Windows 11 + Docker Desktop + WSL 发行版 `RiChangPIM`）的实机口径见
-> [README-OPS.md](README-OPS.md) 的「这台机器的实机真相」与 `/home/AI-PIM/从启动到穿透.md`。
+> [README-OPS.md](docs/README-OPS.md) 的「这台机器的实机真相」与 `/home/AI-PIM/从启动到穿透.md`。
 > 下面是通用流程。
 
 ```bash
@@ -477,7 +477,7 @@ PYTHONPATH=. pytest
 `app.core.database` 的叶子模块。撞上了要去改应用的 import 链，不要把整个 app 拖进单元层。
 
 这台实机的宿主 python 是 3.14，缺 `pgvector` / `pytest-asyncio` / `pillow` 且 PEP 668 不让往系统装，
-`pytest` 会直接 collect 失败——临时 venv 的配方见 `README-OPS.md` 排障「在宿主机跑 `backend/tests`」。
+`pytest` 会直接 collect 失败——临时 venv 的配方见 `docs/README-OPS.md` 排障「在宿主机跑 `backend/tests`」。
 
 ### 测试数据库
 
@@ -532,9 +532,9 @@ npm run build
 - `docs/09-测试计划.md`
 - `AI-Docs/README.md`：可插拔 AI 设计与规划总入口
 - `docs/过时/README.md`：历史文档归档说明
-- `MIGRATION_BUNDLE.md`：全量迁移包制作与恢复
-- `README-OPS.md`：当前实机运维 runbook
-- `RELEASE_GATE.md`：发布门禁
+- `docs/MIGRATION_BUNDLE.md`：全量迁移包制作与恢复
+- `docs/README-OPS.md`：当前实机运维 runbook
+- `docs/RELEASE_GATE.md`：发布门禁
 
 ## 运行约定
 

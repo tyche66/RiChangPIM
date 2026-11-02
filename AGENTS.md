@@ -33,7 +33,7 @@
 
 ## Git
 - `.gitattributes` 强制 LF;Windows 与 WSL 操作同一仓库,任选一侧提交,不要两边同时改
-- 分支、remote、版本号锚点、tag、CHANGELOG 流程,以 `git` 实际状态和 `版本控制规范和Git.md` 为准,不要凭记忆写数字
+- 分支、remote、版本号锚点、tag、CHANGELOG 流程,以 `git` 实际状态和 `docs/版本控制规范和Git.md` 为准,不要凭记忆写数字
 - 推送前先确认工作区干净
 
 ## 硬规则
@@ -43,7 +43,7 @@
 - 受管理对象改完后,在最终稳定状态只调一次 `aoci_maintain`
 
 ## 需要细节时看
-`docs/Windows开发与WSL构建.md`(环境) · `README-OPS.md`(运维) · `MIGRATION_BUNDLE.md`(全量迁移) · `docs/数据卷与持久化存储.md` · `docs/MinIO对象存储.md`
+`docs/Windows开发与WSL构建.md`(环境) · `docs/README-OPS.md`(运维) · `docs/MIGRATION_BUNDLE.md`(全量迁移) · `docs/数据卷与持久化存储.md` · `docs/MinIO对象存储.md`
 
 <!-- aoci:begin -->
 ## AOCI 仓库认知

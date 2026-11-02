@@ -24,7 +24,7 @@
 #    历史包袱已清：公开分享页 /share/:token 现在由门户承载
 #    （portal/src/views/SharePage.vue），此前那段「把后台静态资源复制一份到
 #    portal/dist」的 merge_admin_static 补丁已随之删除，别再加回来。
-#    改这里的同时记得同步 README-OPS.md 的「已知缺口」。
+#    改这里的同时记得同步 docs/README-OPS.md 的「已知缺口」。
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -35,7 +35,7 @@ if ! command -v node >/dev/null 2>&1; then
   exit 1
 fi
 
-# 版本锚点是 frontend/package.json（见 版本控制规范和Git.md §1.1），这里只读它，
+# 版本锚点是 frontend/package.json（见 docs/版本控制规范和Git.md §1.1），这里只读它，
 # 不去改它——发版时手改那 7 处的清单在 CHANGELOG.md 顶部。
 APP_VERSION="${APP_VERSION:-$(node -p "require('./frontend/package.json').version")}"
 # 构建时间一律用北京时间（UTC+8），不用 UTC。版本信息校对页的「构建时间」是给人看的，
