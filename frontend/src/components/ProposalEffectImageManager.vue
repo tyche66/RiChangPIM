@@ -65,7 +65,7 @@
           >
             <img
               v-if="item.image_url"
-              :src="item.image_url"
+              :src="withThumbWidth(item.image_url, TILE_THUMB_WIDTH)"
               :alt="item.name"
               loading="lazy"
             >
@@ -191,6 +191,7 @@ import MediaPicker from '@/components/MediaPicker.vue'
 import { mediaApi } from '@/api/media'
 import type { MediaItem } from '@/api/media'
 import { proposalEffectImageApi } from '@/api/proposalEffectImages'
+import { TILE_THUMB_WIDTH, withThumbWidth } from '@/utils/thumbnail'
 import type { EffectImageDraft, ProposalEffectImage, ProposalItem } from '@/types/sales'
 
 const MAX_COUNT = 20

@@ -31,6 +31,7 @@ import {
   type ShareSceneImage,
 } from '@/api'
 import { MISSING_TEXT, formatPrice } from '@/utils/format'
+import { withThumbWidth } from '@/utils/image'
 import { useSettingsStore } from '@/stores/settings'
 
 const settings = useSettingsStore()
@@ -444,7 +445,7 @@ onMounted(load)
             >
               <span class="effect-tile__thumb">
                 <img
-                  :src="img.image_url as string"
+                  :src="withThumbWidth(img.image_url, 480)"
                   :alt="img.name || '效果图'"
                   loading="lazy"
                   decoding="async"
@@ -530,9 +531,10 @@ onMounted(load)
                               class="share-product__custom"
                             >自定义</span>
                           </span>
-                          <span class="product-code">
-                            {{ item.is_custom ? '自定义产品 · 仅本方案展示' : (item.product_no || MISSING_TEXT) }}
-                          </span>
+                          <span
+                            v-if="!item.is_custom"
+                            class="product-code"
+                          >{{ item.product_no || MISSING_TEXT }}</span>
                           <span
                             v-if="item.display_name && item.product_original_name && item.product_original_name !== item.product_name"
                             class="share-product__original"

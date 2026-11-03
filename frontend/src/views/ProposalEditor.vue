@@ -225,7 +225,7 @@
               >
                 <img
                   v-if="plan.image_url"
-                  :src="plan.image_url"
+                  :src="withThumbWidth(plan.image_url, TILE_THUMB_WIDTH)"
                   :alt="plan.name"
                   loading="lazy"
                 >
@@ -332,6 +332,7 @@ import ImageViewer from '@/components/ImageViewer.vue'
 import ProposalItemEditor from '@/components/ProposalItemEditor.vue'
 import ProposalEffectImageManager from '@/components/ProposalEffectImageManager.vue'
 import ProposalFloorPlanManager from '@/components/ProposalFloorPlanManager.vue'
+import { TILE_THUMB_WIDTH, withThumbWidth } from '@/utils/thumbnail'
 
 const route = useRoute()
 const router = useRouter()

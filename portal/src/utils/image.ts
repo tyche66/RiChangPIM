@@ -106,3 +106,14 @@ export function resolveImageUrl(product: Record<string, unknown> | null | undefi
   return null
 }
 
+/**
+ * 追加后端缩略图宽度参数（白名单 96/192/240/480/960）。
+ *
+ * 分享页的方案平面图/效果图可能出现 17MB 级原图，缩略图网格必须取小图，
+ * 否则浏览器按原尺寸解码会直接把内存打爆；全屏查看器仍用原图地址。
+ */
+export function withThumbWidth(url: string | null | undefined, width: number): string {
+  if (!url) return ''
+  return `${url}${url.includes('?') ? '&' : '?'}w=${width}`
+}
+

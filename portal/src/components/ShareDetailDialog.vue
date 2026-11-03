@@ -102,11 +102,7 @@ watch(
       <div class="share-detail-dialog__heading">
         <h2>{{ item.product_name || MISSING_TEXT }}</h2>
         <span
-          v-if="item.is_custom"
-          class="product-code"
-        >自定义产品 · 仅本方案展示</span>
-        <span
-          v-else
+          v-if="!item.is_custom"
           class="product-code"
         >{{ item.product_no || MISSING_TEXT }}</span>
       </div>

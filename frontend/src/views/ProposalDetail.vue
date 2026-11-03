@@ -152,7 +152,7 @@
               <div class="product-cell">
                 <img
                   v-if="row.cover_image_url && !row._imgError"
-                  :src="row.cover_image_url"
+                  :src="withThumbWidth(row.cover_image_url, TABLE_THUMB_WIDTH)"
                   class="product-thumb-img"
                   @error="onImgError(row)"
                 >
@@ -380,6 +380,7 @@ import type { Proposal, ProposalItem, ShareLinkInfo } from '@/types/sales'
 import ProposalFloorPlanManager from '@/components/ProposalFloorPlanManager.vue'
 import ProposalEffectImageManager from '@/components/ProposalEffectImageManager.vue'
 import ShareLinkCard from '@/components/ShareLinkCard.vue'
+import { TABLE_THUMB_WIDTH, withThumbWidth } from '@/utils/thumbnail'
 
 const route = useRoute()
 const router = useRouter()

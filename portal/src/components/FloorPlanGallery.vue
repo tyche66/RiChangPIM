@@ -10,6 +10,7 @@
  */
 import { computed } from 'vue'
 import type { ShareFloorPlan } from '@/api'
+import { withThumbWidth } from '@/utils/image'
 
 const props = defineProps<{ images: ShareFloorPlan[] }>()
 const emit = defineEmits<{ open: [index: number] }>()
@@ -40,7 +41,7 @@ function planName(image: ShareFloorPlan, index: number): string {
     >
       <span class="plan-tile__thumb">
         <img
-          :src="image.image_url as string"
+          :src="withThumbWidth(image.image_url, 480)"
           :alt="planName(image, index)"
           loading="lazy"
           decoding="async"
