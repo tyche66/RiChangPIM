@@ -38,108 +38,181 @@
       >
         添加商品
       </el-button>
+      <el-button
+        class="capsule-btn"
+        title="跳转到产品列表，可按分类/品牌等筛选后多选，选完点「完成」返回"
+        @click="$emit('pick-from-list')"
+      >
+        从产品列表选择
+      </el-button>
+      <el-button
+        class="capsule-btn"
+        title="自定义产品不入产品库，仅在本方案中对外展示"
+        @click="customOpen = true"
+      >
+        添加自定义产品
+      </el-button>
     </div>
 
     <div
       v-if="items.length"
-      class="items-list"
+      class="items-groups"
     >
-      <el-card
-        v-for="(item, idx) in items"
-        :key="idx"
-        class="item-card glass-card"
+      <el-collapse
+        v-model="openGroups"
+        class="items-collapse"
       >
-        <div class="item-card-header">
-          <div class="item-product-info">
-            <img
-              v-if="item.cover_image_url"
-              :src="item.cover_image_url"
-              class="item-cover"
-              @error="onCoverError"
+        <el-collapse-item
+          v-for="group in itemGroups"
+          :key="group.key"
+          :name="group.key"
+        >
+          <template #title>
+            <span class="group-title">{{ group.label }}</span>
+            <span class="group-count">{{ groupCount(group.key) }} 项</span>
+          </template>
+          <div class="group-cards">
+            <el-card
+              v-for="item in groupItems(group.key)"
+              :key="itemKey(item)"
+              class="item-card glass-card"
             >
-            <div class="item-name-no">
-              <span class="item-name">{{ item.product_name || '-' }}</span>
-              <span class="item-no">{{ item.product_no || '-' }}</span>
-            </div>
-            <div class="item-meta">
-              <span class="item-face-price">面价 {{ formatMoney(item.face_price) }}</span>
-              <span class="item-stock">库存状态 {{ item.stock_status || '-' }}</span>
-            </div>
+              <div class="item-card-header">
+                <div class="item-product-info">
+                  <img
+                    v-if="item.cover_image_url"
+                    :src="item.cover_image_url"
+                    class="item-cover"
+                    @error="onCoverError"
+                  >
+                  <div class="item-name-no">
+                    <span class="item-name">
+                      {{ item.is_custom ? (item.custom_product?.name || '自定义产品') : (item.display_name || item.product_name || '-') }}
+                    </span>
+                    <span
+                      v-if="item.is_custom"
+                      class="item-no"
+                    >自定义产品 · 仅本方案展示</span>
+                    <template v-else>
+                      <span class="item-no">{{ item.product_no || '-' }}</span>
+                      <span
+                        v-if="item.display_name && item.product_name && item.product_name !== item.display_name"
+                        class="item-original-name"
+                        :title="item.product_name"
+                      >原名：{{ item.product_name }}</span>
+                    </template>
+                  </div>
+                  <div class="item-meta">
+                    <span class="item-face-price">面价 {{ formatMoney(item.is_custom ? item.custom_product?.face_price : item.face_price) }}</span>
+                    <span class="item-stock">
+                      {{ item.is_custom ? '自定义产品' : `库存状态 ${item.stock_status || '-'}` }}
+                    </span>
+                  </div>
+                </div>
+                <el-button
+                  type="danger"
+                  link
+                  class="item-remove"
+                  @click="removeItem(item)"
+                >
+                  <el-icon><Close /></el-icon>
+                </el-button>
+              </div>
+              <div class="item-fields">
+                <div class="item-field">
+                  <label>数量</label>
+                  <el-input-number
+                    :model-value="item.quantity"
+                    :min="1"
+                    :step="1"
+                    :precision="0"
+                    controls-position="right"
+                    class="capsule-number"
+                    @update:model-value="updateQuantity(item, $event)"
+                  />
+                </div>
+                <div class="item-field">
+                  <label>备注</label>
+                  <el-input
+                    :model-value="item.remark ?? ''"
+                    placeholder="备注（可选）"
+                    clearable
+                    class="capsule-input"
+                    @update:model-value="updateRemark(item, $event)"
+                  />
+                </div>
+                <div class="item-field">
+                  <label>楼层名称</label>
+                  <el-input
+                    :model-value="item.floor_label ?? ''"
+                    placeholder="请输入楼层名称（可选）"
+                    clearable
+                    class="capsule-input"
+                    @update:model-value="(val: string) => updateLocation(item, 'floor_label', val)"
+                  />
+                </div>
+                <div class="item-field">
+                  <label>空间名称</label>
+                  <el-input
+                    :model-value="item.space_label ?? ''"
+                    placeholder="请输入空间名称（可选）"
+                    clearable
+                    class="capsule-input"
+                    @update:model-value="(val: string) => updateLocation(item, 'space_label', val)"
+                  />
+                </div>
+                <div
+                  v-if="item.project_space_id"
+                  class="item-space-id"
+                  :title="`已绑定项目空间 ID：${item.project_space_id}`"
+                >
+                  已绑定空间 ID：{{ item.project_space_id }}
+                </div>
+                <div
+                  v-if="!item.is_custom"
+                  class="item-field"
+                >
+                  <label>方案内名称</label>
+                  <el-input
+                    :model-value="item.display_name ?? ''"
+                    placeholder="方案中展示的名称，留空用产品名"
+                    clearable
+                    class="capsule-input"
+                    @update:model-value="updateDisplayName(item, $event)"
+                  />
+                </div>
+                <div
+                  v-if="item.is_custom"
+                  class="item-field item-field--wide"
+                >
+                  <label>自定义产品字段</label>
+                  <el-button
+                    link
+                    type="primary"
+                    class="custom-edit-btn"
+                    @click="editCustom(item)"
+                  >
+                    编辑名称 / 面价 / 图片 / 规格 / 材质 / 颜色 / 材质说明
+                  </el-button>
+                </div>
+                <div class="item-field item-field--wide">
+                  <label>材质说明</label>
+                  <el-input
+                    :model-value="item.material_desc ?? ''"
+                    type="textarea"
+                    :rows="2"
+                    resize="none"
+                    placeholder="该明细的材质说明（可选）"
+                    clearable
+                    class="capsule-input"
+                    @update:model-value="updateMaterialDesc(item, $event)"
+                  />
+                </div>
+              </div>
+            </el-card>
           </div>
-          <el-button
-            type="danger"
-            link
-            class="item-remove"
-            @click="removeItem(idx)"
-          >
-            <el-icon><Close /></el-icon>
-          </el-button>
-        </div>
-        <div class="item-fields">
-          <div class="item-field">
-            <label>数量</label>
-            <el-input-number
-              :model-value="item.quantity"
-              :min="1"
-              :step="1"
-              :precision="0"
-              controls-position="right"
-              class="capsule-number"
-              @update:model-value="updateQuantity(idx, $event)"
-            />
-          </div>
-          <div class="item-field">
-            <label>备注</label>
-            <el-input
-              :model-value="item.remark ?? ''"
-              placeholder="备注（可选）"
-              clearable
-              class="capsule-input"
-              @update:model-value="updateRemark(idx, $event)"
-            />
-          </div>
-          <div class="item-field">
-            <label>楼层名称</label>
-            <el-input
-              :model-value="item.floor_label ?? ''"
-              placeholder="请输入楼层名称（可选）"
-              clearable
-              class="capsule-input"
-              @update:model-value="(val: string) => updateLocation(idx, 'floor_label', val)"
-            />
-          </div>
-          <div class="item-field">
-            <label>空间名称</label>
-            <el-input
-              :model-value="item.space_label ?? ''"
-              placeholder="请输入空间名称（可选）"
-              clearable
-              class="capsule-input"
-              @update:model-value="(val: string) => updateLocation(idx, 'space_label', val)"
-            />
-          </div>
-          <div
-            v-if="item.project_space_id"
-            class="item-space-id"
-            :title="`已绑定项目空间 ID：${item.project_space_id}`"
-          >
-            已绑定空间 ID：{{ item.project_space_id }}
-          </div>
-          <div class="item-field item-field--wide">
-            <label>材质说明</label>
-            <el-input
-              :model-value="item.material_desc ?? ''"
-              type="textarea"
-              :rows="2"
-              resize="none"
-              placeholder="该明细的材质说明（可选）"
-              clearable
-              class="capsule-input"
-              @update:model-value="updateMaterialDesc(idx, $event)"
-            />
-          </div>
-        </div>
-      </el-card>
+        </el-collapse-item>
+      </el-collapse>
     </div>
 
     <div
@@ -151,14 +224,149 @@
         :image-size="80"
       />
     </div>
+
+    <el-dialog
+      v-model="customOpen"
+      :title="customEditIndex >= 0 ? '编辑自定义产品' : '添加自定义产品'"
+      width="560px"
+      class="custom-dialog"
+    >
+      <el-form
+        ref="customFormRef"
+        :model="customForm"
+        :rules="customRules"
+        label-position="top"
+        class="custom-form"
+      >
+        <el-row :gutter="16">
+          <el-col :span="12">
+            <el-form-item
+              label="名称 *"
+              prop="name"
+            >
+              <el-input
+                v-model="customForm.name"
+                placeholder="自定义产品名称"
+                maxlength="255"
+                class="capsule-input"
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="面价">
+              <el-input-number
+                v-model="customForm.face_price"
+                :min="0"
+                :precision="2"
+                controls-position="right"
+                class="capsule-number custom-price"
+              />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-form-item label="图片（可选，随方案随用随删）">
+          <div class="custom-upload">
+            <img
+              v-if="customForm.image_url"
+              :src="customForm.image_url"
+              class="custom-upload__preview"
+              @error="onCoverError"
+            >
+            <el-button
+              size="small"
+              class="capsule-btn"
+              :loading="customUploading"
+              @click="customFileInput?.click()"
+            >
+              {{ customForm.image_url ? '更换图片' : '上传图片' }}
+            </el-button>
+            <el-button
+              v-if="customForm.image_url"
+              size="small"
+              class="capsule-btn"
+              @click="clearCustomImage"
+            >
+              移除图片
+            </el-button>
+          </div>
+          <input
+            ref="customFileInput"
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            class="custom-file-input"
+            @change="onCustomFilePicked"
+          >
+        </el-form-item>
+        <el-row :gutter="16">
+          <el-col :span="12">
+            <el-form-item label="规格">
+              <el-input
+                v-model="customForm.specification"
+                placeholder="如 1200×600×750mm"
+                maxlength="255"
+                class="capsule-input"
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="材质">
+              <el-input
+                v-model="customForm.material"
+                placeholder="如 红橡木"
+                maxlength="128"
+                class="capsule-input"
+              />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-form-item label="颜色">
+          <el-input
+            v-model="customForm.colors"
+            placeholder="如 原木色 / 胡桃色"
+            maxlength="512"
+            class="capsule-input"
+          />
+        </el-form-item>
+        <el-form-item label="材质说明">
+          <el-input
+            v-model="customForm.material_description"
+            type="textarea"
+            :rows="3"
+            resize="none"
+            maxlength="2048"
+            placeholder="自定义产品的材质说明"
+            class="capsule-input"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button
+          class="capsule-btn"
+          @click="customOpen = false"
+        >
+          取消
+        </el-button>
+        <el-button
+          type="primary"
+          class="capsule-btn capsule-btn-primary"
+          :disabled="customSaving"
+          @click="saveCustom"
+        >
+          确定
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { computed, reactive, ref } from 'vue'
+import type { FormInstance, FormRules } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import { productApi } from '@/api'
+import { mediaApi } from '@/api/media'
 import { formatMoney } from '@/utils/money'
-import type { ProposalItem, ProductOption } from '@/types/sales'
+import type { ProposalCustomProduct, ProposalItem, ProductOption } from '@/types/sales'
 import { Close } from '@element-plus/icons-vue'
 
 interface Props {
@@ -175,6 +383,7 @@ interface Props {
 interface Emits {
   (e: 'update:modelValue', value: ProposalItem[]): void
   (e: 'change', value: ProposalItem[]): void
+  (e: 'pick-from-list'): void
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -198,6 +407,57 @@ const items = computed({
     emit('change', val)
   },
 })
+
+// ---------------------------------------------------------------------------
+// 楼层/空间折叠分组：与分享页分组同口径，产品多时按位置收纳，减少上下滑动
+// ---------------------------------------------------------------------------
+
+const openGroups = ref<string[]>([])
+
+interface ItemGroup {
+  key: string
+  label: string
+}
+
+const itemGroups = computed<ItemGroup[]>(() => {
+  const map = new Map<string, ItemGroup>()
+  for (const item of props.modelValue) {
+    const floor = (item.floor_label || '').trim()
+    const space = (item.space_label || '').trim()
+    const key = `${floor}||${space}`
+    if (!map.has(key)) {
+      map.set(key, {
+        key,
+        label: [floor, space].filter(Boolean).join(' / ') || '未指定位置',
+      })
+    }
+  }
+  return [...map.values()]
+})
+
+function groupItems(key: string): ProposalItem[] {
+  const [floor, space] = key.split('||')
+  return props.modelValue.filter(
+    (item) =>
+      (item.floor_label || '').trim() === floor && (item.space_label || '').trim() === space,
+  )
+}
+
+function groupCount(key: string): number {
+  return groupItems(key).length
+}
+
+function itemKey(item: ProposalItem): string {
+  return item._key
+    || item.id
+    || `${item.product_id || 'custom'}-${item.quantity}-${item.display_name || ''}`.slice(0, 64)
+}
+
+let uid = 0
+function nextUid(): string {
+  uid += 1
+  return `draft-${Date.now()}-${uid}`
+}
 
 const handleRemoteSearch = (query: string) => {
   if (searchTimer) clearTimeout(searchTimer)
@@ -236,9 +496,10 @@ const addItem = () => {
   const pid = pendingProductId.value
   if (!pid) return
   // Deduplicate: skip if already selected
-  if (items.value.some((i) => i.product_id === pid)) return
+  if (items.value.some((i) => !i.is_custom && i.product_id === pid)) return
   const opt = findProductOption(pid)
   items.value = [...items.value, {
+    _key: nextUid(),
     product_id: pid,
     quantity: 1,
     remark: undefined,
@@ -252,44 +513,39 @@ const addItem = () => {
   productOptions.value = []
 }
 
-const removeItem = (idx: number) => {
-  items.value = items.value.filter((_, i) => i !== idx)
+const removeItem = (target: ProposalItem) => {
+  items.value = items.value.filter((item) => item !== target)
 }
 
-const updateItemField = (idx: number, field: keyof ProposalItem, value: unknown) => {
-  items.value = items.value.map((item, i) => {
-    if (i !== idx) return item
-    return { ...item, [field]: value }
-  })
+const updateItemField = (target: ProposalItem, field: keyof ProposalItem, value: unknown) => {
+  items.value = items.value.map((item) => (item === target ? { ...item, [field]: value } : item))
 }
 
-const updateQuantity = (idx: number, val: number | null) => {
-  updateItemField(idx, 'quantity', Math.max(1, Math.round(val ?? 1)))
+const updateQuantity = (target: ProposalItem, val: number | null) => {
+  updateItemField(target, 'quantity', Math.max(1, Math.round(val ?? 1)))
 }
 
-const updateRemark = (idx: number, val: string) => {
-  updateItemField(idx, 'remark', val)
+const updateRemark = (target: ProposalItem, val: string) => {
+  updateItemField(target, 'remark', val)
+}
+
+const updateDisplayName = (target: ProposalItem, val: string) => {
+  updateItemField(target, 'display_name', val.trim() || null)
 }
 
 // ---------------------------------------------------------------------------
 // Track C：自由输入空间标签与材质说明
 // ---------------------------------------------------------------------------
 
-function updateLocation(idx: number, field: 'floor_label' | 'space_label', val: string) {
-  items.value = items.value.map((item, i) => {
-    if (i !== idx) return item
-    return {
-      ...item,
-      [field]: val.trim() || undefined,
-      // Typed labels are authoritative; an old compatibility ID must not
-      // survive a manual location edit or a cleared label.
-      project_space_id: undefined,
-    }
-  })
+function updateLocation(target: ProposalItem, field: 'floor_label' | 'space_label', val: string) {
+  updateItemField(target, field, val.trim() || undefined)
+  // Typed labels are authoritative; an old compatibility ID must not
+  // survive a manual location edit or a cleared label.
+  updateItemField(target, 'project_space_id', undefined)
 }
 
-function updateMaterialDesc(idx: number, val: string) {
-  updateItemField(idx, 'material_desc', val || undefined)
+function updateMaterialDesc(target: ProposalItem, val: string) {
+  updateItemField(target, 'material_desc', val || undefined)
 }
 
 const onCoverError = (e: Event) => {
@@ -297,6 +553,151 @@ const onCoverError = (e: Event) => {
   if (img) img.style.display = 'none'
 }
 
+// ---------------------------------------------------------------------------
+// 自定义产品（不入产品库）：名称/面价/图片/规格/材质/颜色/材质说明自由填写
+// ---------------------------------------------------------------------------
+
+interface CustomFormModel {
+  name: string
+  face_price: number | null
+  attachment_id: string | null
+  image_url: string | null
+  specification: string
+  material: string
+  colors: string
+  material_description: string
+}
+
+const customOpen = ref(false)
+const customSaving = ref(false)
+const customUploading = ref(false)
+/** >=0 表示编辑已有自定义产品；-1 表示新增 */
+const customEditIndex = ref(-1)
+const customFormRef = ref<FormInstance>()
+const customFileInput = ref<HTMLInputElement>()
+
+const customForm = reactive<CustomFormModel>({
+  name: '',
+  face_price: null,
+  attachment_id: null,
+  image_url: null,
+  specification: '',
+  material: '',
+  colors: '',
+  material_description: '',
+})
+
+const customRules: FormRules = {
+  name: [{ required: true, message: '请输入自定义产品名称', trigger: 'blur' }],
+}
+
+function editCustom(target: ProposalItem) {
+  customEditIndex.value = items.value.indexOf(target)
+  const cp: ProposalCustomProduct = target.custom_product || {
+    name: '',
+    face_price: null,
+    attachment_id: null,
+    specification: null,
+    material: null,
+    colors: null,
+    material_description: null,
+  }
+  customForm.name = cp.name || ''
+  customForm.face_price = cp.face_price ?? null
+  customForm.attachment_id = cp.attachment_id || null
+  customForm.image_url = target.cover_image_url || null
+  customForm.specification = cp.specification || ''
+  customForm.material = cp.material || ''
+  customForm.colors = cp.colors || ''
+  customForm.material_description = cp.material_description || ''
+  customOpen.value = true
+}
+
+async function onCustomFilePicked(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+  if (!file.type.startsWith('image/')) {
+    ElMessage.warning('仅支持图片文件')
+    return
+  }
+  customUploading.value = true
+  try {
+    const media = await mediaApi.upload(file)
+    customForm.attachment_id = media.id
+    customForm.image_url = media.url
+  } catch {
+    // 统一错误提示由 axios 拦截器给出
+  } finally {
+    customUploading.value = false
+  }
+}
+
+function clearCustomImage() {
+  customForm.attachment_id = null
+  customForm.image_url = null
+}
+
+async function saveCustom() {
+  if (customSaving.value) return
+  if (customFormRef.value) {
+    const valid = await customFormRef.value.validate().catch(() => false)
+    if (!valid) return
+  }
+  const name = customForm.name.trim()
+  if (!name) {
+    ElMessage.warning('请输入自定义产品名称')
+    return
+  }
+
+  const customProduct: ProposalCustomProduct = {
+    name,
+    face_price: customForm.face_price ?? null,
+    attachment_id: customForm.attachment_id,
+    specification: customForm.specification.trim() || null,
+    material: customForm.material.trim() || null,
+    colors: customForm.colors.trim() || null,
+    material_description: customForm.material_description.trim() || null,
+  }
+
+  customSaving.value = true
+  try {
+    if (customEditIndex.value >= 0) {
+      const item = items.value[customEditIndex.value]
+      if (item) {
+        items.value = items.value.map((it, i) =>
+          i === customEditIndex.value
+            ? {
+                ...it,
+                is_custom: true,
+                custom_product: customProduct,
+                product_name: name,
+                face_price: customProduct.face_price,
+                cover_image_url: customForm.image_url || undefined,
+              }
+            : it,
+        )
+      }
+    } else {
+      items.value = [...items.value, {
+        _key: nextUid(),
+        product_id: null,
+        is_custom: true,
+        custom_product: customProduct,
+        quantity: 1,
+        remark: undefined,
+        product_name: name,
+        product_no: undefined,
+        face_price: customProduct.face_price,
+        cover_image_url: customForm.image_url || undefined,
+      }]
+    }
+    customOpen.value = false
+  } finally {
+    customSaving.value = false
+  }
+}
 </script>
 
 <style scoped>
@@ -319,12 +720,13 @@ const onCoverError = (e: Event) => {
 .product-picker {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .product-picker__select {
   flex: 1;
-  min-width: 0;
+  min-width: 200px;
 }
 
 .product-picker > .capsule-btn {
@@ -355,6 +757,49 @@ const onCoverError = (e: Event) => {
 .option-stock {
   font-size: 12px;
   color: var(--text-secondary);
+}
+
+/* 楼层/空间分组折叠 */
+.items-groups {
+  margin-top: 12px;
+}
+
+.items-collapse {
+  border: none;
+  width: 100%;
+}
+
+.items-collapse :deep(.el-collapse-item__header) {
+  background: transparent;
+  border-bottom: 1px solid rgba(var(--pim-brand), 0.08);
+  height: auto;
+  padding: 8px 4px;
+  line-height: 1.4;
+  font-weight: 600;
+  color: var(--brand-deep);
+}
+
+.items-collapse :deep(.el-collapse-item__wrap) {
+  background: transparent;
+  border-bottom: none;
+}
+
+.group-title {
+  font-size: 14px;
+}
+
+.group-count {
+  margin-left: 8px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-secondary);
+}
+
+.group-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 0 4px;
 }
 
 /* Items list */
@@ -424,14 +869,25 @@ const onCoverError = (e: Event) => {
   font-family: monospace;
 }
 
+.item-original-name {
+  font-size: 12px;
+  color: var(--text-faint, var(--pim-text-faint));
+  font-style: normal;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .item-meta {
   margin-top: 4px;
   font-size: 12px;
   color: var(--text-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .item-face-price {
-  margin-right: 12px;
   color: var(--brand-deep);
 }
 
@@ -448,8 +904,6 @@ const onCoverError = (e: Event) => {
 
 /*
  * 明细字段网格：数量/备注/楼层/空间各占一列，材质说明跨整行。
- * 原来每个字段 min-width:140px 在 640px 弹窗里会挤成横向滚动，
- * 备注和材质说明只剩几个字宽；网格让每一格都有稳定宽度。
  */
 .item-fields {
   display: grid;
@@ -495,9 +949,16 @@ const onCoverError = (e: Event) => {
   width: 100%;
 }
 
+.custom-edit-btn {
+  justify-content: flex-start;
+  padding: 0;
+  font-size: 12px;
+}
+
 /* 紧凑模式：缩小的明细卡片间距，避免弹窗里出现双层滚动条 */
-.proposal-item-editor--compact .items-list {
+.proposal-item-editor--compact .group-cards {
   max-height: 46vh;
+  overflow-y: auto;
   gap: 10px;
 }
 
@@ -511,15 +972,11 @@ const onCoverError = (e: Event) => {
 }
 
 /*
- * 页面级模式（FR-2）：全宽编辑页。去掉内部 max-height/overflow（页面自然滚动），
- * 商品搜索固定在明细区顶部（sticky，滚过基础信息后始终可搜），
- * 字段栅格 ≥1200px 四列（数量/备注/楼层/空间，材质说明跨整行）。
+ * 页面级模式（FR-2）：全宽编辑页。去掉内部滚动（页面自然滚动）、
+ * 商品搜索固定在明细区顶部（sticky）、字段栅格 ≥1200px 四列。
  */
-.proposal-item-editor--page .items-list {
-  max-height: none;
-  overflow-y: visible;
+.proposal-item-editor--page .group-cards {
   gap: 12px;
-  padding-right: 0;
 }
 
 .proposal-item-editor--page .product-picker {
@@ -595,6 +1052,39 @@ const onCoverError = (e: Event) => {
   border-color: var(--brand-deep);
 }
 
+/* 自定义产品弹窗 */
+.custom-form {
+  width: 100%;
+}
+
+.custom-upload {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.custom-upload__preview {
+  width: 72px;
+  height: 72px;
+  border-radius: 10px;
+  object-fit: cover;
+  background: var(--brand-lighter);
+  border: 1px solid rgba(var(--pim-brand), 0.1);
+}
+
+.custom-file-input {
+  display: none;
+}
+
+.custom-price {
+  width: 100%;
+}
+
+.custom-price :deep(.el-input-number) {
+  width: 100%;
+}
+
 .items-empty {
   margin-top: 16px;
 }
@@ -604,6 +1094,11 @@ const onCoverError = (e: Event) => {
   .product-picker {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .product-picker__select {
+    width: 100% !important;
+    max-width: none;
   }
 
   .item-card-body {

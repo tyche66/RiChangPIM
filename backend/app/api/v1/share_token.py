@@ -24,7 +24,20 @@ from app.core.security_limits import (
 from app.middleware.audit import audit_action
 from app.models.audit import Share, ShareLog, ShareToken, Visitor
 from app.models.product import Attachment, Product, ProductImage, SceneImage, product_scene_image
-from app.models.sales import ProjectSpace, Proposal, ProposalItem, Quotation, QuotationItem
+from app.models.sales import (
+    ProjectSpace,
+    Proposal,
+    ProposalEffectImage,
+    ProposalItem,
+    Quotation,
+    QuotationItem,
+)
+from app.services.proposal_effect_images import (
+    content_url as effect_image_content_url,
+)
+from app.services.proposal_effect_images import (
+    load_effect_images,
+)
 from app.services.proposal_floor_plans import (
     content_url as floor_plan_content_url,
 )
@@ -190,49 +203,47 @@ async def _build_content(db: AsyncSession, share_type: str, target_id: UUID) -> 
             }
             for fp in await load_floor_plans(db, prop.id)
         ]
-        product_ids = [it.product_id for it in rows]
-        if not product_ids:
-            return {
-                "proposal_no": prop.proposal_no,
-                "proposal_name": prop.proposal_name,
-                "customer_name": prop.customer_name,
-                "status": prop.status,
-                "total_face_value": 0.0,
-                "floor_plans": floor_plans,
-                "items": [],
-            }
+        # 效果图：优先服务方案本身；可绑定产品/空间，产品名用方案内生效名
+        effect_image_rows = await load_effect_images(db, prop.id)
+
+        product_ids = [it.product_id for it in rows if it.product_id is not None]
 
         # 批量加载产品
-        prod_result = await db.execute(
-            select(Product)
-                .options(selectinload(Product.category))
-                .where(Product.id.in_(product_ids), Product.is_deleted.is_(False))
-        )
-        products_map = {p.id: p for p in prod_result.scalars().all()}
+        products_map: dict[UUID, Product] = {}
+        if product_ids:
+            prod_result = await db.execute(
+                select(Product)
+                    .options(selectinload(Product.category))
+                    .where(Product.id.in_(product_ids), Product.is_deleted.is_(False))
+            )
+            products_map = {p.id: p for p in prod_result.scalars().all()}
 
         # 批量加载产品图片
-        img_result = await db.execute(
-            select(ProductImage)
-            .where(ProductImage.product_id.in_(product_ids), ProductImage.is_deleted.is_(False))
-        )
         product_images: dict[UUID, list[ProductImage]] = {}
-        for pi in img_result.scalars().all():
-            product_images.setdefault(pi.product_id, []).append(pi)
+        if product_ids:
+            img_result = await db.execute(
+                select(ProductImage)
+                .where(ProductImage.product_id.in_(product_ids), ProductImage.is_deleted.is_(False))
+            )
+            for pi in img_result.scalars().all():
+                product_images.setdefault(pi.product_id, []).append(pi)
 
         # 批量加载场景图关联
-        scene_assoc = await db.execute(
-            select(
-            product_scene_image.c.product_id,
-            product_scene_image.c.scene_image_id,
-            product_scene_image.c.sort,
-        )
-        .where(
-            product_scene_image.c.product_id.in_(product_ids),
-            product_scene_image.c.is_deleted.is_(False),
-        )
-        .order_by(product_scene_image.c.product_id, product_scene_image.c.sort)
-        )
-        scene_assoc_rows = scene_assoc.fetchall()
+        scene_assoc_rows = []
+        if product_ids:
+            scene_assoc = await db.execute(
+                select(
+                    product_scene_image.c.product_id,
+                    product_scene_image.c.scene_image_id,
+                    product_scene_image.c.sort,
+                )
+                .where(
+                    product_scene_image.c.product_id.in_(product_ids),
+                    product_scene_image.c.is_deleted.is_(False),
+                )
+                .order_by(product_scene_image.c.product_id, product_scene_image.c.sort)
+            )
+            scene_assoc_rows = scene_assoc.fetchall()
         scene_image_ids = [row.scene_image_id for row in scene_assoc_rows]
 
         # 批量加载场景图详情
@@ -263,9 +274,10 @@ async def _build_content(db: AsyncSession, share_type: str, target_id: UUID) -> 
                     }
                 )
 
-        # 收集所有需要预签名的 attachment_id
+        # 收集所有需要预签名的 attachment_id（含自定义产品图片）
         cover_att_ids: list[UUID] = []
         scene_att_ids: list[UUID] = []
+        custom_att_ids: list[UUID] = []
         for pid in product_ids:
             images = product_images.get(pid, [])
             if images:
@@ -275,13 +287,67 @@ async def _build_content(db: AsyncSession, share_type: str, target_id: UUID) -> 
             for si_info in product_scene_images.get(pid, []):
                 if si_info["attachment_id"]:
                     scene_att_ids.append(si_info["attachment_id"])
+        for it in rows:
+            if it.is_custom:
+                att = (it.custom_product or {}).get("attachment_id")
+                if att:
+                    try:
+                        custom_att_ids.append(UUID(str(att)))
+                    except (TypeError, ValueError):
+                        continue
 
-        all_att_ids = list(dict.fromkeys(cover_att_ids + scene_att_ids))
+        all_att_ids = list(dict.fromkeys(cover_att_ids + scene_att_ids + custom_att_ids))
         url_map = await _fetch_content_urls(db, all_att_ids)
 
         items = []
         total_face_value = 0.0
+        # 产品绑定效果图的对名：方案内名称（display_name）或快照/实时名
+        eff_name_map: dict[str, str | None] = {}
         for it in rows:
+            floor_label, space_label = _space_labels(it)
+
+            if it.is_custom:
+                custom = it.custom_product or {}
+                fp = custom.get("face_price") or 0.0
+                line_total = round(fp * it.quantity, 2) if fp is not None else 0.0
+                total_face_value += line_total
+                att_id = custom.get("attachment_id")
+                cover_image_url = None
+                if att_id:
+                    try:
+                        uuid_att = UUID(str(att_id))
+                        cover_image_url = url_map.get(uuid_att) or _create_share_content_url(uuid_att)
+                    except (TypeError, ValueError):
+                        cover_image_url = None
+                items.append(
+                    {
+                        "product_id": None,
+                        "is_custom": True,
+                        "product_no": None,
+                        "product_name": custom.get("name") or "自定义产品",
+                        "category_name": None,
+                        "face_price": fp,
+                        "quantity": it.quantity,
+                        "line_total": line_total,
+                        "cover_image_url": cover_image_url,
+                        "scene_images": [],
+                        "project_space_id": (
+                            str(it.project_space_id) if it.project_space_id else None
+                        ),
+                        "floor_label": floor_label,
+                        "space_label": space_label,
+                        "material_desc": it.material_desc,
+                        "material": custom.get("material"),
+                        "colors": custom.get("colors"),
+                        "material_description": custom.get("material_description"),
+                        "specification": custom.get("specification"),
+                        "product_snapshot": None,
+                        "display_name": None,
+                        "product_original_name": None,
+                    }
+                )
+                continue
+
             prod = products_map.get(it.product_id)
             images = product_images.get(it.product_id, [])
             cover = (
@@ -315,15 +381,25 @@ async def _build_content(db: AsyncSession, share_type: str, target_id: UUID) -> 
             line_total = round(face_price * it.quantity, 2) if face_price is not None else 0.0
             total_face_value += line_total
 
-            # 展示事实按"快照优先、当前产品其次"合并，保证历史方案不漂移
+            # 展示事实按"快照优先、当前产品其次"合并，保证历史方案不漂移；
+            # 方案内名称（display_name）优先于一切作为对外展示名
             _field = partial(_snapshot_field, snapshot, prod)
-            floor_label, space_label = _space_labels(it)
+            base_name = _field("product_name")
+            display_name = it.display_name
+            product_name = display_name or base_name
+
+            _key = str(it.product_id)
+            if _key not in eff_name_map:
+                eff_name_map[_key] = product_name
 
             items.append(
                 {
-                    "product_id": str(it.product_id),
+                    "product_id": _key,
+                    "is_custom": False,
                     "product_no": _field("product_no"),
-                    "product_name": _field("product_name"),
+                    "product_name": product_name,
+                    "display_name": display_name,
+                    "product_original_name": base_name,
                     "category_name": _field("category_name")
                     or (prod.category.category_name if prod and prod.category else None),
                     "face_price": face_price,
@@ -345,6 +421,22 @@ async def _build_content(db: AsyncSession, share_type: str, target_id: UUID) -> 
                     "product_snapshot": snapshot or None,
                 }
             )
+
+        effect_images = [
+            {
+                "id": str(pei.id),
+                "name": pei.name,
+                "product_id": str(pei.product_id) if pei.product_id else None,
+                "product_name": (
+                    eff_name_map.get(str(pei.product_id)) if pei.product_id else None
+                ),
+                "floor_label": pei.floor_label,
+                "space_label": pei.space_label,
+                "sort": pei.sort,
+                "image_url": effect_image_content_url(pei.attachment_id),
+            }
+            for pei in effect_image_rows
+        ]
         return {
             "proposal_no": prop.proposal_no,
             "proposal_name": prop.proposal_name,
@@ -352,6 +444,7 @@ async def _build_content(db: AsyncSession, share_type: str, target_id: UUID) -> 
             "status": prop.status,
             "total_face_value": round(total_face_value, 2),
             "floor_plans": floor_plans,
+            "effect_images": effect_images,
             "items": items,
         }
 
@@ -552,6 +645,9 @@ _PUBLIC_ITEM_KEYS = (
     "product_id",
     "product_no",
     "product_name",
+    "display_name",
+    "product_original_name",
+    "is_custom",
     "category_name",
     "face_price",
     "quantity",
@@ -590,6 +686,16 @@ _PUBLIC_FLOOR_PLAN_KEYS = (
     "sort",
     "image_url",
 )
+_PUBLIC_EFFECT_IMAGE_KEYS = (
+    "id",
+    "name",
+    "product_id",
+    "product_name",
+    "floor_label",
+    "space_label",
+    "sort",
+    "image_url",
+)
 _PUBLIC_PROPOSAL_KEYS = (
     "proposal_no",
     "proposal_name",
@@ -597,6 +703,7 @@ _PUBLIC_PROPOSAL_KEYS = (
     "status",
     "total_face_value",
     "floor_plans",
+    "effect_images",
     "items",
 )
 _PUBLIC_QUOTATION_KEYS = (
@@ -638,6 +745,10 @@ def _public_share_content(raw_content: dict | None, share_type: str) -> dict | N
     if "floor_plans" in content:
         content["floor_plans"] = _public_list(
             content["floor_plans"], _PUBLIC_FLOOR_PLAN_KEYS
+        )
+    if "effect_images" in content:
+        content["effect_images"] = _public_list(
+            content["effect_images"], _PUBLIC_EFFECT_IMAGE_KEYS
         )
     if "items" in content:
         content["items"] = [

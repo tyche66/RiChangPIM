@@ -43,6 +43,11 @@ async def _validate_quotation_items(
     """校验产品存在、未删除、status=active，并去重。"""
     seen: set[UUID] = set()
     for pid in item_ids:
+        if pid is None:
+            raise HTTPException(
+                status_code=422,
+                detail={"code": 42201, "msg": "方案自定义产品不可加入报价单"},
+            )
         if pid in seen:
             raise HTTPException(
                 status_code=422, detail={"code": 42201, "msg": f"重复产品 {pid}"}
@@ -538,7 +543,7 @@ async def create_quotation(
         raise HTTPException(status_code=404, detail={"code": 40401, "msg": "关联方案不存在"})
 
     proposal_items = await _proposal_item_map(
-        db, proposal.id, [item.product_id for item in quotation_data.items]
+        db, proposal.id, [i.product_id for i in quotation_data.items if i.product_id is not None]
     )
     await _validate_quotation_spaces(
         db, proposal.project_id, [*quotation_data.items, *proposal_items.values()]
@@ -667,7 +672,9 @@ async def update_quotation(
                 )
             ).scalar_one_or_none()
             proposal_items = await _proposal_item_map(
-                db, quotation.proposal_id, [item.product_id for item in new_items]
+                db,
+                quotation.proposal_id,
+                [item.product_id for item in new_items if item.product_id is not None],
             )
             await _validate_quotation_spaces(
                 db,

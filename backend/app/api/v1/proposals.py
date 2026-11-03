@@ -11,11 +11,18 @@ from app.core.database import get_db
 from app.core.permission import PermissionChecker
 from app.core.security import create_access_token
 from app.middleware.audit import audit_action
-from app.models.product import Product, ProductImage
+from app.models.product import Attachment, Product, ProductImage
 from app.models.project import Project
-from app.models.sales import ProjectSpace, Proposal, ProposalFloorPlan, ProposalItem
+from app.models.sales import (
+    ProjectSpace,
+    Proposal,
+    ProposalEffectImage,
+    ProposalFloorPlan,
+    ProposalItem,
+)
 from app.schemas.proposal import ProposalCreate, ProposalUpdate
 from app.services.product_snapshot import build_product_snapshot
+from app.services.proposal_effect_images import effect_image_payload, load_effect_images
 from app.services.proposal_floor_plans import floor_plan_payload, load_floor_plans
 
 router = APIRouter()
@@ -238,27 +245,31 @@ async def _cover_urls(
     for product_id, attachment_id in rows:
         if not attachment_id:
             continue
-        token = create_access_token(
-            {
-                "sub": getattr(request.state, "user_id", None) or "file-content",
-                "scope": "file_content",
-                "attachment_id": str(attachment_id),
-            },
-            expires_delta=timedelta(minutes=15),
-            token_type="file_content",
-        )
-        urls[product_id] = f"/api/v1/files/{attachment_id}/content?token={token}"
+        urls[product_id] = _sign_content_url(request, attachment_id)
     return urls
 
 
-def _enrich_item(item: ProposalItem, product: Product | None, cover_url: str | None) -> dict:
-    snapshot = item.product_snapshot
-    snapshot_face_price = snapshot.get("face_price") if snapshot else None
-    fp = (
-        snapshot_face_price
-        if snapshot_face_price not in (None, "")
-        else (product.face_price if product else 0.0)
+def _sign_content_url(request: Request, attachment_id: UUID) -> str:
+    """按当前登录用户签发一个 15 分钟的只读图片地址（不暴露 MinIO）。"""
+    token = create_access_token(
+        {
+            "sub": getattr(request.state, "user_id", None) or "file-content",
+            "scope": "file_content",
+            "attachment_id": str(attachment_id),
+        },
+        expires_delta=timedelta(minutes=15),
+        token_type="file_content",
     )
+    return f"/api/v1/files/{attachment_id}/content?token={token}"
+
+
+def _enrich_item(
+    item: ProposalItem,
+    product: Product | None,
+    cover_url: str | None,
+    *,
+    custom_image_url: str | None = None,
+) -> dict:
     floor_label = item.floor_label
     space_label = item.space_label
     bound_space = item.__dict__.get("space")
@@ -272,19 +283,57 @@ def _enrich_item(item: ProposalItem, product: Product | None, cover_url: str | N
                     floor_label = parent.space_name
         if space_label is None and bound_space.space_type != "floor":
             space_label = bound_space.space_name
-    # 展示字段按"快照优先、当前产品其次、缺失文案兜底"合并
+
+    # 自定义产品：不入产品库，展示字段全部来自 custom_product
+    if item.is_custom:
+        custom = item.custom_product or {}
+        fp = custom.get("face_price") or 0.0
+        return {
+            "id": str(item.id),
+            "product_id": None,
+            "is_custom": True,
+            "product_no": None,
+            "product_name": custom.get("name") or "自定义产品",
+            "category_name": None,
+            "material": custom.get("material"),
+            "colors": custom.get("colors"),
+            "material_description": custom.get("material_description"),
+            "specification": custom.get("specification"),
+            "face_price": fp,
+            "quantity": item.quantity,
+            "remark": item.remark,
+            "line_total": _round(fp * item.quantity),
+            "cover_image_url": custom_image_url,
+            "project_space_id": str(item.project_space_id) if item.project_space_id else None,
+            "floor_label": floor_label,
+            "space_label": space_label,
+            "material_desc": item.material_desc,
+            "product_snapshot": None,
+            "custom_product": custom,
+        }
+
+    snapshot = item.product_snapshot
+    snapshot_face_price = snapshot.get("face_price") if snapshot else None
+    fp = (
+        snapshot_face_price
+        if snapshot_face_price not in (None, "")
+        else (product.face_price if product else 0.0)
+    )
+    original_name = (snapshot.get("product_name") if snapshot else None) or (
+        product.product_name if product else None
+    )
+    # 展示字段按"快照优先、当前产品其次、缺失文案兜底"合并；
+    # 方案内名称（display_name）优先于一切作为对外展示名
     return {
         "id": str(item.id),
         "product_id": str(item.product_id),
-        "product_no": (
-            snapshot.get("product_no") if snapshot else None
-        ) or (product.product_no if product else None),
-        "product_name": (
-            snapshot.get("product_name") if snapshot else None
-        ) or (product.product_name if product else None),
-        "category_name": (
-            snapshot.get("category_name") if snapshot else None
-        ) or (product.category.category_name if product and product.category else None),
+        "is_custom": False,
+        "product_no": (snapshot.get("product_no") if snapshot else None)
+        or (product.product_no if product else None),
+        "product_name": item.display_name or original_name,
+        "display_name": item.display_name,
+        "category_name": (snapshot.get("category_name") if snapshot else None)
+        or (product.category.category_name if product and product.category else None),
         "material": (snapshot.get("material") if snapshot else None)
         or (product.material if product else None),
         "colors": (snapshot.get("colors") if snapshot else None)
@@ -306,7 +355,26 @@ def _enrich_item(item: ProposalItem, product: Product | None, cover_url: str | N
         "space_label": space_label,
         "material_desc": item.material_desc,
         "product_snapshot": snapshot,
+        "custom_product": None,
     }
+
+
+async def _soft_delete_custom_images(db: AsyncSession, items: list[ProposalItem]) -> None:
+    """自定义产品图片随方案随用随删：软删附件行，不再停留在媒体库。"""
+    att_ids: list[UUID] = []
+    for it in items:
+        if it.is_custom and (it.custom_product or {}).get("attachment_id"):
+            try:
+                att_ids.append(UUID(str(it.custom_product["attachment_id"])))
+            except (TypeError, ValueError):
+                continue
+    if not att_ids:
+        return
+    await db.execute(
+        sa_update(Attachment)
+        .where(Attachment.id.in_(att_ids), Attachment.is_deleted.is_(False))
+        .values(is_deleted=True, deleted_at=func.now())
+    )
 
 
 def _proposal_to_dict(proposal: Proposal) -> dict:
@@ -346,13 +414,26 @@ async def _floor_plan_payloads(
     return [floor_plan_payload(row, subject=subject) for row in rows]
 
 
+async def _effect_image_payloads(
+    db: AsyncSession, proposal_id: UUID, request: Request
+) -> list[dict]:
+    """方案详情里的效果图：短时展示地址按当前登录用户签发。"""
+    rows = await load_effect_images(db, proposal_id)
+    subject = getattr(request.state, "user_id", None)
+    return [effect_image_payload(row, subject=subject) for row in rows]
+
+
 def _wrap_proposal(
-    proposal: Proposal, enriched_items: list[dict], floor_plans: list[dict] | None = None
+    proposal: Proposal,
+    enriched_items: list[dict],
+    floor_plans: list[dict] | None = None,
+    effect_images: list[dict] | None = None,
 ) -> dict:
     resp = _proposal_to_dict(proposal)
     resp["items"] = enriched_items
     # Track D：平面图随详情返回，前端不必为只读展示再打一次接口
     resp["floor_plans"] = floor_plans or []
+    resp["effect_images"] = effect_images or []
     return {"code": 200, "data": resp}
 
 
@@ -413,7 +494,7 @@ async def get_proposal(request: Request, proposal_id: UUID, db: AsyncSession = D
     if not proposal:
         raise HTTPException(status_code=404, detail={"code": 40401, "msg": "方案不存在"})
 
-    product_ids = [it.product_id for it in proposal.items]
+    product_ids = [it.product_id for it in proposal.items if it.product_id is not None]
     prod_map: dict[UUID, Product] = {}
     if product_ids:
         prod_result = await db.execute(
@@ -426,11 +507,17 @@ async def get_proposal(request: Request, proposal_id: UUID, db: AsyncSession = D
     cover_urls = await _cover_urls(product_ids, request, db)
     enriched_items = []
     for it in proposal.items:
+        if it.is_custom:
+            att_id = (it.custom_product or {}).get("attachment_id")
+            custom_image_url = _sign_content_url(request, UUID(str(att_id))) if att_id else None
+            enriched_items.append(_enrich_item(it, None, None, custom_image_url=custom_image_url))
+            continue
         prod = prod_map.get(it.product_id)
         enriched_items.append(_enrich_item(it, prod, cover_urls.get(it.product_id)))
 
     floor_plans = await _floor_plan_payloads(db, proposal.id, request)
-    return _wrap_proposal(proposal, enriched_items, floor_plans)
+    effect_images = await _effect_image_payloads(db, proposal.id, request)
+    return _wrap_proposal(proposal, enriched_items, floor_plans, effect_images)
 
 
 @router.post(
@@ -442,7 +529,10 @@ async def get_proposal(request: Request, proposal_id: UUID, db: AsyncSession = D
 async def create_proposal(
     request: Request, proposal_data: ProposalCreate, db: AsyncSession = Depends(get_db)
 ):
-    products = await _validate_proposal_items([i.product_id for i in proposal_data.items], db)
+    library_items = [i for i in proposal_data.items if not i.is_custom]
+    products = await _validate_proposal_items(
+        [i.product_id for i in library_items if i.product_id is not None], db
+    )
     resolved_spaces = await _resolve_project_spaces(
         proposal_data.items, proposal_data.project_id, db
     )
@@ -458,8 +548,24 @@ async def create_proposal(
     db.add(proposal)
     await db.flush()
 
-    items = []
+    items = []  # (item, product|None, face_price)
     for item_data, space_data in zip(proposal_data.items, resolved_spaces, strict=True):
+        if item_data.is_custom:
+            item = ProposalItem(
+                proposal_id=proposal.id,
+                product_id=None,
+                is_custom=True,
+                custom_product=item_data.custom_product.model_dump(mode="json"),
+                quantity=item_data.quantity,
+                remark=item_data.remark,
+                project_space_id=space_data["project_space_id"],
+                floor_label=space_data["floor_label"],
+                space_label=space_data["space_label"],
+                material_desc=item_data.material_desc,
+            )
+            db.add(item)
+            items.append((item, None, item_data.custom_product.face_price or 0.0))
+            continue
         prod = products[item_data.product_id]
         # 服务端生成快照，绝不信任前端传入的产品事实
         snapshot = await build_product_snapshot(db, item_data.product_id)
@@ -472,11 +578,14 @@ async def create_proposal(
             floor_label=space_data["floor_label"],
             space_label=space_data["space_label"],
             material_desc=item_data.material_desc,
+            display_name=item_data.display_name,
             product_snapshot=snapshot,
         )
         db.add(item)
-        items.append((item, prod))
-    proposal.total_face_value = _round(sum(prod.face_price * it.quantity for it, prod in items))
+        items.append((item, prod, prod.face_price))
+    proposal.total_face_value = _round(
+        sum(price * it.quantity for it, _prod, price in items)
+    )
 
     await db.commit()
     result = await db.execute(
@@ -484,10 +593,17 @@ async def create_proposal(
     )
     prop = result.scalar_one()
 
-    prod_map = {p.id: p for _, p in items}
-    cover_urls = await _cover_urls([item.product_id for item in prop.items], request, db)
+    prod_map = {p.id: p for _i, p, _price in items if p is not None}
+    cover_urls = await _cover_urls(
+        [item.product_id for item in prop.items if item.product_id is not None], request, db
+    )
     enriched = []
     for it in prop.items:
+        if it.is_custom:
+            att_id = (it.custom_product or {}).get("attachment_id")
+            custom_image_url = _sign_content_url(request, UUID(str(att_id))) if att_id else None
+            enriched.append(_enrich_item(it, None, None, custom_image_url=custom_image_url))
+            continue
         prod = prod_map.get(it.product_id)
         enriched.append(_enrich_item(it, prod, cover_urls.get(it.product_id)))
 
@@ -541,12 +657,20 @@ async def update_proposal(
         setattr(proposal, field, getattr(proposal_data, field))
 
     if "project_id" in update_fields:
-        # Track D：平面图的项目归属跟随方案，避免方案换项目后平面图仍挂在旧项目
+        # Track D：平面图/效果图的项目归属跟随方案，避免方案换项目后仍挂在旧项目
         await db.execute(
             sa_update(ProposalFloorPlan)
             .where(
                 ProposalFloorPlan.proposal_id == proposal.id,
                 ProposalFloorPlan.is_deleted.is_(False),
+            )
+            .values(project_id=proposal.project_id)
+        )
+        await db.execute(
+            sa_update(ProposalEffectImage)
+            .where(
+                ProposalEffectImage.proposal_id == proposal.id,
+                ProposalEffectImage.is_deleted.is_(False),
             )
             .values(project_id=proposal.project_id)
         )
@@ -560,8 +684,13 @@ async def update_proposal(
             if "project_id" in proposal_data.model_fields_set
             else proposal.project_id
         )
-        products = await _validate_proposal_items([i.product_id for i in new_items], db)
+        library_items = [i for i in new_items if not i.is_custom]
+        products = await _validate_proposal_items(
+            [i.product_id for i in library_items if i.product_id is not None], db
+        )
         resolved_spaces = await _resolve_project_spaces(new_items, effective_project_id, db)
+        # 自定义产品图片随方案随用随删：被替换移除的旧自定义图片软删附件行
+        await _soft_delete_custom_images(db, list(proposal.items))
         # Replace through the loaded relationship collection.  The session uses
         # expire_on_commit=False, so assigning an unrelated list here would leave
         # proposal.items stale after commit and selectinload() would not
@@ -570,6 +699,21 @@ async def update_proposal(
         proposal.items.clear()
         created = []
         for item_data, space_data in zip(new_items, resolved_spaces, strict=True):
+            if item_data.is_custom:
+                item = ProposalItem(
+                    product_id=None,
+                    is_custom=True,
+                    custom_product=item_data.custom_product.model_dump(mode="json"),
+                    quantity=item_data.quantity,
+                    remark=item_data.remark,
+                    project_space_id=space_data["project_space_id"],
+                    floor_label=space_data["floor_label"],
+                    space_label=space_data["space_label"],
+                    material_desc=item_data.material_desc,
+                )
+                proposal.items.append(item)
+                created.append((item, None, item_data.custom_product.face_price or 0.0))
+                continue
             prod = products[item_data.product_id]
             snapshot = await build_product_snapshot(db, item_data.product_id)
             item = ProposalItem(
@@ -580,14 +724,15 @@ async def update_proposal(
                 floor_label=space_data["floor_label"],
                 space_label=space_data["space_label"],
                 material_desc=item_data.material_desc,
+                display_name=item_data.display_name,
                 product_snapshot=snapshot,
             )
             proposal.items.append(item)
-            created.append((item, prod))
+            created.append((item, prod, prod.face_price))
 
-        total_face = _round(sum(prod.face_price * it.quantity for it, prod in created))
+        total_face = _round(sum(price * it.quantity for it, _prod, price in created))
         proposal.total_face_value = total_face
-        items_prod_map = {p.id: p for _, p in created}
+        items_prod_map = {p.id: p for _it, p, _price in created if p is not None}
 
     await db.commit()
     result = await db.execute(
@@ -602,24 +747,34 @@ async def update_proposal(
 
     # 富化返回 item 详情
     if not items_prod_map and proposal.items:
-        product_result = await db.execute(
-            select(Product)
-                .options(selectinload(Product.category))
-                .where(
-                    Product.id.in_([item.product_id for item in proposal.items]),
-                    Product.is_deleted.is_(False),
-                )
-        )
-        items_prod_map = {product.id: product for product in product_result.scalars().all()}
-    cover_urls = await _cover_urls([item.product_id for item in proposal.items], request, db)
+        real_product_ids = [it.product_id for it in proposal.items if it.product_id is not None]
+        if real_product_ids:
+            product_result = await db.execute(
+                select(Product)
+                    .options(selectinload(Product.category))
+                    .where(
+                        Product.id.in_(real_product_ids),
+                        Product.is_deleted.is_(False),
+                    )
+            )
+            items_prod_map = {product.id: product for product in product_result.scalars().all()}
+    cover_urls = await _cover_urls(
+        [item.product_id for item in proposal.items if item.product_id is not None], request, db
+    )
     enriched = []
     for it in proposal.items:
+        if it.is_custom:
+            att_id = (it.custom_product or {}).get("attachment_id")
+            custom_image_url = _sign_content_url(request, UUID(str(att_id))) if att_id else None
+            enriched.append(_enrich_item(it, None, None, custom_image_url=custom_image_url))
+            continue
         enriched.append(
             _enrich_item(it, items_prod_map.get(it.product_id), cover_urls.get(it.product_id))
         )
 
     floor_plans = await _floor_plan_payloads(db, proposal.id, request)
-    return _wrap_proposal(proposal, enriched, floor_plans)
+    effect_images = await _effect_image_payloads(db, proposal.id, request)
+    return _wrap_proposal(proposal, enriched, floor_plans, effect_images)
 
 
 @router.post(
@@ -676,24 +831,7 @@ async def revert_confirmation(
 
     # 幂等：已处于草稿直接返回富化结果
     if proposal.status == "draft":
-        product_ids = [it.product_id for it in proposal.items]
-        prod_map: dict[UUID, Product] = {}
-        if product_ids:
-            prod_result = await db.execute(
-                select(Product)
-                .options(selectinload(Product.category))
-                .where(Product.id.in_(product_ids), Product.is_deleted.is_(False))
-            )
-            prod_map = {p.id: p for p in prod_result.scalars().all()}
-        cover_urls = await _cover_urls(product_ids, request, db)
-        enriched = []
-        for it in proposal.items:
-            enriched.append(
-                _enrich_item(it, prod_map.get(it.product_id), cover_urls.get(it.product_id))
-            )
-        return _wrap_proposal(
-            proposal, enriched, await _floor_plan_payloads(db, proposal.id, request)
-        )
+        return await _rich_proposal_response(db, proposal, request)
 
     if proposal.status != "confirmed":
         raise HTTPException(
@@ -728,23 +866,7 @@ async def revert_confirmation(
     )
     proposal = result.scalar_one()
 
-    product_ids = [it.product_id for it in proposal.items]
-    prod_map: dict[UUID, Product] = {}
-    if product_ids:
-        prod_result = await db.execute(
-            select(Product)
-                .options(selectinload(Product.category))
-                .where(Product.id.in_(product_ids), Product.is_deleted.is_(False))
-        )
-        prod_map = {p.id: p for p in prod_result.scalars().all()}
-    cover_urls = await _cover_urls(product_ids, request, db)
-    enriched = []
-    for it in proposal.items:
-        enriched.append(
-            _enrich_item(it, prod_map.get(it.product_id), cover_urls.get(it.product_id))
-        )
-    floor_plans = await _floor_plan_payloads(db, proposal.id, request)
-    return _wrap_proposal(proposal, enriched, floor_plans)
+    return await _rich_proposal_response(db, proposal, request)
 
 
 @router.delete("/{proposal_id}", dependencies=[Depends(PermissionChecker("proposal:delete"))])
@@ -759,6 +881,40 @@ async def delete_proposal(request: Request, proposal_id: UUID, db: AsyncSession 
     if not proposal:
         raise HTTPException(status_code=404, detail={"code": 40401, "msg": "方案不存在"})
 
+    # 自定义产品图片随方案随用随删：软删附件行，不再停留在媒体库
+    await _soft_delete_custom_images(db, list(proposal.items))
     proposal.is_deleted = True
     await db.commit()
     return {"code": 200, "msg": "success"}
+
+
+async def _rich_proposal_response(
+    db: AsyncSession, proposal: Proposal, request: Request
+) -> dict:
+    """组装方案完整响应：富化 items + 平面图 + 效果图。"""
+    product_ids = [it.product_id for it in proposal.items if it.product_id is not None]
+    prod_map: dict[UUID, Product] = {}
+    if product_ids:
+        prod_result = await db.execute(
+            select(Product)
+            .options(selectinload(Product.category))
+            .where(Product.id.in_(product_ids), Product.is_deleted.is_(False))
+        )
+        prod_map = {p.id: p for p in prod_result.scalars().all()}
+    cover_urls = await _cover_urls(product_ids, request, db)
+    enriched = []
+    for it in proposal.items:
+        if it.is_custom:
+            att_id = (it.custom_product or {}).get("attachment_id")
+            custom_image_url = _sign_content_url(request, UUID(str(att_id))) if att_id else None
+            enriched.append(_enrich_item(it, None, None, custom_image_url=custom_image_url))
+            continue
+        enriched.append(
+            _enrich_item(it, prod_map.get(it.product_id), cover_urls.get(it.product_id))
+        )
+    return _wrap_proposal(
+        proposal,
+        enriched,
+        await _floor_plan_payloads(db, proposal.id, request),
+        await _effect_image_payloads(db, proposal.id, request),
+    )

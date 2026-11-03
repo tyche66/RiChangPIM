@@ -101,7 +101,14 @@ watch(
     <div v-if="item" class="share-detail-dialog__header">
       <div class="share-detail-dialog__heading">
         <h2>{{ item.product_name || MISSING_TEXT }}</h2>
-        <span class="product-code">{{ item.product_no || MISSING_TEXT }}</span>
+        <span
+          v-if="item.is_custom"
+          class="product-code"
+        >自定义产品 · 仅本方案展示</span>
+        <span
+          v-else
+          class="product-code"
+        >{{ item.product_no || MISSING_TEXT }}</span>
       </div>
       <button type="button" class="icon-button icon-button--quiet" aria-label="关闭商品详情" @click="close">
         <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">

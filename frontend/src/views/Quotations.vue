@@ -890,14 +890,19 @@ onMounted(() => {
     Promise.resolve().then(async () => {
       try {
         const res = await proposalApi.get(pid)
-        quotationForm.items = res.data.items.map((item) => ({
-          product_id: item.product_id,
+        // 自定义产品不可进入报价单（无 product_id）；生成报价前剔除并提示
+        const customCount = res.data.items.filter((i) => i.is_custom).length
+        if (customCount > 0) {
+          ElMessage.warning(`方案中有 ${customCount} 项自定义产品（仅方案展示），未带入报价单`)
+        }
+        quotationForm.items = res.data.items.filter((i) => !i.is_custom).map((item) => ({
+          product_id: item.product_id as string,
           quantity: item.quantity,
           unit_price: item.face_price ?? 0,
           tax_rate: quotationForm.tax_rate,
           subtotal: (item.face_price ?? 0) * item.quantity,
           product_name: item.product_name,
-          product_no: item.product_no,
+          product_no: item.product_no ?? undefined,
           face_price: item.face_price,
           cover_image_url: item.cover_image_url,
           // Track C：楼层/空间/材质说明与产品快照一起带入报价

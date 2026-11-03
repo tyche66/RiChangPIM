@@ -264,7 +264,29 @@
       <ProposalItemEditor
         v-model="form.items"
         page
+        @pick-from-list="handlePickFromList"
       />
+
+      <!-- 效果图：优先服务方案本身，编辑时可上传并存媒体库；可绑定产品或空间 -->
+      <el-divider
+        content-position="left"
+        class="glass-divider"
+      >
+        方案效果图
+      </el-divider>
+      <template v-if="isEdit">
+        <ProposalEffectImageManager
+          :proposal-id="proposalId"
+          :items="form.items"
+        />
+      </template>
+      <template v-else>
+        <!-- 创建模式：先暂存，方案创建成功后一次性 batchCreate 绑定 -->
+        <ProposalEffectImageManager
+          v-model="effectImages"
+          :items="form.items"
+        />
+      </template>
 
       <!-- 创建模式：平面图先暂存在页面里，方案创建成功后一次性 batchCreate 绑定 -->
       <template v-if="!isEdit">
@@ -292,11 +314,13 @@ import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { proposalApi } from '@/api'
+import { proposalEffectImageApi } from '@/api/proposalEffectImages'
 import { proposalFloorPlanApi } from '@/api/proposalFloorPlans'
 import { customerApi } from '@/api/customer'
 import { projectApi } from '@/api/project'
 import { useAuthStore } from '@/stores/auth'
 import type {
+  EffectImageDraft,
   FloorPlanDraft,
   Proposal,
   ProposalFloorPlan,
@@ -306,6 +330,7 @@ import type {
 import type { ImageViewerImage } from '@/components/ImageViewer.vue'
 import ImageViewer from '@/components/ImageViewer.vue'
 import ProposalItemEditor from '@/components/ProposalItemEditor.vue'
+import ProposalEffectImageManager from '@/components/ProposalEffectImageManager.vue'
 import ProposalFloorPlanManager from '@/components/ProposalFloorPlanManager.vue'
 
 const route = useRoute()
@@ -331,6 +356,8 @@ const form = reactive({
 
 // Track D：新增时先暂存平面图，方案创建成功后再一次性绑定
 const floorPlans = ref<FloorPlanDraft[]>([])
+// 方案效果图：新增时先暂存，创建成功后再一次性绑定
+const effectImages = ref<EffectImageDraft[]>([])
 
 const formRules: FormRules = {
   proposal_name: [{ required: true, message: '请输入方案名称', trigger: 'blur' }],
@@ -493,12 +520,11 @@ async function consumeSelectionToken() {
   const storageKey = `proposal_token_${selectionToken}`
   const raw = sessionStorage.getItem(storageKey)
   if (raw) sessionStorage.removeItem(storageKey)
-  // 消费完立刻清理地址栏：刷新停留在空白创建页，而不是被过期 token 踢回列表
+  // 消费完立刻清理地址栏：刷新停留在页面，而不是被过期 token 踢回列表
   router.replace({ query: {} })
 
   if (!raw) {
-    ElMessage.warning('未找到制作方案数据，请从产品列表重新选择')
-    await router.replace('/proposals')
+    ElMessage.warning('未找到选中的商品数据，请重新从产品列表选择')
     return
   }
 
@@ -506,18 +532,17 @@ async function consumeSelectionToken() {
   try {
     token = JSON.parse(raw) as ProposalToken
   } catch {
-    ElMessage.warning('未找到制作方案数据，请从产品列表重新选择')
-    await router.replace('/proposals')
+    ElMessage.warning('未找到选中的商品数据，请重新从产品列表选择')
     return
   }
 
   if (!token?.options?.length) {
-    ElMessage.warning('方案数据已使用，请从产品列表重新选择')
-    await router.replace('/proposals')
+    ElMessage.warning('选中的商品数据已使用，请重新从产品列表选择')
     return
   }
 
-  form.items = token.options.map((opt) => ({
+  const picked = token.options.map((opt) => ({
+    _key: `picked-${opt.id}-${Date.now()}`,
     product_id: opt.id,
     quantity: 1,
     product_name: opt.product_name,
@@ -526,6 +551,26 @@ async function consumeSelectionToken() {
     stock_status: opt.stock_status,
     cover_image_url: opt.cover_image_url,
   }))
+
+  if (isEdit.value) {
+    // 已保存方案：追加并去重（已存在的产品不重复加入）
+    const existing = new Set(
+      form.items.filter((i) => !i.is_custom && i.product_id).map((i) => i.product_id),
+    )
+    form.items = [...form.items, ...picked.filter((p) => p.product_id && !existing.has(p.product_id))]
+    ElMessage.success(`已从产品列表追加 ${picked.length} 个商品（去重后）`)
+    return
+  }
+  form.items = picked
+}
+
+/** 「从产品列表选择」：跳到产品列表页，选完点「完成」带 selection_token 回来。 */
+function handlePickFromList() {
+  const returnTo = isEdit.value ? `/proposals/${proposalId.value}/edit` : '/proposals/create'
+  router.push({
+    path: '/products',
+    query: { proposal_pick: '1', return_to: returnTo },
+  })
 }
 
 // ---------------------------------------------------------------------------
@@ -598,6 +643,11 @@ function onBeforeUnload(event: BeforeUnloadEvent) {
 function validateItems(): string | null {
   if (form.items.length === 0) return '请至少添加一项商品'
   for (const item of form.items) {
+    if (item.is_custom) {
+      const name = item.custom_product?.name?.trim()
+      if (!name) return '自定义产品缺少名称'
+      continue
+    }
     if (typeof item.product_id !== 'string' || !item.product_id.trim()) {
       return '商品信息缺少有效产品 ID，请重新选择商品'
     }
@@ -664,13 +714,26 @@ const handleSave = async () => {
     }
 
     const itemsPayload = form.items.map((item) => ({
-      product_id: item.product_id.trim(),
+      product_id: item.is_custom ? null : item.product_id?.trim(),
       quantity: item.quantity,
       remark: item.remark?.trim() || undefined,
       project_space_id: item.project_space_id || undefined,
       floor_label: item.floor_label?.trim() || undefined,
       space_label: item.space_label?.trim() || undefined,
       material_desc: item.material_desc?.trim() || undefined,
+      display_name: item.is_custom ? undefined : item.display_name?.trim() || null,
+      is_custom: Boolean(item.is_custom),
+      custom_product: item.is_custom
+        ? {
+            name: (item.custom_product?.name || '').trim(),
+            face_price: item.custom_product?.face_price ?? null,
+            material: item.custom_product?.material?.trim() || null,
+            colors: item.custom_product?.colors?.trim() || null,
+            specification: item.custom_product?.specification?.trim() || null,
+            material_description: item.custom_product?.material_description?.trim() || null,
+            attachment_id: item.custom_product?.attachment_id || null,
+          }
+        : null,
     }))
 
     if (isEdit.value) {
@@ -706,7 +769,7 @@ const handleSave = async () => {
       { suppressErrorMessage: true },
     )
 
-    // 平面图是附加物料：绑定失败不回滚已创建的方案，但要明确告知去哪里补
+    // 平面图/效果图是附加物料：绑定失败不回滚已创建的方案，但要明确告知去哪里补
     if (floorPlans.value.length && created?.data?.id) {
       try {
         await proposalFloorPlanApi.batchCreate(
@@ -719,6 +782,24 @@ const handleSave = async () => {
         )
       } catch {
         ElMessage.warning('方案已创建，但平面图绑定失败，请到方案详情页重新添加')
+      }
+    }
+    if (effectImages.value.length && created?.data?.id) {
+      try {
+        await proposalEffectImageApi.batchCreate(
+          created.data.id,
+          effectImages.value.map((img, index) => ({
+            attachment_id: img.attachment_id,
+            name: img.name,
+            sort: index,
+            product_id: img.product_id || null,
+            project_space_id: img.project_space_id || null,
+            floor_label: img.floor_label || null,
+            space_label: img.space_label || null,
+          })),
+        )
+      } catch {
+        ElMessage.warning('方案已创建，但效果图绑定失败，请到方案详情页重新添加')
       }
     }
 
@@ -769,12 +850,15 @@ async function initPage() {
   form.project_id = null
   form.items = []
   floorPlans.value = []
+  effectImages.value = []
   viewerImages.value = null
 
   if (isEdit.value) {
     await loadProposal()
     resolveBindingNames()
     loadFloorPlans()
+    // 已保存方案也可从产品列表选品追加（带 selection_token 返回）
+    await consumeSelectionToken()
     return
   }
 

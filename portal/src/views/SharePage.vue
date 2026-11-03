@@ -22,6 +22,7 @@ import ShareDetailDialog from '@/components/ShareDetailDialog.vue'
 import {
   ShareAccessError,
   getShareContent,
+  type ShareEffectImage,
   type ShareEnvelopeData,
   type ShareFloorPlan,
   type ShareProductItem,
@@ -76,6 +77,61 @@ const planIndex = ref(0)
 function openPlan(index: number) {
   planIndex.value = index
   planOpen.value = true
+}
+
+// ---------------------------------------------------------------------------
+// 方案效果图：优先服务方案本身。按 空间绑定 → 产品绑定 → 方案整体 分组展示。
+// ---------------------------------------------------------------------------
+
+const effectImages = computed<ShareEffectImage[]>(() =>
+  isProposal.value
+    ? (proposal.value?.effect_images || []).filter((img) => Boolean(img.image_url))
+    : [],
+)
+
+interface EffectGroup {
+  key: string
+  label: string
+  images: ShareEffectImage[]
+}
+
+const effectGroups = computed<EffectGroup[]>(() => {
+  const groups: EffectGroup[] = []
+  const spaceMap = new Map<string, EffectGroup>()
+  const productMap = new Map<string, EffectGroup>()
+  for (const img of effectImages.value) {
+    const floor = (img.floor_label || '').trim()
+    const space = (img.space_label || '').trim()
+    if (floor || space) {
+      const key = `space||${floor}||${space}`
+      if (!spaceMap.has(key)) {
+        spaceMap.set(key, {
+          key,
+          label: [floor, space].filter(Boolean).join(' / '),
+          images: [],
+        })
+      }
+      spaceMap.get(key)!.images.push(img)
+    } else if (img.product_name) {
+      const key = `product||${img.product_id || img.product_name}`
+      if (!productMap.has(key)) {
+        productMap.set(key, { key, label: img.product_name || '产品', images: [] })
+      }
+      productMap.get(key)!.images.push(img)
+    } else {
+      groups.push({ key: `overall||${img.id || img.image_url}`, label: '方案整体', images: [img] })
+    }
+  }
+  return [...groups, ...spaceMap.values(), ...productMap.values()]
+})
+
+const effectOpen = ref(false)
+const effectIndex = ref(0)
+
+function openEffectAt(image: ShareEffectImage) {
+  const flatIndex = effectImages.value.findIndex((img) => img === image)
+  effectIndex.value = Math.max(0, flatIndex)
+  effectOpen.value = true
 }
 
 const headline = computed(() => {
@@ -362,6 +418,44 @@ onMounted(load)
         </div>
       </section>
 
+      <!-- 方案效果图：优先服务方案本身；绑定空间/产品时分组展示 -->
+      <section
+        v-if="effectGroups.length"
+        class="panel"
+      >
+        <div class="panel__header">
+          <div class="panel__title"><h2>效果图</h2></div>
+          <span class="section-head__count">{{ effectImages.length }} 张</span>
+        </div>
+        <div
+          v-for="group in effectGroups"
+          :key="group.key"
+          class="effect-group"
+        >
+          <p class="effect-group__label">{{ group.label }}</p>
+          <div class="effect-grid">
+            <button
+              v-for="(img, index) in group.images"
+              :key="img.id || img.image_url || index"
+              type="button"
+              class="effect-tile"
+              :aria-label="`全屏查看：${img.name || '效果图'}`"
+              @click="openEffectAt(img)"
+            >
+              <span class="effect-tile__thumb">
+                <img
+                  :src="img.image_url as string"
+                  :alt="img.name || '效果图'"
+                  loading="lazy"
+                  decoding="async"
+                >
+              </span>
+              <span class="effect-tile__name">{{ img.name || '效果图' }}</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
       <section class="panel">
         <div class="panel__header">
           <div class="panel__title"><h2>{{ isProposal ? '商品列表' : '商品明细' }}</h2></div>
@@ -429,8 +523,20 @@ onMounted(load)
                           title="查看商品详情"
                           @click="openDetail(item)"
                         >
-                          <span class="share-product__name">{{ item.product_name || MISSING_TEXT }}</span>
-                          <span class="product-code">{{ item.product_no || MISSING_TEXT }}</span>
+                          <span class="share-product__name">
+                            {{ item.product_name || MISSING_TEXT }}
+                            <span
+                              v-if="item.is_custom"
+                              class="share-product__custom"
+                            >自定义</span>
+                          </span>
+                          <span class="product-code">
+                            {{ item.is_custom ? '自定义产品 · 仅本方案展示' : (item.product_no || MISSING_TEXT) }}
+                          </span>
+                          <span
+                            v-if="item.display_name && item.product_original_name && item.product_original_name !== item.product_name"
+                            class="share-product__original"
+                          >原名：{{ item.product_original_name }}</span>
                           <span class="share-product__hint">{{ categoryText(item) }}</span>
                         </button>
                       </div>
@@ -472,6 +578,13 @@ onMounted(load)
       :images="planOpen ? floorPlans : null"
       :start-index="planIndex"
       @close="planOpen = false"
+    />
+
+    <!-- 效果图全屏：复用平面图查看器（同为缩略图入口 + 全屏缩放切换） -->
+    <FloorPlanViewer
+      :images="effectOpen ? effectImages : null"
+      :start-index="effectIndex"
+      @close="effectOpen = false"
     />
 
     <!-- 商品详情：明细表只放摘要，规格/材质/颜色/材质说明与场景图在点击后展开 -->

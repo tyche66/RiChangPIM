@@ -120,6 +120,8 @@ async def stats_products_hot(
 
     items = []
     for product_id, ref_count in rows:
+        if product_id is None:
+            continue
         product_result = await db.execute(select(Product).where(Product.id == product_id))
         product = product_result.scalar_one_or_none()
         items.append(

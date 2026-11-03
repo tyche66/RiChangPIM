@@ -335,6 +335,41 @@
         @change="onSceneImagesChange"
       />
 
+      <!-- 搭配案例：效果图优先服务方案本身，这里只是连带展示绑定了本产品的方案效果图 -->
+      <section
+        v-if="effectImages.length"
+        class="effect-case-section glass-section"
+      >
+        <h4 class="section-title">
+          搭配案例
+          <span class="section-note">来自绑定该产品的方案效果图</span>
+        </h4>
+        <div class="effect-case-grid">
+          <button
+            v-for="(img, index) in effectImages"
+            :key="img.id"
+            type="button"
+            class="effect-case-card"
+            :title="`预览：${img.name}`"
+            @click="openEffectViewer(index)"
+          >
+            <img
+              :src="img.imageUrl || img.image_url"
+              :alt="img.name"
+              loading="lazy"
+            >
+            <span class="effect-case-caption">
+              <span class="effect-case-name">{{ img.name }}</span>
+              <span class="effect-case-proposal">{{ img.proposalName || img.proposal_name || img.proposalNo || img.proposal_no }}</span>
+              <span
+                v-if="img.floorLabel || img.spaceLabel || img.floor_label || img.space_label"
+                class="effect-case-space"
+              >{{ [img.floorLabel || img.floor_label, img.spaceLabel || img.space_label].filter(Boolean).join(' / ') }}</span>
+            </span>
+          </button>
+        </div>
+      </section>
+
       <!-- Edit Form -->
       <el-dialog
         v-if="editMode"
@@ -541,6 +576,13 @@
         hide-on-click-modal
         @close="viewerVisible = false"
       />
+      <el-image-viewer
+        v-if="effectViewerVisible"
+        :url-list="effectImages.map((img: any) => img.image_url)"
+        :initial-index="effectViewerIndex"
+        hide-on-click-modal
+        @close="effectViewerVisible = false"
+      />
 
       <!-- Status Dialog -->
       <el-dialog
@@ -741,6 +783,17 @@ function openViewer(index: number) {
   viewerVisible.value = true
 }
 
+// 搭配案例：绑定本产品的方案效果图灯箱
+const effectImages = computed<any[]>(() => product.value?.effectImages || [])
+const effectViewerVisible = ref(false)
+const effectViewerIndex = ref(0)
+
+function openEffectViewer(index: number) {
+  if (!effectImages.value.length) return
+  effectViewerIndex.value = Math.min(Math.max(index, 0), effectImages.value.length - 1)
+  effectViewerVisible.value = true
+}
+
 const editRules: FormRules = {
   productName: [{ required: true, message: '请输入产品名称', trigger: 'blur' }],
   facePrice: [{ required: true, message: '请输入面价', trigger: 'blur' }],
@@ -810,6 +863,18 @@ const normalizeProduct = (item: any) => ({
     thumbnailUrl: img.file_url,
     name: img.name,
     sortOrder: img.sort,
+  })),
+  effectImages: (item.effect_images || []).map((img: any) => ({
+    id: img.id,
+    proposalId: img.proposal_id,
+    proposalNo: img.proposal_no,
+    proposalName: img.proposal_name,
+    name: img.name,
+    imageUrl: img.image_url,
+    floorLabel: img.floor_label,
+    spaceLabel: img.space_label,
+    sort: img.sort,
+    createTime: img.create_time,
   })),
 })
 
@@ -1254,6 +1319,68 @@ watch(editMode, (val) => {
   color: var(--brand-deep);
   font-size: 15px;
   font-weight: 600;
+}
+
+.section-note {
+  margin-left: 8px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-secondary);
+}
+
+/* 搭配案例：效果图从方案绑定，随方案变化自动回流，这里只读展示 */
+.effect-case-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  gap: 12px;
+}
+
+.effect-case-card {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  border: 1px solid rgba(var(--pim-brand), 0.12);
+  border-radius: var(--radius-sm);
+  background: var(--brand-lighter);
+  overflow: hidden;
+  cursor: zoom-in;
+}
+
+.effect-case-card img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  display: block;
+}
+
+.effect-case-caption {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px 10px;
+  text-align: left;
+}
+
+.effect-case-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--brand-deep);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.effect-case-proposal {
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.effect-case-space {
+  font-size: 12px;
+  color: var(--text-secondary);
 }
 
 /* ===== Table ===== */

@@ -25,6 +25,7 @@ from app.api.v1 import (
     observability,
     pending_actions,
     products,
+    proposal_effect_images,
     proposal_floor_plans,
     proposals,
     roles,
@@ -285,6 +286,11 @@ app.include_router(proposals.router, prefix="/api/v1/proposals", tags=["proposal
 app.include_router(
     proposal_floor_plans.router,
     prefix="/api/v1/proposals/{proposal_id}/floor-plans",
+    tags=["proposals"],
+)
+app.include_router(
+    proposal_effect_images.router,
+    prefix="/api/v1/proposals/{proposal_id}/effect-images",
     tags=["proposals"],
 )
 app.include_router(shares.router, prefix="/api/v1/shares", tags=["shares"])

@@ -24,14 +24,27 @@ export interface ProductSnapshot {
   face_price: number | null
 }
 
+/** 方案内自定义产品：不入产品库，仅在该方案对外展示；图片随方案随用随删。 */
+export interface ProposalCustomProduct {
+  name: string
+  face_price?: number | null
+  material?: string | null
+  colors?: string | null
+  specification?: string | null
+  material_description?: string | null
+  attachment_id?: string | null
+}
+
 export interface ProposalItem {
   id?: string
-  product_id: string
+  /** 前端草稿唯一键（暂存条目用，不上送后端） */
+  _key?: string
+  product_id?: string | null
   quantity: number
   remark?: string
   /** Enriched display fields (not sent to server). */
   product_name?: string
-  product_no?: string
+  product_no?: string | null
   face_price?: number | null
   stock_status?: string | null
   cover_image_url?: string | null
@@ -49,6 +62,11 @@ export interface ProposalItem {
   colors?: string | null
   material_description?: string | null
   specification?: string | null
+  // 方案内产品名称：仅服务当前方案，设置后替代产品库名称对外展示
+  display_name?: string | null
+  // 自定义产品（不入产品库）
+  is_custom?: boolean
+  custom_product?: ProposalCustomProduct | null
 }
 
 export interface Proposal {
@@ -69,6 +87,63 @@ export interface Proposal {
   items: ProposalItem[]
   /** Track D：方案平面图（媒体库绑定，详情接口随方案返回） */
   floor_plans?: ProposalFloorPlan[]
+  /** 方案效果图（媒体库绑定，可挂产品/空间，详情接口随方案返回） */
+  effect_images?: ProposalEffectImage[]
+}
+
+/**
+ * 方案效果图：图片本体在媒体库，本结构只是绑定关系 + 展示名 + 产品/空间归属。
+ * `image_url` 是后端签发的短时地址（15 分钟），不要缓存到 localStorage。
+ */
+export interface ProposalEffectImage {
+  id: string
+  proposal_id: string
+  project_id: string | null
+  attachment_id: string
+  name: string
+  product_id?: string | null
+  product_no?: string | null
+  product_name?: string | null
+  project_space_id?: string | null
+  floor_label?: string | null
+  space_label?: string | null
+  sort: number
+  file_name?: string | null
+  file_type?: string | null
+  file_size?: number | null
+  image_url: string
+  create_time?: string | null
+}
+
+/** 产品详情页「搭配案例」：绑定该产品的方案效果图（连带展示，含方案上下文）。 */
+export interface ProductEffectImage {
+  id: string
+  proposal_id: string
+  proposal_no: string
+  proposal_name: string
+  name: string
+  image_url: string
+  floor_label?: string | null
+  space_label?: string | null
+  sort: number
+  create_time?: string | null
+}
+
+/**
+ * 新增方案里的效果图暂存项：方案还没创建，因此没有绑定 id。
+ * 创建成功后由 `proposalEffectImageApi.batchCreate` 一次性绑定。
+ */
+export interface EffectImageDraft {
+  id?: string
+  attachment_id: string
+  name: string
+  product_id?: string | null
+  project_space_id?: string | null
+  floor_label?: string | null
+  space_label?: string | null
+  image_url?: string | null
+  product_name?: string | null
+  sort?: number
 }
 
 /**
@@ -193,9 +268,15 @@ export interface ShareLinkInfo {
 // ============ Share content (from backend share endpoint) ============
 
 export interface ShareProductItem {
-  product_id: string
+  product_id: string | null
   product_name: string
-  product_no?: string
+  product_no?: string | null
+  /** 方案内名称：仅服务该方案，替代产品库名称对外展示 */
+  display_name?: string | null
+  /** 未设置方案内名称时的原名（快照/实时） */
+  product_original_name?: string | null
+  /** 自定义产品（不入产品库） */
+  is_custom?: boolean
   face_price: number | null
   quantity: number
   cover_image_url?: string | null
@@ -218,12 +299,25 @@ export interface ShareProductItem {
   product_snapshot?: ProductSnapshot | null
 }
 
+export interface ShareEffectImage {
+  id: string
+  name: string
+  product_id?: string | null
+  product_name?: string | null
+  floor_label?: string | null
+  space_label?: string | null
+  sort: number
+  image_url: string
+}
+
 export interface ShareProposalContent {
   proposal_no: string
   proposal_name: string
   customer_name: string | null
   status: 'draft' | 'confirmed'
   total_face_value: number
+  floor_plans?: { id: string; name: string; floor_label?: string | null; space_label?: string | null; sort: number; image_url: string }[]
+  effect_images?: ShareEffectImage[]
   items: ShareProductItem[]
 }
 
@@ -260,13 +354,16 @@ export interface ProductListItem {
 }
 
 export interface ProposalItemRequest {
-  product_id: string
+  product_id?: string | null
   quantity: number
   remark?: string
   project_space_id?: string | null
   floor_label?: string | null
   space_label?: string | null
   material_desc?: string | null
+  display_name?: string | null
+  is_custom?: boolean
+  custom_product?: ProposalCustomProduct | null
 }
 
 export interface ProposalCreateRequest {

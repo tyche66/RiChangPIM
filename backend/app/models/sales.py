@@ -84,7 +84,7 @@ class ProposalItem(CommonBase):
     proposal_id = Column(
         PGUUID(as_uuid=True), ForeignKey("proposal.id", ondelete="CASCADE"), nullable=False
     )
-    product_id = Column(PGUUID(as_uuid=True), ForeignKey("product.id"), nullable=False)
+    product_id = Column(PGUUID(as_uuid=True), ForeignKey("product.id"), nullable=True)
     quantity = Column(Integer, nullable=False, default=1)
     sort = Column(Integer, default=0)
     remark = Column(Text)
@@ -96,6 +96,12 @@ class ProposalItem(CommonBase):
     space_label = Column(String(128), nullable=True)
     material_desc = Column(Text, nullable=True)
     product_snapshot = Column(JSONB, nullable=True)
+    # 方案内产品名称：仅服务当前方案，设置后替代产品库名称对外展示；空则回落原名
+    display_name = Column(String(128), nullable=True)
+    # 自定义产品（不入产品库）：is_custom=True 时 product_id 为空，
+    # custom_product 存自由填写的展示字段与图片附件（随方案随用随删）
+    is_custom = Column(Boolean, nullable=False, default=False)
+    custom_product = Column(JSONB, nullable=True)
 
     proposal = relationship("Proposal", back_populates="items")
     product = relationship("Product")
@@ -153,6 +159,79 @@ class ProposalFloorPlan(CommonBase):
         # 同一方案不得重复绑定同一个附件；软删除后可重新绑定
         Index(
             "uq_pfp_proposal_attachment",
+            "proposal_id",
+            "attachment_id",
+            unique=True,
+            postgresql_where=text("is_deleted = false"),
+        ),
+    )
+
+
+class ProposalEffectImage(CommonBase):
+    """方案效果图：媒体库附件与方案的绑定，可绑定方案内产品或空间。
+
+    与平面图同构但语义不同：效果图对外展示方案的「渲染/实景效果」，优先
+    服务于方案本身；可额外绑定方案明细中的某个产品或某个空间（二者独立，
+    允许同时绑定，也允许都不绑定作为方案整体效果图）。产品详情页「搭配
+    案例」板块只是连带展示绑定了该产品的效果图。
+
+    楼层/空间名是冗余快照而不是外键：与 proposal_item 的 floor_label /
+    space_label 同口径，命名漂移不会影响已分享内容。
+    """
+
+    __tablename__ = "proposal_effect_image"
+
+    proposal_id = Column(
+        PGUUID(as_uuid=True), ForeignKey("proposal.id", ondelete="CASCADE"), nullable=False
+    )
+    project_id = Column(
+        PGUUID(as_uuid=True), ForeignKey("projects.id", ondelete="SET NULL"), nullable=True
+    )
+    attachment_id = Column(
+        PGUUID(as_uuid=True), ForeignKey("attachment.id", ondelete="RESTRICT"), nullable=False
+    )
+    name = Column(String(128), nullable=False)
+    product_id = Column(
+        PGUUID(as_uuid=True), ForeignKey("product.id", ondelete="SET NULL"), nullable=True
+    )
+    project_space_id = Column(
+        PGUUID(as_uuid=True), ForeignKey("project_spaces.id", ondelete="SET NULL"), nullable=True
+    )
+    floor_label = Column(String(128), nullable=True)
+    space_label = Column(String(128), nullable=True)
+    sort = Column(Integer, nullable=False, default=0)
+
+    proposal = relationship("Proposal", backref="effect_images")
+    attachment = relationship("Attachment")
+    product = relationship("Product")
+    space = relationship("ProjectSpace")
+
+    __table_args__ = (
+        CheckConstraint("char_length(name) > 0", name="ck_pei_name"),
+        Index(
+            "ix_pei_proposal",
+            "proposal_id",
+            "sort",
+            postgresql_where=text("is_deleted = false"),
+        ),
+        Index(
+            "ix_pei_project",
+            "project_id",
+            postgresql_where=text("is_deleted = false AND project_id IS NOT NULL"),
+        ),
+        Index(
+            "ix_pei_attachment",
+            "attachment_id",
+            postgresql_where=text("is_deleted = false"),
+        ),
+        Index(
+            "ix_pei_product",
+            "product_id",
+            postgresql_where=text("is_deleted = false AND product_id IS NOT NULL"),
+        ),
+        # 同一方案不得重复绑定同一个附件；软删除后可重新绑定
+        Index(
+            "uq_pei_proposal_attachment",
             "proposal_id",
             "attachment_id",
             unique=True,

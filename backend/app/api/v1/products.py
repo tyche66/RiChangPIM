@@ -41,6 +41,7 @@ from app.models.product import (
     Tag,
     product_scene_image,
 )
+from app.models.sales import Proposal, ProposalEffectImage
 from app.schemas.product import (
     ProductCloneResponse,
     ProductCreate,
@@ -658,8 +659,10 @@ async def get_product(
     if not product:
         raise HTTPException(status_code=404, detail={"code": 40401, "msg": "产品不存在"})
     scene_images_data = await _fetch_scene_images_for_product(db, product_id, request)
+    effect_images_data = await _fetch_effect_images_for_product(db, product_id, request)
     body = _product_response(product, request)
     body["scene_images"] = scene_images_data
+    body["effect_images"] = effect_images_data
     role_code = getattr(request.state, "role_code", None)
     return filter_sensitive_fields(body, role_code or "sales")
 
@@ -711,6 +714,45 @@ async def _fetch_scene_images_for_product(
         )
     scene_images.sort(key=lambda image: image["sort"])
     return scene_images
+
+
+async def _fetch_effect_images_for_product(
+    db: AsyncSession, product_id: UUID, request: Request
+) -> list[dict]:
+    """「搭配案例」：跨全部未删除方案汇总绑定到该产品的效果图。
+
+    效果图优先服务方案本身，产品详情页只是连带展示；按方案创建时间倒序、
+    组内按 sort 排序，展示地址一律走后端 15 分钟短 token。
+    """
+    rows = (
+        await db.execute(
+            select(ProposalEffectImage, Proposal)
+            .join(Proposal, Proposal.id == ProposalEffectImage.proposal_id)
+            .where(
+                ProposalEffectImage.product_id == product_id,
+                ProposalEffectImage.is_deleted.is_(False),
+                Proposal.is_deleted.is_(False),
+            )
+            .order_by(Proposal.create_time.desc(), ProposalEffectImage.sort)
+        )
+    ).all()
+    result = []
+    for pei, prop in rows:
+        result.append(
+            {
+                "id": str(pei.id),
+                "proposal_id": str(prop.id),
+                "proposal_no": prop.proposal_no,
+                "proposal_name": prop.proposal_name,
+                "name": pei.name,
+                "image_url": _create_content_url(request, pei.attachment_id),
+                "floor_label": pei.floor_label,
+                "space_label": pei.space_label,
+                "sort": pei.sort,
+                "create_time": pei.create_time.isoformat() if pei.create_time else None,
+            }
+        )
+    return result
 
 
 def _product_response(product: Product, request: Request) -> dict:

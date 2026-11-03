@@ -110,11 +110,13 @@
         v-if="proposalMode"
         class="selection-bar"
       >
-        <span class="selection-count">已选 {{ selectedCount }} 项</span>
+        <span class="selection-count">
+          {{ pickReturnTo ? '为方案选择商品 · ' : '' }}已选 {{ selectedCount }} 项
+        </span>
         <div class="selection-actions">
           <el-button
             class="capsule-btn"
-            @click="exitProposalMode"
+            @click="pickReturnTo ? cancelProposalPick() : exitProposalMode()"
           >
             取消
           </el-button>
@@ -767,7 +769,7 @@ import { ref, reactive, computed, onMounted, nextTick, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { View, Hide, Operation, Grid, List, ArrowDown } from '@element-plus/icons-vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { productApi, categoryApi, brandApi, supplierApi, tagApi } from '@/api'
 import ProductFilterNav from '@/components/ProductFilterNav.vue'
 import { usePreference } from '@/composables/usePreference'
@@ -778,6 +780,7 @@ import type { ProductOption, ProposalToken } from '@/types/sales'
 
 const authStore = useAuthStore()
 const router = useRouter()
+const route = useRoute()
 const userPermissions = computed(() => authStore.userPermissions)
 const roleCode = computed(() => authStore.userRoleCode)
 
@@ -831,6 +834,8 @@ const previewUrl = ref('')
 const proposalMode = ref(false)
 const selectedIds = ref(new Set<string>())
 const allSelectedProducts = ref<ProductOption[]>([])
+/** 从方案编辑跳产品列表选品时，完成/取消要回跳的编辑页路径（含 selection_token 返回） */
+const pickReturnTo = ref<string | null>(null)
 
 const selectedCount = computed(() => selectedIds.value.size)
 
@@ -1479,7 +1484,22 @@ const finishProposal = async () => {
   const storageKey = `proposal_token_${tokenId}`
   try {
     sessionStorage.setItem(storageKey, JSON.stringify(token))
-    // FR-2：选品直接进入独立创建页，由 ProposalEditor 消费 selection_token（只能用一次）
+    if (pickReturnTo.value) {
+      // 从方案编辑跳来：选完回编辑页，编辑器消费 selection_token 追加商品
+      const returnTo = pickReturnTo.value
+      pickReturnTo.value = null
+      const navigationFailure = await router.push({
+        path: returnTo,
+        query: { selection_token: tokenId },
+      })
+      if (navigationFailure) {
+        throw navigationFailure || new Error('proposal edit route was not reached')
+      }
+      exitProposalMode()
+      ElMessage.success('已返回方案编辑')
+      return
+    }
+    // 原入口：选品直接进入独立创建页，由 ProposalEditor 消费 selection_token（只能用一次）
     const navigationFailure = await router.push({
       path: '/proposals/create',
       query: { mode: 'create', selection_token: tokenId },
@@ -1495,13 +1515,32 @@ const finishProposal = async () => {
     } catch {
       // Storage can be unavailable in the same contexts that reject setItem.
     }
-    ElMessage.error('无法打开方案创建页面，请重试')
+    ElMessage.error('无法打开方案编辑页面，请重试')
   }
+}
+
+/** 从方案编辑跳来选品的取消：直接回编辑页，不导航到创建页。 */
+function cancelProposalPick() {
+  const target = pickReturnTo.value
+  pickReturnTo.value = null
+  exitProposalMode()
+  if (target) router.push(target)
+}
+
+/** URL 带 proposal_pick=1 时自动进入方案模式（从方案编辑跳来选品）。 */
+function enterPickIfRequested() {
+  if (route.query.proposal_pick !== '1') return
+  pickReturnTo.value =
+    typeof route.query.return_to === 'string' && route.query.return_to
+      ? route.query.return_to
+      : '/proposals/create'
+  enterProposalMode()
 }
 
 onMounted(() => {
   fetchMasterData()
   fetchProducts()
+  enterPickIfRequested()
   nextTick(() => computeFillWidths())
   let resizeTimer: number | undefined
   window.addEventListener('resize', () => {

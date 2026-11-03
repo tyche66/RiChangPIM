@@ -1628,6 +1628,77 @@ button.citation:hover { background: var(--accent-strong); border-color: var(--ac
 .share-product__name { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
 .share-product__hint { font-size: 11.5px; color: var(--ink-subtle); }
 .share-product__text:hover .share-product__name { text-decoration: underline; }
+.share-product__custom {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--ink-faint, rgba(0, 0, 0, 0.08));
+  color: var(--ink-subtle);
+  font-size: 10.5px;
+  font-weight: 600;
+  vertical-align: 1px;
+}
+.share-product__original {
+  font-size: 11px;
+  color: var(--ink-subtle);
+}
+
+/* 方案效果图：优先服务方案本身，按空间/产品/整体分组展示 */
+.effect-group {
+  margin-bottom: 14px;
+}
+.effect-group:last-child {
+  margin-bottom: 0;
+}
+.effect-group__label {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-strong, #1f2937);
+}
+.effect-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+}
+.effect-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: zoom-in;
+}
+.effect-tile__thumb {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface-mist, rgba(0, 0, 0, 0.04));
+}
+.effect-tile__thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.effect-tile__name {
+  font-size: 12px;
+  color: var(--ink-subtle);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.effect-tile:hover .effect-tile__thumb img {
+  transform: scale(1.03);
+}
+.effect-tile__thumb img {
+  transition: transform 160ms ease;
+}
 .share-foot {
   display: flex;
   align-items: center;

@@ -115,6 +115,19 @@
         :disabled="!hasPerm('proposal:edit')"
       />
 
+      <!-- 效果图：优先服务方案分享页；可绑定产品/空间，绑定产品后同步进产品详情「搭配案例」 -->
+      <el-divider
+        content-position="left"
+        class="glass-divider"
+      >
+        方案效果图
+      </el-divider>
+      <ProposalEffectImageManager
+        :proposal-id="proposalId"
+        :items="items"
+        :disabled="!hasPerm('proposal:edit')"
+      />
+
       <el-divider
         content-position="left"
         class="glass-divider"
@@ -150,8 +163,25 @@
                   {{ row.product_name ? row.product_name.slice(0, 2) : '无图' }}
                 </div>
                 <div class="product-cell-info">
-                  <span class="product-cell-name cell-strong">{{ row.product_name || '-' }}</span>
-                  <span class="cell-code">{{ row.product_no || '-' }}</span>
+                  <span class="product-cell-name cell-strong">
+                    <template v-if="row.is_custom">
+                      {{ row.custom_product?.name || row.product_name || '自定义产品' }}
+                      <el-tag
+                        size="small"
+                        type="warning"
+                        class="cell-custom-tag"
+                      >自定义</el-tag>
+                    </template>
+                    <template v-else>
+                      {{ row.display_name || row.product_name || '-' }}
+                      <template v-if="row.display_name && row.product_name && row.display_name !== row.product_name">
+                        <span class="cell-original-name">（原名：{{ row.product_name }}）</span>
+                      </template>
+                    </template>
+                  </span>
+                  <span class="cell-code">
+                    {{ row.is_custom ? '自定义 · 仅本方案展示' : (row.product_no || '-') }}
+                  </span>
                   <span
                     v-if="row.floor_label || row.space_label"
                     class="cell-space"
@@ -348,6 +378,7 @@ import type { PolishContent } from '@/types/ai'
 import { tryParseJson, isPolishFailed } from '@/types/ai'
 import type { Proposal, ProposalItem, ShareLinkInfo } from '@/types/sales'
 import ProposalFloorPlanManager from '@/components/ProposalFloorPlanManager.vue'
+import ProposalEffectImageManager from '@/components/ProposalEffectImageManager.vue'
 import ShareLinkCard from '@/components/ShareLinkCard.vue'
 
 const route = useRoute()
@@ -720,6 +751,17 @@ onMounted(async () => {
 
 .cell-material {
   color: var(--pim-text-faint);
+}
+
+/* 方案内名称/自定义产品：原名以次要字号附注 */
+.cell-original-name {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--pim-text-faint);
+}
+
+.cell-custom-tag {
+  margin-left: 6px;
 }
 
 /* ===== Polish Section ===== */

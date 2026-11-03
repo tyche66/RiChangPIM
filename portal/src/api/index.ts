@@ -207,6 +207,18 @@ export type ShareFloorPlan = {
   sort?: number | null
 }
 
+/** Scheme 效果图：优先服务方案本身，可绑定产品/空间（产品名用方案内生效名）。 */
+export type ShareEffectImage = {
+  id?: string
+  name?: string | null
+  product_id?: string | null
+  product_name?: string | null
+  floor_label?: string | null
+  space_label?: string | null
+  image_url?: string | null
+  sort?: number | null
+}
+
 export type ProductSnapshot = {
   product_no?: string | null
   product_name?: string | null
@@ -219,9 +231,15 @@ export type ProductSnapshot = {
 }
 
 export type ShareProductItem = {
-  product_id?: string
+  product_id?: string | null
   product_no?: string | null
   product_name?: string | null
+  /** 方案内名称：仅服务该方案，替代产品库名称对外展示 */
+  display_name?: string | null
+  /** 未设置方案内名称时的原名（快照/实时） */
+  product_original_name?: string | null
+  /** 自定义产品（不入产品库，仅本方案展示） */
+  is_custom?: boolean
   face_price?: number | null
   quantity?: number
   line_total?: number | null
@@ -251,6 +269,8 @@ export type ShareProposalContent = {
   total_face_value?: number | null
   // Track D：方案平面图（可空，旧分享没有这个字段）
   floor_plans?: ShareFloorPlan[]
+  // 方案效果图：优先服务方案本身，可绑定产品/空间
+  effect_images?: ShareEffectImage[]
   items?: ShareProductItem[]
 }
 

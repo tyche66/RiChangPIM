@@ -27,6 +27,23 @@ class SceneImageInfo(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class ProposalEffectImageInfo(BaseModel):
+    """产品详情「搭配案例」：绑定该产品的方案效果图（连带展示，含方案上下文）。"""
+
+    id: UUID
+    proposal_id: UUID
+    proposal_no: str
+    proposal_name: str
+    name: str
+    image_url: str
+    floor_label: str | None = None
+    space_label: str | None = None
+    sort: int = 0
+    create_time: datetime | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class ProductBase(BaseModel):
     product_no: str
     product_name: str
@@ -100,6 +117,7 @@ class ProductResponse(ProductBase):
     cover_image_url: str | None = None
     cover_image_filename: str | None = None
     scene_images: list[SceneImageInfo] = []
+    effect_images: list[ProposalEffectImageInfo] = []
 
     @field_validator("tags", mode="before")
     @classmethod

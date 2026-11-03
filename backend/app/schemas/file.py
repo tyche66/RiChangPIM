@@ -65,11 +65,23 @@ class ProposalFloorPlanRef(BaseModel):
     project_id: UUID | None = None
 
 
+class ProposalEffectImageRef(BaseModel):
+    """媒体库删除前的引用提示：这张图被哪个方案的效果图在用。"""
+
+    effect_image_id: UUID
+    proposal_id: UUID
+    proposal_no: str
+    proposal_name: str
+    effect_image_name: str
+    project_id: UUID | None = None
+
+
 class FileReferences(BaseModel):
     product_images: list[ProductImageRef] = []
     scene_images: list[SceneImageRef] = []
     manuals: list[ManualRef] = []
     proposal_floor_plans: list[ProposalFloorPlanRef] = []
+    proposal_effect_images: list[ProposalEffectImageRef] = []
 
 
 class FileDetailResponse(BaseModel):
@@ -94,6 +106,7 @@ __all__ = [
     "FileDetailResponse",
     "FileReferences",
     "ProductImageRef",
+    "ProposalEffectImageRef",
     "ProposalFloorPlanRef",
     "SceneImageRef",
     "ManualRef",

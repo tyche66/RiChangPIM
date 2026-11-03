@@ -26,11 +26,12 @@ from app.models.product import (
     SceneImage,
     product_scene_image,
 )
-from app.models.sales import Proposal, ProposalFloorPlan
+from app.models.sales import Proposal, ProposalEffectImage, ProposalFloorPlan
 from app.schemas.file import (
     FilePresignResponse,
     FileReferences,
     FileUploadResponse,
+    ProposalEffectImageRef,
     ProposalFloorPlanRef,
 )
 from app.services.thumbnails import THUMB_WIDTHS, purge_thumbnails, thumbnail_bytes
@@ -316,6 +317,7 @@ async def _count_refs(db: AsyncSession, attachment_id: UUID) -> int:
         (ProductManual, ProductManual.attachment_id),
         (SceneImage, SceneImage.attachment_id),
         (ProposalFloorPlan, ProposalFloorPlan.attachment_id),
+        (ProposalEffectImage, ProposalEffectImage.attachment_id),
     ]:
         result = await db.execute(
             select(func.count())
@@ -362,6 +364,17 @@ async def _check_refs(db: AsyncSession, attachment_id: UUID) -> list[str]:
     )
     if floor_plan_result.scalar() > 0:
         refs.append("方案平面图")
+
+    effect_image_result = await db.execute(
+        select(func.count())
+        .select_from(ProposalEffectImage)
+        .where(
+            ProposalEffectImage.attachment_id == attachment_id,
+            ProposalEffectImage.is_deleted.is_(False),
+        )
+    )
+    if effect_image_result.scalar() > 0:
+        refs.append("方案效果图")
 
     return refs
 
@@ -463,6 +476,28 @@ async def _fetch_references(db: AsyncSession, attachment_id: UUID) -> FileRefere
                 proposal_name=prop.proposal_name,
                 floor_plan_name=pfp.name,
                 project_id=pfp.project_id,
+            )
+        )
+
+    # 方案效果图
+    pei_result = await db.execute(
+        select(ProposalEffectImage, Proposal)
+        .join(Proposal, Proposal.id == ProposalEffectImage.proposal_id)
+        .where(
+            ProposalEffectImage.attachment_id == attachment_id,
+            ProposalEffectImage.is_deleted.is_(False),
+            Proposal.is_deleted.is_(False),
+        )
+    )
+    for pei, prop in pei_result.fetchall():
+        refs.proposal_effect_images.append(
+            ProposalEffectImageRef(
+                effect_image_id=pei.id,
+                proposal_id=prop.id,
+                proposal_no=prop.proposal_no,
+                proposal_name=prop.proposal_name,
+                effect_image_name=pei.name,
+                project_id=pei.project_id,
             )
         )
 
