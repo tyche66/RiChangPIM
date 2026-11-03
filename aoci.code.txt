@@ -6,8 +6,8 @@
 .gitattributes[FV4T]: F:强制文本文件检出保持LF的Git属性声明 | R:- | A:- | S:AOCI按原始字节建基线，autocrlf重写会使全树被误判为漂移；二进制自动识别不动
 .gitignore[FC5T]: F:Git忽略清单：密钥、环境文件、依赖产物、缓存、数据卷、日志、机器绑定配置与OpenChamber捕获 | R:code:.env.example | A:- | S:.env、AI.env、embedding.env含真密钥必须忽略；opencode.json等AOCI宿主配置机器绑定也不入库；回收站/弃用内容不纳入版本控制
 AGENTS.md[SG6S]: F:仓库级协作与认知契约：工作区硬约束(Windows侧写代码WSL内构建、禁wsl$路径)、环境与构建坑点、Git版本锚点规则、硬规则与AOCI认知层使用收尾约定 | R:code:docs/Windows开发与WSL构建.md,code:.mcp.json | A:- | S:禁删文件只能移入同级回收站/；密钥只在.env；受管对象改完在最终稳定状态只调一次aoci_maintain；版本号以git实际状态为准
-CHANGELOG.md[SV6L]: F:版本变更唯一现值来源：发版手改7处锚点(两个package.json、config.VERSION、本文件、两个README、annotated tag)及自动派生与禁改历史的规则 | R:code:frontend/package.json,code:backend/app/core/config.py,code:README.md | A:- | S:版本锚点是frontend/package.json；自动派生字段不要手改；历史发布记录禁止改写
-README.md[SG6L]: F:项目总览：技术栈、目录结构、快速开始、入口端口、数据存储位置与产品信息索引 | R:code:README_EN.md,code:AGENTS.md,code:docs/Windows开发与WSL构建.md | A:- | S:当前版本与迁移head以CHANGELOG和git实际为准；每次开工先跑scripts/where-am-i.sh
+CHANGELOG.md[SV6L]: F:版本变更唯一现值来源：发版手改7处锚点(两个package.json、config.VERSION、本文件、两个README、annotated tag)及自动派生与禁改历史的规则；顶部为最新版本章节 | R:code:frontend/package.json,code:backend/app/core/config.py,code:README.md | A:- | S:版本锚点是frontend/package.json；自动派生字段不要手改；历史发布记录禁止改写
+README.md[SG6L]: F:项目总览：技术栈、目录结构、快速开始、入口端口、数据存储位置与产品信息索引；概览表记录当前版本与迁移head | R:code:README_EN.md,code:AGENTS.md,code:docs/Windows开发与WSL构建.md | A:- | S:当前版本与迁移head以CHANGELOG和git实际为准；每次开工先跑scripts/where-am-i.sh
 README_EN.md[SG4S]: F:英文版项目概览：英文入口、发布信息与快速开始，与中文README互链 | R:code:README.md | A:- | S:英文版与中文README互链；版本信息以CHANGELOG为准
 docker-compose.yml[OV6S]: F:生产编排：nginx 888:80统一入口、backend(构建参数APP_VERSION等、健康检查)、postgres pgvector:pg16/redis/minio/gotenberg/ocr，data网络internal，三数据卷固定名称 | R:code:docker-compose.worker.yml,code:docker/nginx/Dockerfile,code:backend/Dockerfile | A:- | S:POSTGRES_PASSWORD/JWT_SECRET/MINIO_ROOT_*缺失即起不来；backend只expose不publish；卷名固定richangpim_go_*_20260716
 docker-compose.dev.yml[OD4T]: F:开发依赖编排：postgres(发布5432)/redis/minio(9000加9001)/gotenberg(8002→3000)，数据走项目内绑定挂载，首次init自动建ai_pim_test | R:code:docker/postgres/initdb/01-create-test-db.sql,code:docker-compose.yml | A:- | S:只有依赖服务没有backend与nginx；gotenberg宿主8002映射容器3000；PG_DATA可覆盖路径
@@ -18,7 +18,7 @@ docker-compose.worker.yml[OW4T]: F:提醒/索引worker服务编排：基于backe
 ci.yml[OV7M]: F:CI流水线：构建元数据派生、后端ruff/compileall/pytest/pip-audit、迁移0001-0009哈希锁定、前端typecheck/lint/vitest/build/audit、portal与backend镜像构建、compose校验 | R:code:scripts/gate.sh | A:- | S:版本派生链tag>describe>frontend/package.json禁止写死；BUILD_TIME强制Asia/Shanghai；集成测试凭据只来自service容器
 
 ===/home/AI-PIM/RiChangPIM/AI-Docs/===
-README.md[SG6T]: F:AI架构规划总览：可插拔AI文档库入口，PIM原生智能层结论、已确认决策、文档地图与使用规则 | R:code:AI-Docs/07-实施路线图与验收标准.md,code:AI-Docs/06-可观测性评测与运维.md | A:- | S:标记目标的能力未实现不得对外承诺；需求变化先改本目录再改代码
+README.md[SG6T]: F:AI架构规划总览：可插拔AI文档库入口，PIM原生智能层结论、已确认决策、文档地图与使用规则；头部标注当前版本 | R:code:AI-Docs/07-实施路线图与验收标准.md,code:AI-Docs/06-可观测性评测与运维.md | A:- | S:当前版本以CHANGELOG为准；未实现能力不得对外承诺；需求变化先改本目录再改代码
 01-现状基线与需求边界.md[SB7S]: F:AI现状事实基线：工程栈、AI能力成熟度、13条试点数据现实、权限现实与四类助手范围 | R:code:AI-Docs/README.md | A:- | S:face_price=99999即待核价必须显式展示；13条试点产品全为draft，不能宣称实时价格库存能力
 02-目标架构与核心流程.md[SG6M]: F:目标架构设计：模块化单体加独立Worker、Gateway/Planner/Tool/Retriever组件边界、查询流程与超时预算 | R:code:AI-Docs/08-架构决策记录ADR.md | A:- | S:目标态尚未实现，现代码仍是独立ai路由与同步RAG；写工具禁止自动重试
 03-知识与数据架构.md[SD6M]: F:知识数据架构设计：三数据通道、knowledge_document/chunk/index_job目标表、切块与混合检索、Embedding版本治理 | R:code:AI-Docs/02-目标架构与核心流程.md | A:- | S:目标态设计当前未实现，现仅product_manual表与未启用vector列；动态字段不得进知识卡片与向量
@@ -158,7 +158,7 @@ permission.py[EI6T]: F:鉴权依赖：HTTPBearer取token解码校验type=access�
 permissions.py[II3T]: F:权限加载辅助：load_user_perms按角色查权限码、get_user_role_code查用户角色码 | R:code:backend/app/models/user.py,code:backend/app/core/permission.py | A:- | S:只查is_deleted=false的权限与映射；用户不存在返回空列表不抛错
 serializers.py[CS4T]: F:敏感字段过滤：按角色剔除cost_price/supplier_*/margin/profit，递归处理嵌套dict与list | R:code:backend/app/api/v1/products.py,code:backend/app/api/v1/share_token.py | A:- | S:admin及admin前缀角色不过滤；未知角色按全部敏感字段过滤；只滤key不动值
 database.py[PD6T]: F:数据库引擎：asyncpg异步engine、session工厂、declarative Base；导入期强制加载pgvector的Vector与HalfVector类型 | R:code:backend/app/core/config.py,code:backend/app/models/user.py | A:- | S:缺pgvector依赖import期即抛RuntimeError不静默退回普通类型；URL强制转postgresql+asyncpg；expire_on_commit=False
-config.py[FC7S]: F:全局配置：pydantic-settings从backend/.env加载，环境变量优先extra忽略；覆盖DB/Redis/MinIO/JWT/登录分享限流/AI适配器/导入上限/提醒等全部开关，启动期校验JWT算法与密钥 | R:code:backend/app/core/security.py,code:backend/app/core/security_limits.py | A:- | S:JWT只允许HS256且密钥≥32字节禁含REPLACE_ME；KEY_FILE优先于内联Key；改导入上限须同步改nginx client_max_body_size
+config.py[FC7S]: F:全局配置：pydantic-settings从backend/.env加载，环境变量优先extra忽略；覆盖DB/Redis/MinIO/JWT/登录分享限流/AI适配器/导入上限/提醒等开关，VERSION为APP_VERSION未注入时的兜底版本；启动期校验JWT算法与密钥 | R:code:backend/app/core/security.py,code:backend/app/core/security_limits.py | A:- | S:JWT只允许HS256且密钥≥32字节禁含REPLACE_ME；VERSION兜底值须随发版更新；KEY_FILE优先于内联Key；改导入上限须同步改nginx client_max_body_size
 masking.py[SS4T]: F:PII脱敏纯函数：手机号保留前后段中间****、微信留前2位、地址保留到市；None与过短值全掩 | R:code:backend/app/api/v1/customers.py | A:- | S:列表不返回PII只给has_phone；明文只经customer:pii端点；地址恰以市结尾也全掩
 minio_client.py[LD3T]: F:MinIO客户端工厂：惰性构造Minio对象(import与路由收集期零网络IO)，ensure_bucket只返桶名不探测 | R:code:backend/app/core/config.py,code:backend/app/api/v1/files.py | A:- | S:不调用探测方法；presigned签名本地HMAC不触网
 rate_limiter.py[RR5S]: F:AI限流器：Redis INCR/EXPIRE滑动窗口计数(默认每用户10次/60秒)，进程级单例，Redis不可用fail-closed拒绝 | R:code:backend/app/api/v1/ai.py,code:backend/app/core/config.py | A:- | S:Redis不可用或检查异常都返回True拒绝并记warning；窗口按时间片取整非真滑动；连接2秒超时；调用方据available区分503与429
@@ -400,9 +400,10 @@ PROJECT_MANAGEMENT.md[SV5M]: F:项目管理台账：各阶段规划(MVP/V1.1/V1.
 README-OPS.md[SO6L]: F:运维交接手册：实机真相(本机888栈与生产区分)、服务拓扑、启动升级runbook、健康检查、备份恢复、TLS、发布门禁、排障 | R:code:docs/06-部署方案.md,code:docs/RELEASE_GATE.md,code:docs/MIGRATION_BUNDLE.md | A:- | S:实机真相节优先于通用说明；库不发布端口只能docker exec
 RELEASE_GATE.md[SV5S]: F:发布门禁：工程质量(ruff/compileall/pytest/vue-tsc/eslint/vitest/build/compose校验/migration升级/pip-audit)、功能数据、浏览器E2E、运行恢复门禁，任一失败即NO-GO | R:code:scripts/release_gate.sh,code:CHANGELOG.md | A:- | S:版本无关不绑定版本号；任一门禁失败即NO-GO
 TODO.md[SV4T]: F:开发TODO台账：各阶段工作包进度与遗留项，当前版本以CHANGELOG为准 | R:code:docs/PROJECT_MANAGEMENT.md,code:CHANGELOG.md | A:- | S:已发布条目只读；现值看CHANGELOG
-UPDATE_README.md[SV5T]: F:v2.0.0云端更新包说明：改动清单（含方案效果图/方案内名称/自定义产品/从产品列表选品）、索引与字段变更表、行为变化(分享默认24h)、升级步骤与校验 | R:code:CHANGELOG.md,code:docs/云端更新包.md | A:- | S:包不含业务数据与凭据；存量升级容器入口自动跑迁移与种子；迁移头为0043
+UPDATE_README.md[SV5T]: F:v2.0.1云端更新包说明：改动清单（方案效果图/方案内名称/自定义产品/从产品列表选品/明细折叠/输入与大图崩溃修复）、索引与字段变更表、升级步骤与版本页校验 | R:code:CHANGELOG.md,code:docs/云端更新包.md | A:- | S:包不含业务数据与凭据；迁移0041-0043由容器入口自动执行；无手动数据回填
 Windows开发与WSL构建.md[SG6S]: F:Windows开发与WSL构建指南：E盘与/mnt/e同文件双视图、禁wsl$路径、WSL内构建测试Docker、前端构建与nginx镜像重建 | R:code:AGENTS.md,code:scripts/build_frontends.sh | A:- | S:绝不把wsl$ UNC路径当项目根；构建一律在WSL内执行
 版本控制规范和Git.md[SV6S]: F:版本控制与Git规范：语义化版本锚点frontend/package.json、CHANGELOG为现值唯一来源、手改7处与派生禁改、分支PR与Conventional Commits、脚本禁写真凭据 | R:code:CHANGELOG.md,code:frontend/package.json | A:- | S:构建时间用北京时间；脚本内口令须与生产不同并过secret_scan
+更新包说明-2.0.1.md[SV5S]: F:v2.0.1更新包产物记录：文件名、大小、SHA-256、commit/tag、迁移head与云端使用步骤 | R:code:docs/云端更新包.md,code:docs/UPDATE_README.md | A:- | S:包只含源码与手册，不含业务数据与凭据；以包内source/git-head.txt为准
 
 ===/home/AI-PIM/RiChangPIM/docs/appendix/===
 权限矩阵.md[IS5S]: F:字段级权限矩阵：模块级(四角色)、产品/报价/方案/分享四张字段矩阵(cost_price与supplier_id对销售屏蔽)、双重防线(接口层加序列化层)实现说明 | R:code:backend/app/core/serializers.py,code:backend/app/core/permission.py | A:- | S:实际屏蔽字段集比文档多(margin/profit/quotation_item_cost/proposal_cost_details按池)；矩阵四角色未含CRM新增三角色；internal_remark字段实际不存在
@@ -461,7 +462,7 @@ p2-rag-report.json[OO2T]: F:P2-RAG评测报告：suite/total/product_entity_prec
 ===/home/AI-PIM/RiChangPIM/frontend/===
 .eslintrc.cjs[FQ3T]: F:ESLint配置：vue3-recommended加typescript-recommended、vue-eslint-parser、关multi-word组件名与no-explicit-any、未用变量error(下划线前缀除外) | R:code:.github/workflows/ci.yml,code:frontend/package.json | A:- | S:下划线前缀参数豁免；配置文件自身被eslintignore排除；既有10错在tests
 .eslintignore[FV1T]: F:lint忽略：dist/node_modules/coverage/*.config.ts/*.timestamp-* | R:code:frontend/.eslintrc.cjs | A:- | S:所有config.ts不lint连vite配置也是；timestamp是构建中间产物
-package.json[FV4T]: F:后台前端包配置：版本锚点2.0.0、vue3+element-plus+pinia+echarts依赖、dev/build/lint/test脚本 | R:code:portal/package.json,code:frontend/src/main.ts | A:- | S:version是版本锚点发版必改；package-lock须同步提交
+package.json[FV4T]: F:后台前端包配置：版本锚点2.0.1、vue3+element-plus+pinia+echarts依赖、dev/build/lint/test脚本 | R:code:portal/package.json,code:frontend/src/main.ts | A:- | S:version是版本锚点发版必改；package-lock须同步提交
 index.html[FU1T]: F:后台SPA入口：zh-CN、#app挂载、/src/main.ts模块脚本、图标public/RiChangPIM.png | R:code:frontend/src/main.ts,code:scripts/build_frontends.sh | A:- | S:base由VITE_BASE_PATH构建期决定；无内联样式
 playwright.config.ts[FQ3T]: F:E2E配置：testDir=tests/e2e、fullyParallel=false、chromium加Mobile Chrome双项目、webServer起npm run dev、E2E_PORT可换端口 | R:code:frontend/tests/e2e/helpers.ts,code:HANDOFF.md | A:- | S:reuseExistingServer非CI复用错误服务；strictPort必须带
 package-lock.json[FV3L]: F:npm lockfile v3锁定后台依赖版本/完整性以供npm ci复现 | R:code:frontend/package.json,code:portal/package-lock.json | A:- | S:根version须匹配package.json
@@ -520,6 +521,7 @@ productDetailError.ts[IU2T]: F:产品详情错误分类：axios错误按404/403/
 passwordRules.ts[CU4T]: F:密码表单规则：12-72位长度与两次输入一致校验，供重置密码表单复用 | R:code:frontend/src/views/Login.vue,code:backend/app/schemas/user.py | A:- | S:长度边界与后端bcrypt72字节上限一致
 markdown.ts[LU4L]: F:零依赖Markdown安全渲染(公告裁剪版)：输入先整体escape，标签全部自产，链接仅http/https/mailto/tel，图片退化为文字不发请求 | R:code:portal/src/utils/markdown.ts,code:frontend/src/components/AnnouncementPopup.vue | A:- | S:v-html只接收本渲染器输出；与portal版须手工同步
 money.ts[LU4T]: F:金额格式化：货币符号与小数位取全局设置store，未加载回落¥和2位，非法值显示- | R:code:frontend/src/stores/settings.ts | A:- | S:禁止再写死¥或toFixed(2)
+thumbnail.ts[CG5T]: F:媒体缩略图工具：向后端content地址追加w白名单宽度(192/480)，避免大图按原尺寸解码导致浏览器OOM | R:code:backend/app/services/thumbnails.py,code:frontend/src/components/ProposalFloorPlanManager.vue | A:- | S:仅用于网格/卡片，全屏查看仍用原图；w只接96/192/240/480/960
 
 ===/home/AI-PIM/RiChangPIM/frontend/src/composables/===
 useTheme.ts[FU4T]: F:主题单例：light/dark/system三态、持久化localStorage theme、applyTheme落html.dark-mode类、system监听matchMedia、initTheme挂载前初始化 | R:code:frontend/src/main.ts,code:frontend/src/components/ThemeToggle.vue | A:- | S:模块级单例经storage事件跨iframe同步；无记录默认system；类名dark-mode
@@ -535,18 +537,18 @@ ThemeToggle.vue[CU2T]: F:主题切换按钮：太阳/月亮图标、aria-pressed
 TodoDrawer.vue[CU5M]: F:待办抽屉：右侧drawer、提醒列表(状态标签overdue=danger、截止时间、完成/推迟1或3天操作)、pending计数与刷新 | R:code:frontend/src/api/reminder.ts,code:frontend/src/components/NotificationBell.vue | A:- | S:抽屉打开时load；推迟按1/3天由前端换算until；overdue用danger标签；操作后本地刷新列表
 MediaPicker.vue[CU4M]: F:媒体选择对话框：搜索/类型筛选、网格卡片(缩略图懒加载、多选)、双击确认、selectedIds受控多选 | R:code:frontend/src/api/media.ts,code:frontend/src/components/MediaUploader.vue | A:- | S:destroy-on-close每次重载；缩略图回退url；类型三档；多选外部受控；筛选态用activeType
 ShareResultDialog.vue[CU4M]: F:分享结果对话框：只读链接加复制、canvas二维码生成与下载、新窗口预览；绝对URL优先VITE_PUBLIC_FRONTEND_URL回落origin | R:code:frontend/src/api/index.ts,code:frontend/src/views/ShareManagement.vue | A:- | S:禁点击遮罩关闭防丢链接；二维码canvas可下载；公网需配PUBLIC_FRONTEND_URL
-ProposalItemEditor.vue[CU5L]: F:方案明细编辑组件：远程搜索/从产品列表选择/自定义产品三种加项，明细卡编辑数量备注空间标签与方案内名称，按楼层/空间折叠分组，compact与page两种布局 | R:code:frontend/src/views/ProposalEditor.vue,code:backend/app/api/v1/proposals.py | A:- | S:自定义产品不入产品库仅本方案展示；封面图加载失败有兜底处理
+ProposalItemEditor.vue[CU5L]: F:方案明细编辑组件：远程搜索/从产品列表选择/自定义产品三种加项，明细卡编辑数量备注空间标签与方案内名称，按楼层/空间折叠分组 | R:code:frontend/src/views/ProposalEditor.vue,code:backend/app/api/v1/proposals.py | A:- | S:自定义产品不入产品库仅本方案展示；分组失焦后才换组避免输入丢焦点；改字段须一次原子更新
 SceneImageSelector.vue[CU4L]: F:产品场景图绑定组件：网格展示(缩略图/错误占位)、上移/下移排序、解绑、绑定对话框入口，上限30 | R:code:backend/app/api/v1/scene_images.py,code:frontend/src/views/ProductDetail.vue | A:- | S:解绑只移关联不删文件；30上限与后端一致；排序改关联sort非文件
 ProductSceneCarousel.vue[CU3M]: F:场景图灯片：全屏overlay(点遮罩关闭)、大图加名称、上一张/下一张、圆点跳转、计数器、触摸滑动 | R:code:frontend/src/views/SharePage.vue | A:- | S:键盘左右与Esc必须绑定且在overlay挂载后才生效；触摸阈值防止误触翻页
 ProductImageManager.vue[CU4L]: F:产品图片管理：网格(缩略图/错误占位/主图徽章)、设为主图、上移下移排序、解绑、添加对话框，上限10 | R:code:backend/app/api/v1/products.py,code:frontend/src/views/ProductDetail.vue | A:- | S:解绑不删文件只移关联；10上限与导入配置一致；主图即is_cover唯一
 MediaUploader.vue[CU4M]: F:媒体上传组件：拖拽区(auto-upload=false手动队列)、accept白名单、上传队列(进度/成功/错误/移除)、beforeUpload前端预检 | R:code:frontend/src/api/media.ts,code:backend/app/api/v1/files.py | A:- | S:手动队列非自动上传；提示50MB与后端图片上限一致视频100MB；accept须与后端白名单一致
 ImportConflictDialog.vue[EU5M]: F:展示导入预检计数、精确/别名冲突、无效行并选择覆盖追加跳过及别名处理 | R:code:frontend/src/views/Import.vue,code:backend/app/api/v1/products.py | A:- | S:别名未明确选择时不允许提交；高风险别名必须逐行确认
-ProposalFloorPlanManager.vue[EU6L]: F:方案平面图管理器，上传/选用媒体并维护缩略图、改名、排序、删除绑定和预览，支持已有方案与新建暂存 | R:code:frontend/src/api/proposalFloorPlans.ts,code:frontend/src/components/MediaPicker.vue,code:backend/app/api/v1/proposal_floor_plans.py | A:- | S:每方案20张；confirmed仍可维护；删除只解除绑定；创建流程先暂存待方案创建后批量绑定
+ProposalFloorPlanManager.vue[EU6L]: F:方案平面图管理器，上传/选用媒体并维护缩略图、改名、排序、删除绑定和预览，支持已有方案与新建暂存；网格按后端w参数取缩略图 | R:code:frontend/src/api/proposalFloorPlans.ts,code:frontend/src/components/MediaPicker.vue,code:backend/app/api/v1/proposal_floor_plans.py | A:- | S:每方案20张；confirmed仍可维护；删除只解除绑定；大图必须走缩略图否则浏览器OOM
 AnnouncementPopup.vue[CU5M]: F:后台公告弹窗：按新到旧排队弹出admin受众公告，Markdown白名单渲染，已读写localStorage同浏览器只弹一次，失败静默 | R:code:frontend/src/api/announcement.ts,code:frontend/src/utils/markdown.ts | A:- | S:v-html只接收renderMarkdown白名单输出；请求失败不影响页面
 ImageViewer.vue[CU5L]: F:通用全屏图片画廊：原生dialog焦点陷阱，滚轮双击双指缩放0.5-5x加拖拽平移，键盘切换，与portal版行为同步 | R:code:portal/src/components/ImageViewer.vue,code:frontend/src/components/ShareLinkCard.vue | A:- | S:加载失败显示兜底文案不自动重试防蹭分享次数；打开期间锁body滚动
 ProductFilterNav.vue[CU5L]: F:产品列表六维度三级筛选导航：tab切换维度，二三级选项来自后端filter-options实时聚合 | R:code:frontend/src/api/index.ts,code:backend/app/services/product_filter_options.py | A:- | S:菜单计数与列表筛选同源，没有产品的选项不出现
 ShareLinkCard.vue[CU5M]: F:方案详情分享链接卡：展示最近一次分享的链接二维码有效期次数与密码状态，支持复制预览下载 | R:code:backend/app/api/v1/shares.py,code:frontend/src/api/index.ts | A:- | S:无分享时显示空态不当作错误
-ProposalEffectImageManager.vue[EU6L]: F:方案效果图管理器：上传/选用媒体并维护缩略图、改名、排序、删除绑定、绑定产品/空间（下拉来自方案明细）与预览，支持已有方案与新建暂存 | R:code:frontend/src/api/proposalEffectImages.ts,code:frontend/src/components/MediaPicker.vue,code:frontend/src/types/sales.ts | A:- | S:每方案20张；confirmed仍可维护；删除只解除绑定；创建流程先暂存待方案创建后批量绑定
+ProposalEffectImageManager.vue[EU6L]: F:方案效果图管理器：上传/选用媒体并维护缩略图、改名、排序、删除绑定、绑定产品/空间（下拉来自方案明细）与预览，支持已有方案与新建暂存 | R:code:frontend/src/api/proposalEffectImages.ts,code:frontend/src/components/MediaPicker.vue,code:frontend/src/types/sales.ts | A:- | S:每方案20张；confirmed仍可维护；删除只解除绑定；网格用缩略图宽度防大图OOM
 
 ===/home/AI-PIM/RiChangPIM/frontend/src/views/===
 Login.vue[EU4M]: F:后台登录页：视频分栏品牌面板加登录卡，真实Logo，登录成功落点后台 | R:code:frontend/src/stores/auth.ts,code:frontend/src/utils/passwordRules.ts | A:- | S:与门户登录页保持同步；视频CDN失败回落渐变背景
@@ -573,7 +575,7 @@ SharePage.vue[ES4L]: F:后台内嵌分享预览页：按token访问分享内容�
 Proposals.vue[EU4L]: F:方案列表页：关键词状态筛选、分页、新增跳独立创建页、行操作进详情编辑分享 | R:code:frontend/src/views/ProposalEditor.vue,code:backend/app/api/v1/proposals.py | A:- | S:新增走/proposals/create独立页非弹窗
 Quotations.vue[EB4L]: F:报价管理页：按方案ID与状态筛选、分页列表、行操作进详情编辑确认与PDF导出；含自定义产品的方案预填报价时剔除并提示 | R:code:backend/app/api/v1/quotations.py,code:frontend/src/views/ProposalDetail.vue | A:- | S:已确认报价只读不可再编辑；自定义产品不进报价单
 Projects.vue[EB4L]: F:项目管理页：关键词/阶段/状态筛选(映射来自constants/crm)、项目表格、新增按project:edit | R:code:frontend/src/api/project.ts,code:frontend/src/constants/crm.ts | A:- | S:阶段选项须与后端CHECK一致；新增按project:edit；数据范围后端过滤
-ProposalDetail.vue[EU6L]: F:方案详情页：基础信息明细平面图效果图分享链接卡，编辑、生成报价、撤销确认、AI润色等操作；效果图区可绑定产品/空间 | R:code:frontend/src/views/ProposalEditor.vue,code:frontend/src/components/ShareLinkCard.vue,code:backend/app/api/v1/proposals.py | A:- | S:已确认方案隐藏编辑改显示撤销确认；效果图绑定产品后同步进产品详情「搭配案例」
+ProposalDetail.vue[EU6L]: F:方案详情页：基础信息明细平面图效果图分享链接卡，编辑、生成报价、撤销确认、AI润色等操作；效果图区可绑定产品/空间，明细缩略图走w参数 | R:code:frontend/src/views/ProposalEditor.vue,code:frontend/src/components/ShareLinkCard.vue,code:backend/app/api/v1/proposals.py | A:- | S:已确认方案隐藏编辑改显示撤销确认；效果图绑定产品后同步进产品详情「搭配案例」
 ProductDetail.vue[EB7L]: F:产品详情页：完整字段、图片场景图说明书与「搭配案例」效果图板块（只读连带展示绑本产品的方案效果图）、编辑入口，区分404/403/401/500/网络错误并对后两者提供原地重试 | R:code:frontend/src/views/Products.vue,code:backend/app/api/v1/products.py | A:- | S:错误态分not-found/forbidden/server-error/network-error；搭配案例带方案上下文不可在本页维护
 ProjectDetail.vue[EB7L]: F:项目详情页：阶段Steps加基本信息、成员管理、图纸资产(两步上传)、阶段变更下拉(按projectAllowedTransitions)、关联方案/客户 | R:code:frontend/src/api/project.ts,code:backend/app/services/project_state.py | A:- | S:允许迁移前端算但最终以后端校验为准；客户名只显示customer_brief；图纸同名自动升版
 ContentPublications.vue[EB5L]: F:发布与曝光页：发布登记表单(条目/平台/账号/URL)、发布列表、曝光录入与Excel导入(按content:metric/content:publish显隐) | R:code:frontend/src/api/content.ts,code:backend/app/api/v1/content.py | A:- | S:条目ID可手输易填错；导入只收xlsx；曝光同日重复按唯一键upsert；发布URL必填
@@ -583,12 +585,12 @@ ContentSkills.vue[EU6L]: F:Skills管理中心页：Skill列表(含停用)、新�
 ContentTopics.vue[EU6L]: F:独立选题页：Skill下拉(仅enabled且topic)、主题/平台/语气/产品/数量、生成、采纳/驳回、带去内容工坊 | R:code:frontend/src/api/content.ts | A:- | S:只展示skill_type=topic的Skill；采纳后才生成content_batch_id供工坊预填
 Announcements.vue[EU5L]: F:公告管理页：状态受众筛选、含已删除、新建编辑停启删除与Markdown预览，操作受announcement:manage控制 | R:code:frontend/src/api/announcement.ts,code:frontend/src/components/AnnouncementPopup.vue | A:- | S:已读由弹窗组件localStorage维护，本页只管管理
 KnowledgeIndexAdmin.vue[EA6L]: F:向量索引管理页：服务启停、状态卡(心跳窗口队列)、配置表单、运行报告与授权失败任务重置 | R:code:frontend/src/api/knowledgeIndex.ts,code:backend/app/api/v1/knowledge_index_admin.py | A:- | S:心跳超时显告警；run_now_max_products前端不可改
-ProposalEditor.vue[EU6L]: F:方案创建/编辑独立页：基础信息、商品明细（含自定义产品与从产品列表选品）、平面图与效果图管理，离开与beforeunload未保存拦截，保存成功回详情 | R:code:frontend/src/components/ProposalItemEditor.vue,code:frontend/src/router.ts | A:- | S:已确认方案禁止保存须先撤销确认；编辑态选品按product_id去重追加
+ProposalEditor.vue[EU6L]: F:方案创建/编辑独立页：基础信息、商品明细（含自定义产品与从产品列表选品）、平面图与效果图管理，离开与beforeunload未保存拦截，保存成功回详情 | R:code:frontend/src/components/ProposalItemEditor.vue,code:frontend/src/router.ts | A:- | S:已确认方案禁止保存须先撤销确认；编辑态选品按product_id去重追加；只读平面图卡用缩略图
 SystemSettings.vue[EU6L]: F:全局设置管理页(admin)：品牌文案与Logo、分享缺省值、业务默认税率小数位货币三组表单，保存后台即时生效门户60秒内跟随 | R:code:frontend/src/stores/settings.ts,code:backend/app/api/v1/settings.py | A:- | S:未知key后端一律422；logo走附件校验
 
 ===/home/AI-PIM/RiChangPIM/portal/===
 index.html[FU1T]: F:门户SPA入口：#app挂载、/src/main.ts模块脚本、zh-CN | R:code:portal/src/main.ts,code:portal/src/App.vue | A:- | S:无图标与预加载与后台不同；标题RiChangPIM Portal；base为根路径
-package.json[FV3T]: F:门户包配置：版本2.0.0与后台同版发布、vue3+pinia+vue-router极简依赖、playwright e2e | R:code:frontend/package.json,code:portal/src/main.ts | A:- | S:version须与frontend/package.json完全一致
+package.json[FV3T]: F:门户包配置：版本2.0.1与后台同版发布、vue3+pinia+vue-router极简依赖、playwright e2e | R:code:frontend/package.json,code:portal/src/main.ts | A:- | S:version须与frontend/package.json完全一致
 playwright.config.ts[FQ2T]: F:门户E2E配置：testDir=tests/e2e、baseURL 127.0.0.1:5174、desktop加mobile双项目、webServer起dev | R:code:portal/tests/e2e/portal.spec.ts,code:HANDOFF.md | A:- | S:固定5174与后台错开；reuseExistingServer=true
 vite.config.ts[FV2T]: F:门户Vite配置：@别名、dev端口5174、/api代理(目标可覆盖)、outDir dist | R:code:portal/package.json,code:docker/nginx/conf.d/default.conf | A:- | S:无manualChunks门户体量小；无版本元数据注入；代理默认8000
 tsconfig.json[FV2T]: F:门户TS配置：strict、bundler解析、@别名、include src的ts/vue、noEmit | R:code:portal/vite.config.ts,code:frontend/tsconfig.json | A:- | S:无noUnusedLocals比后台宽松；tests不在include
@@ -611,7 +613,7 @@ settings.ts[DD5T]: F:门户公共设置store：匿名拉取settings/public，失
 ===/home/AI-PIM/RiChangPIM/portal/src/utils/===
 embed.ts[IS4S]: F:iframe嵌入交接：isEmbedded(embed=1且在iframe内)、allowedParentOrigins白名单(同源加VITE_ADMIN_ORIGIN)、adoptParentSession(ready握手加收令牌，4s超时放弃) | R:code:portal/src/main.ts,code:frontend/src/views/AISelect.vue | A:- | S:只信白名单origin；ready也不广播星号；超时放弃不假成功；只写不回发
 theme.ts[FU3T]: F:门户主题：与后台共用localStorage theme键、storage事件监听跨文档同步(iframe嵌入)、system跟随、html.dark-mode类 | R:code:portal/src/main.ts,code:frontend/src/composables/useTheme.ts | A:- | S:与后台两份实现但键与类名须一致；storage事件是iframe同步关键
-image.ts[IU4S]: F:产品图片URL解析：字段优先级(cover_image_url→13个别名→images[].file_url→scene_images)、递归取值、协议白名单(http/https/blob/协议相对/data:image，javascript等判死) | R:code:portal/src/components/ProductCard.vue,code:backend/app/knowledge/tools/product.py | A:- | S:空值绝不进img src；is_cover语义致有图可能无封面靠images回退；递归深度上限3
+image.ts[IU4S]: F:产品图片URL解析：字段优先级(cover_image_url→13个别名→images[].file_url→scene_images)、递归取值、协议白名单；另提供withThumbWidth追加后端缩略图宽度 | R:code:portal/src/components/ProductCard.vue,code:backend/app/knowledge/tools/product.py | A:- | S:空值绝不进img src；有图可能无封面靠images回退；递归深度上限3；缩略图仅用于网格
 format.ts[IU3S]: F:门户展示格式化：字段中文标签、来源类型翻译、缺失值统一「资料未提供」、价格库存翻译与比较字段清单 | R:code:portal/src/stores/settings.ts,code:portal/src/components/CompareTable.vue | A:- | S:空值null与「-」都视为资料缺失
 markdown.ts[IU5L]: F:无依赖Markdown渲染：自写块级(标题/列表/表格/引用/代码块)与行内(粗斜体/链接/角标)解析，输出前全部escapeHtml，链接协议白名单，引用角标私有区占位符还原 | R:code:portal/src/components/AnswerBody.vue,code:portal/src/utils/citations.ts | A:- | S:不引marked因答案是AI不可信内容；所有标签由本文件生成无注入面；链接只放行http/https/mailto/tel；img与script被当纯文本转义
 citations.ts[IU3S]: F:引用角标折叠：把chunk:uuid等标记转脚注序号、resolveSourceId多级匹配(精确/UUID包含/子串)、流式半个标记隐藏 | R:code:portal/src/components/AnswerBody.vue,code:portal/src/utils/markdown.ts | A:- | S:只有像ID的方括号才当引用；流式半个标记先藏；UUID大小写不敏感
@@ -632,8 +634,8 @@ PendingActionCard.vue[CU3T]: F:待确认动作卡：类型/状态业务语言标
 CollapseSection.vue[CU1T]: F:可折叠区块：原生details/summary实现(键盘与无障碍免费获得)、默认收起、quiet样式变体 | R:code:portal/src/components/EventStream.vue,code:portal/src/components/PendingActionCard.vue | A:- | S:用原生details不自己实现键盘交互；默认收起仅排障展开；hint显示条数
 ScopePanel.vue[CU1T]: F:登录页示例问题组：chip按钮emit pick预填问句，明确不代表筛选状态 | R:code:portal/src/views/Home.vue,code:portal/src/components/ChatInput.vue | A:- | S:只预填不过滤注释明示；role=group加aria-label
 SourceDialog.vue[CU3T]: F:来源详情弹层：原生dialog(焦点陷阱/Escape/遮罩)、kv网格(类型/章节/页码/时点/编号shortId)、quote或无可展示提示、open_url新标签页 | R:code:portal/src/utils/format.ts,code:portal/src/components/AnswerBody.vue | A:- | S:原生dialog替换alert；无quote明示无原文不编造；编号收敛shortId
-ShareDetailDialog.vue[CU5M]: F:分享页商品详情弹窗：摘要表之外的分类规格材质场景图展开，快照优先防漂移，场景图交统一画廊；自定义产品显示为仅本方案展示 | R:code:portal/src/views/SharePage.vue,code:portal/src/utils/format.ts | A:- | S:报价单额外展示单价税率未税小计
-FloorPlanGallery.vue[CU4T]: F:分享页方案信息的平面图缩略图库，最多显示4张并以+N提示溢出，点击发出查看序号 | R:code:portal/src/views/SharePage.vue,code:portal/src/components/FloorPlanViewer.vue | A:- | S:只显示带image_url项；不发请求、不处理权限，序号由viewer状态消费
+ShareDetailDialog.vue[CU5M]: F:分享页商品详情弹窗：摘要表之外的分类规格材质场景图展开，快照优先防漂移，场景图交统一画廊；自定义产品不再显示副标题 | R:code:portal/src/views/SharePage.vue,code:portal/src/utils/format.ts | A:- | S:报价单额外展示单价税率未税小计
+FloorPlanGallery.vue[CU4T]: F:分享页方案信息的平面图缩略图库，最多显示4张并以+N提示溢出，点击发出查看序号；缩略图按w=480取小图 | R:code:portal/src/views/SharePage.vue,code:portal/src/components/FloorPlanViewer.vue | A:- | S:只显示带image_url项；全屏仍用原图；序号由viewer状态消费
 FloorPlanViewer.vue[CU5M]: F:平面图全屏查看器：ImageViewer薄封装，把平面图名与楼层空间翻译成标题副标题 | R:code:portal/src/components/ImageViewer.vue,code:portal/src/views/SharePage.vue | A:- | S:未填名称时显示「平面图 N」
 AnnouncementDialog.vue[CU5S]: F:门户公告弹层：首页对话页检查portal受众公告排队弹出，Markdown白名单渲染，已读写localStorage | R:code:portal/src/utils/markdown.ts,code:backend/app/api/v1/announcements.py | A:- | S:分享页不弹公告；请求失败静默不影响主流程
 ImageLightbox.vue[CU4T]: F:门户极简图片灯箱：一层遮罩，Esc与遮罩点击关闭，打开期间锁body滚动 | R:code:portal/src/components/CompareTable.vue | A:- | S:门户无组件库不引入轮播依赖
@@ -642,7 +644,7 @@ ImageViewer.vue[CU5M]: F:门户通用全屏图片查看器(FR-1)：原生dialog�
 ===/home/AI-PIM/RiChangPIM/portal/src/views/===
 Home.vue[EU4T]: F:门户登录页：与后台登录页同步的视频分栏设计，登录成功进/chat，挂载公告弹层 | R:code:frontend/src/views/Login.vue,code:portal/src/stores/auth.ts | A:- | S:不开放注册入口
 Conversation.vue[EU9L]: F:门户查询工作台：SSE流式问答、答案Markdown渲染、产品卡堆、比较表、来源与待确认动作，技术细节折叠，错误退化占位卡不编造数据 | R:code:portal/src/api/index.ts,code:portal/src/components/ChatInput.vue,code:backend/app/api/v1/knowledge.py | A:- | S:403或错误时卡堆退化为占位卡；查询后不自动滚动
-SharePage.vue[ES5M]: F:门户公开分享页/share/:token：匿名访问方案报价内容，密码门槛，商品详情弹窗、平面图与效果图画廊（空间/产品/整体分组），图片失败兜底；方案内名称与自定义产品标识 | R:code:backend/app/api/v1/share_token.py,code:portal/src/components/ShareDetailDialog.vue | A:- | S:绝不带Authorization鉴权由分享token承担
+SharePage.vue[ES5M]: F:门户公开分享页/share/:token：匿名访问方案报价内容，密码门槛，商品详情弹窗、平面图与效果图画廊（空间/产品/整体分组），缩略图走w参数，图片失败兜底；方案内名称与自定义产品标签 | R:code:backend/app/api/v1/share_token.py,code:portal/src/components/ShareDetailDialog.vue | A:- | S:绝不带Authorization鉴权由分享token承担；自定义产品副标题已移除
 
 ===/home/AI-PIM/RiChangPIM/portal/src/styles/===
 main.css[FS6L]: F:门户全局样式与设计Token：浅色北欧极简色板(VR-1克莱因蓝强调色)加深色主题语义角色映射，组件不写死颜色；含方案效果图分组与分享页名称角标样式 | R:code:portal/src/utils/theme.ts,code:portal/src/components/AppHeader.vue | A:- | S:深色主题accent映射回松绿；颜色唯一入口是本文件变量
@@ -736,6 +738,7 @@ tagger.py[IA6S]: F:产品图视觉标注：未配置vision_model或适配器无�
 1.9.7-V-Log.md[SV4T]: F:v1.9.7版本日志：方案平面图附件、导入预检加显式覆盖/追加/跳过 | R:code:CHANGELOG.md | A:- | S:历史版本记录只读不改写
 1.9.8-V-Log.md[SV4T]: F:v1.9.8版本日志：三级分类筛选、交货期字段、产品变更自动重建知识卡含视觉标注、门户比较表导出 | R:code:CHANGELOG.md | A:- | S:历史版本记录只读不改写
 2.0.0-V-Log.md[SV4T]: F:v2.0.0版本日志：FR-1分享画廊/FR-2方案独立页/FR-3全局设置/FR-4公告/VR-1视觉，迁移0039-0040 | R:code:CHANGELOG.md,code:docs/UPDATE_README.md | A:- | S:历史版本记录只读不改写
+2.0.1-V-Log.md[SV5S]: F:v2.0.1版本日志：效果图/方案内名称/自定义产品/从产品列表选品/明细折叠与两处修复，迁移0041-0043与验证记录 | R:code:CHANGELOG.md,code:docs/UPDATE_README.md | A:- | S:版本日志是历史记录，发新版时只增不改
 
 ===/home/AI-PIM/RiChangPIM/portal/src/components/回收站/===
 ShareSceneDialog.vue[CU3T]: F:已废弃的分享页场景图灯箱：原生dialog轮播，已移入回收站由统一ImageViewer画廊取代 | R:code:portal/src/components/ImageViewer.vue | A:- | S:弃用仅留痕不接新调用
