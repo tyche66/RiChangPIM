@@ -92,7 +92,7 @@
                     <span
                       v-if="item.is_custom"
                       class="item-no"
-                    >自定义产品 · 仅本方案展示</span>
+                    >自定义产品</span>
                     <template v-else>
                       <span class="item-no">{{ item.product_no || '-' }}</span>
                       <span
@@ -105,7 +105,7 @@
                   <div class="item-meta">
                     <span class="item-face-price">面价 {{ formatMoney(item.is_custom ? item.custom_product?.face_price : item.face_price) }}</span>
                     <span class="item-stock">
-                      {{ item.is_custom ? '自定义产品' : `库存状态 ${item.stock_status || '-'}` }}
+                      {{ item.is_custom ? '仅本方案展示' : `库存状态 ${item.stock_status || '-'}` }}
                     </span>
                   </div>
                 </div>
@@ -149,6 +149,7 @@
                     clearable
                     class="capsule-input"
                     @update:model-value="(val: string) => updateLocation(item, 'floor_label', val)"
+                    @blur="commitGroupKey(item)"
                   />
                 </div>
                 <div class="item-field">
@@ -159,6 +160,7 @@
                     clearable
                     class="capsule-input"
                     @update:model-value="(val: string) => updateLocation(item, 'space_label', val)"
+                    @blur="commitGroupKey(item)"
                   />
                 </div>
                 <div
@@ -360,7 +362,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
 import { productApi } from '@/api'
@@ -409,23 +411,35 @@ const items = computed({
 })
 
 // ---------------------------------------------------------------------------
-// 楼层/空间折叠分组：与分享页分组同口径，产品多时按位置收纳，减少上下滑动
+// 楼层/空间折叠分组：与分享页分组同口径，产品多时按位置收纳，减少上下滑动。
+//
+// 分组归属用 groupKeys（itemKey → 分组键）单独保存，只在输入框失焦时更新：
+// 若直接按 floor_label/space_label 实时分组，正在输入这两个字段时每敲一个字
+// 卡片就会换组、输入框被重新挂载而丢失焦点，表现为「打不进字」。
 // ---------------------------------------------------------------------------
 
 const openGroups = ref<string[]>([])
+const groupKeys = ref<Record<string, string>>({})
 
 interface ItemGroup {
   key: string
   label: string
 }
 
+function currentGroupKey(item: ProposalItem): string {
+  return `${(item.floor_label || '').trim()}||${(item.space_label || '').trim()}`
+}
+
+function groupKeyOf(item: ProposalItem): string {
+  return groupKeys.value[itemKey(item)] ?? currentGroupKey(item)
+}
+
 const itemGroups = computed<ItemGroup[]>(() => {
   const map = new Map<string, ItemGroup>()
   for (const item of props.modelValue) {
-    const floor = (item.floor_label || '').trim()
-    const space = (item.space_label || '').trim()
-    const key = `${floor}||${space}`
+    const key = groupKeyOf(item)
     if (!map.has(key)) {
+      const [floor, space] = key.split('||')
       map.set(key, {
         key,
         label: [floor, space].filter(Boolean).join(' / ') || '未指定位置',
@@ -436,16 +450,47 @@ const itemGroups = computed<ItemGroup[]>(() => {
 })
 
 function groupItems(key: string): ProposalItem[] {
-  const [floor, space] = key.split('||')
-  return props.modelValue.filter(
-    (item) =>
-      (item.floor_label || '').trim() === floor && (item.space_label || '').trim() === space,
-  )
+  return props.modelValue.filter((item) => groupKeyOf(item) === key)
 }
 
 function groupCount(key: string): number {
   return groupItems(key).length
 }
+
+/** 失焦后才把卡片移到新的楼层/空间分组，避免输入过程中重挂载。 */
+function commitGroupKey(item: ProposalItem) {
+  const key = itemKey(item)
+  const next = currentGroupKey(item)
+  if (groupKeys.value[key] === next) return
+  groupKeys.value = { ...groupKeys.value, [key]: next }
+}
+
+// 新条目登记初始分组；分组变化/default 全部展开，避免折叠后看不到条目
+watch(
+  () => props.modelValue.map((item) => itemKey(item)).join('|'),
+  () => {
+    const next = { ...groupKeys.value }
+    let changed = false
+    for (const item of props.modelValue) {
+      const key = itemKey(item)
+      if (!(key in next)) {
+        next[key] = currentGroupKey(item)
+        changed = true
+      }
+    }
+    if (changed) groupKeys.value = next
+  },
+  { immediate: true },
+)
+
+watch(
+  itemGroups,
+  (groups) => {
+    const missing = groups.map((g) => g.key).filter((k) => !openGroups.value.includes(k))
+    if (missing.length) openGroups.value = [...new Set([...openGroups.value, ...missing])]
+  },
+  { immediate: true },
+)
 
 function itemKey(item: ProposalItem): string {
   return item._key
@@ -538,10 +583,19 @@ const updateDisplayName = (target: ProposalItem, val: string) => {
 // ---------------------------------------------------------------------------
 
 function updateLocation(target: ProposalItem, field: 'floor_label' | 'space_label', val: string) {
-  updateItemField(target, field, val.trim() || undefined)
-  // Typed labels are authoritative; an old compatibility ID must not
-  // survive a manual location edit or a cleared label.
-  updateItemField(target, 'project_space_id', undefined)
+  // 只做一次数组更新：连续两次 emit 时，第二次读到的 props.modelValue 还是
+  // 旧值（Vue props 更新是异步的），会把刚输入的内容覆盖回去，表现为打不进字。
+  items.value = items.value.map((item) =>
+    item === target
+      ? {
+          ...item,
+          [field]: val.trim() || undefined,
+          // Typed labels are authoritative; an old compatibility ID must not
+          // survive a manual location edit or a cleared label.
+          project_space_id: undefined,
+        }
+      : item,
+  )
 }
 
 function updateMaterialDesc(target: ProposalItem, val: string) {
